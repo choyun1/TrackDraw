@@ -18,7 +18,11 @@ class Model:
     def __init__(self):
         self.default_parms = Parameters()
         self.current_parms = Parameters()
-        self.tracks = [Track() for i in range(self.default_parms.get_ntracks())]
+
+        default_FFs = self.default_parms.get_FF()
+        n_points = self.default_parms.get_ntracks()
+        ones = np.ones(n_points)
+        self.tracks = [Track(formant*ones) for formant in default_FFs]
 
     def get_curr_parms(self):
         return self.current_parms
@@ -67,14 +71,22 @@ class Parameters:
         self.n_tracks = len(self.FF)
         self.voicing = voicing
 
+    def get_F0(self):
+        return self.F0
+
+    def get_FF(self):
+        return self.FF
+
+    def get_ntracks(self):
+        return self.n_tracks
+
+    def get_voicing(self):
+        return self.voicing
+
     def update(self, F0, FF, BW, voicing):
         self.F0 = F0
         self.FF = FF
         self.BW = BW
         self.n_tracks = len(self.FF)
         self.voicing = voicing
-
-    def get_ntracks(self):
-        return self.n_tracks
-
 

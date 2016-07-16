@@ -22,7 +22,7 @@ class Controller:
     def run(self):
         self.view.mainloop()
 
-    def load(self):
+    def load(self, event):
         return 0
 
     def quit(self, event):
