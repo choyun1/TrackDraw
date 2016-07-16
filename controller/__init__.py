@@ -8,6 +8,9 @@ date:    07/15/2016
 version: 0.1.0
 """
 
+import tkinter.filedialog as fdialog
+from scipy.io import wavfile
+
 
 class Controller:
     """
@@ -23,7 +26,13 @@ class Controller:
         self.view.mainloop()
 
     def load(self, event):
-        return 0
+        file_opt = {}
+        file_opt["defaultextension"] = ".wav"
+        file_opt["filetypes"] = [("wave files", ".wav")]
+        file_opt["title"] = "Load wav file"
+        filename = fdialog.askopenfilename(**file_opt)
+        if filename:
+            fs, x = wavfile.read(filename)
 
     def quit(self, event):
         self.view.destroy()

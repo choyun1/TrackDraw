@@ -1,2 +1,2 @@
 # TrackDraw
-# A speech visualization tool.
+A speech visualization tool.

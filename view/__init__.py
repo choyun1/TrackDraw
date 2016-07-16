@@ -22,7 +22,7 @@ class View(tk.Tk):
         self.frame_left  = tk.Frame(self)
         self.frame_right = tk.Frame(self)
         self.frame_left.pack(side="left")
-        self.frame_right.pack(side="left")
+        self.frame_right.pack(side="right")
 
         self.main = MainView(self.frame_left)
         self.wave = WaveView(self.frame_left)
