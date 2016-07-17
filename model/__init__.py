@@ -4,7 +4,7 @@
 The model is initialized here. Put general description here.
 
 authors: A. Y. Cho and Daniel R Guest
-date:    07/15/2016
+date:    07/17/2016
 version: 0.1.0
 """
 
@@ -31,9 +31,10 @@ class Model:
         self.tracks = [Track(formant*ones) for formant in default_FFs]
 
         # Define the two sounds: load and synth
-        default_fs = self.default_parms.fs
-        self.loaded_sound = Sound(np.array([]), default_fs, 1)
-        self.synth_sound  = Sound(np.array([]), default_fs, 1)
+        resample_fs = self.default_parms.resample_fs
+        synth_fs = self.default_parms.synth_fs
+        self.loaded_sound = Sound(np.array([]), resample_fs, 1)
+        self.synth_sound  = Sound(np.array([]), synth_fs, 1)
 
 
 class Sound:
@@ -72,13 +73,15 @@ class Parameters:
     def __init__(self, F0=100,\
                        FF=[800, 1600, 2400, 3200, 4000],\
                        BW=[20, 20, 20, 20, 20],\
-                       fs=10000,\
+                       resample_fs=10000,\
+                       synth_fs=10000,\
                        track_npoints=40,\
                        voicing=0):
         self.F0 = F0
         self.FF = FF
         self.BW = BW
-        self.fs = fs
+        self.resample_fs = resample_fs
+        self.synth_fs = synth_fs
         self.track_npoints = track_npoints
         self.voicing = voicing
 
