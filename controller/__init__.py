@@ -19,21 +19,27 @@ class Controller:
     def __init__(self, model, view):
         self.model = model
         self.view  = view
-        self.view.load_but.bind("<Button-1>", self.load)
-        self.view.quit_but.bind("<Button-1>", self.quit)
+
+        # Define callback functions for buttons in view
+        def load_callback(event):
+            file_opt = {}
+            file_opt["defaultextension"] = ".wav"
+            file_opt["filetypes"] = [("wave files", ".wav")]
+            file_opt["title"] = "Load wav file"
+            filename = fdialog.askopenfilename(**file_opt)
+            if filename:
+                fs, x = wavfile.read(filename)
+        def quit_callback(event):
+            self.view.destroy()
+        def spec_check_callback(event):
+            # Just a test function to display messages
+            print(self.model.loaded_sound.nsamples)
+
+        # Bind the callbacks
+        self.view.load_but.bind("<Button-1>", load_callback)
+        self.view.quit_but.bind("<Button-1>", quit_callback)
+        self.view.spec_check.bind("<Button-1>", spec_check_callback)
 
     def run(self):
         self.view.mainloop()
-
-    def load(self, event):
-        file_opt = {}
-        file_opt["defaultextension"] = ".wav"
-        file_opt["filetypes"] = [("wave files", ".wav")]
-        file_opt["title"] = "Load wav file"
-        filename = fdialog.askopenfilename(**file_opt)
-        if filename:
-            fs, x = wavfile.read(filename)
-
-    def quit(self, event):
-        self.view.destroy()
 

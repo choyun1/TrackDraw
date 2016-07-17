@@ -13,48 +13,56 @@ import numpy as np
 
 class Model:
     """
-    Helpful docstring
+    Contains:
+        default_parms - Default parameters
+        current_parms - Current parameters; expect this to change at runtime
+        tracks - Container for the Track class instances
+        loaded_sound - Sound object for holding the loaded sound file
+        synth_sound  - Sound object for holding the synthesized sound
     """
     def __init__(self):
         self.default_parms = Parameters()
         self.current_parms = Parameters()
 
-        default_FFs = self.default_parms.get_FF()
-        n_points = self.default_parms.get_ntracks()
-        ones = np.ones(n_points)
+        # Create the default formant tracks
+        default_FFs = self.default_parms.FF
+        track_npoints = self.default_parms.track_npoints
+        ones = np.ones(track_npoints)
         self.tracks = [Track(formant*ones) for formant in default_FFs]
 
-    def get_curr_parms(self):
-        return self.current_parms
-
-    def set_curr_parms(self):
-        # This is a stub
-        self.current_parms = Parameters()
+        # Define the two sounds: load and synth
+        default_fs = self.default_parms.fs
+        self.loaded_sound = Sound(np.array([]), default_fs, 1)
+        self.synth_sound  = Sound(np.array([]), default_fs, 1)
 
 
 class Sound:
     """
-    Helpful docstring
+    The Sound class now automatically updates n_samples whenever the waveform
+    attribute changes. n_samples should never be changed individually.
+    - Cho, 07/16
     """
-    def __init__(self, waveform=np.array([]), fs=10000, n_channels=1):
+    def __init__(self, waveform, fs, nchannels):
         self.waveform = waveform
-        self.n_samples = len(self.waveform)
         self.fs = fs
-        self.n_channels = n_channels
+        self.nchannels = nchannels
+
+    @property
+    def waveform(self):
+        return self._waveform
+    # Automatically update n_samples and t whenever waveform changes
+    @waveform.setter
+    def waveform(self, val):
+        self._waveform = val
+        self.nsamples = len(self._waveform)
 
 
 class Track:
     """
     Helpful docstring
     """
-    def __init__(self, points=np.array([])):
+    def __init__(self, points):
         self.points = points
-
-    def get_track(self):
-        return self.points
-
-    def set_track(self, new_points):
-        self.points = new_points
 
 
 class Parameters:
@@ -64,29 +72,13 @@ class Parameters:
     def __init__(self, F0=100,\
                        FF=[800, 1600, 2400, 3200, 4000],\
                        BW=[20, 20, 20, 20, 20],\
+                       fs=10000,\
+                       track_npoints=40,\
                        voicing=0):
         self.F0 = F0
         self.FF = FF
         self.BW = BW
-        self.n_tracks = len(self.FF)
-        self.voicing = voicing
-
-    def get_F0(self):
-        return self.F0
-
-    def get_FF(self):
-        return self.FF
-
-    def get_ntracks(self):
-        return self.n_tracks
-
-    def get_voicing(self):
-        return self.voicing
-
-    def update(self, F0, FF, BW, voicing):
-        self.F0 = F0
-        self.FF = FF
-        self.BW = BW
-        self.n_tracks = len(self.FF)
+        self.fs = fs
+        self.track_npoints = track_npoints
         self.voicing = voicing
 
