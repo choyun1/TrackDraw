@@ -8,11 +8,11 @@ date:    07/15/2016
 version: 0.1.0
 """
 
+import numpy as np
 import tkinter as tk
 from tkinter import ttk
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import numpy as np
 
 
 class View(tk.Tk):
@@ -51,6 +51,7 @@ class View(tk.Tk):
         self.load_but.pack(side="top")
         self.quit_but.pack(side="top")
         self.spec_check.pack(side="top")
+
 
 class WaveView(tk.Frame):
     """
@@ -103,8 +104,6 @@ class MainView(tk.Frame):
             x_loc = x_loc * 40
             y_loc = y_loc * 5000
             return(x_loc, y_loc)
-        else:
-            return
             
     def startTracks(self, tracks):
         """
@@ -134,3 +133,4 @@ class MainView(tk.Frame):
         for i in range(5):
             self.ax.draw_artist(self.tracks[i][0])
         self.fig.canvas.blit(self.ax.bbox)        
+

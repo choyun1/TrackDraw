@@ -8,10 +8,10 @@ date:    07/17/2016
 version: 0.1.0
 """
 
+import time
 import tkinter.filedialog as fdialog
 from scipy import signal
 from scipy.io import wavfile
-import time
 
 
 class Controller:
@@ -76,7 +76,7 @@ class Controller:
             self.view.main.updateTracks()
             self.locked_track = trackNo
         except TypeError:
-            return
+            pass
     
     def drag(self, event):
         """
@@ -84,18 +84,15 @@ class Controller:
         locked_track-th track instead of the closest to the mouse, and does not
         update the locked_track. 
         """
-        if event.button == 1:
+        if event.button:
             try:
                 x_loc, y_loc = self.view.main.mouse(event)
-                trackNo, updated_track = self.model.updateTrackDrag(x_loc,
-                                                                    y_loc, 
-                                                                    self.locked_track)
+                trackNo, updated_track =\
+                    self.model.updateTrackDrag(x_loc, y_loc, self.locked_track)
                 self.view.main.updateTrack(trackNo, updated_track)
                 self.view.main.updateTracks()
             except TypeError:
-                return       
-        else:
-            return
+                pass
 
     def run(self):
         self.view.mainloop()

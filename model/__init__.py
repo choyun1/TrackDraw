@@ -37,18 +37,21 @@ class Model:
         self.synth_sound  = Sound(np.array([]), synth_fs, 1)
         
     def updateTrackClick(self, x_loc, y_loc):
-        track_index = (np.abs(np.arange(0,40,1)-x_loc)).argmin()
-        temp = np.zeros([5])
-        for i in range(5):
-            temp[i] = self.tracks[i].points[track_index]
-        trackNo = (np.abs(temp-y_loc)).argmin()
-        self.tracks[trackNo].points[track_index] = y_loc
-        return(trackNo, self.tracks[trackNo].points)
+        dist_to_x_pts = np.abs(np.arange(40) - x_loc)
+        nearest_x_idx = dist_to_x_pts.argmin()
+        y_coords_at_nearest_x = np.array(\
+                [track.points[nearest_x_idx] for track in self.tracks])
+        dist_to_y_pts = np.abs(y_coords_at_nearest_x - y_loc)
+        trackNo = dist_to_y_pts.argmin()
+        self.tracks[trackNo].points[nearest_x_idx] = y_loc
+        return trackNo, self.tracks[trackNo].points
         
     def updateTrackDrag(self, x_loc, y_loc, trackNo):
-        track_index = (np.abs(np.arange(0,40,1)-x_loc)).argmin()
-        self.tracks[trackNo].points[track_index] = y_loc
-        return(trackNo, self.tracks[trackNo].points)
+        dist_to_x_pts = np.abs(np.arange(40) - x_loc)
+        nearest_x_idx = dist_to_x_pts.argmin()
+        self.tracks[trackNo].points[nearest_x_idx] = y_loc
+        return trackNo, self.tracks[trackNo].points
+
 
 class Sound:
     """
