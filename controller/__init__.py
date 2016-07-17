@@ -11,6 +11,7 @@ version: 0.1.0
 import tkinter.filedialog as fdialog
 from scipy import signal
 from scipy.io import wavfile
+import time
 
 
 class Controller:
@@ -43,11 +44,64 @@ class Controller:
         def spec_check_callback(event):
             # Just a test function to display messages
             print(self.model.loaded_sound.nsamples)
+            
+        def test_callback(event):
+            self.view.main.test()
+            
+        def clear_callback(event):
+            self.view.main.clear()
 
-        # Bind the callbacks
+        # Bind the button callbacks
         self.view.load_but.bind("<Button-1>", load_callback)
         self.view.quit_but.bind("<Button-1>", quit_callback)
         self.view.spec_check.bind("<Button-1>", spec_check_callback)
+        
+        # Bind the canvas callbacks
+        self.view.main.canvas.mpl_connect('button_press_event', self.click)
+        self.view.main.canvas.mpl_connect('motion_notify_event', self.drag)
+        
+        # Send default tracks to view
+        self.view.main.startTracks(self.model.tracks)
+        self.locked_track = 0
+            
+    def click(self, event):
+        """
+        When an area in the main canvas is clicked, mouse() returns the click's
+        location in terms of the data dimensions if the click was within the
+        plot region. This location is passed to model by updateTrackClick(), 
+        which finds the nearest track/vertex to the click and updates the track
+        data accordingly. Data from the updated track is then passed to the view,
+        which updates the appropriate track in the view and redraws everything.
+        At the end, the selected track is stored in locked_track, which drag()
+        uses to lock to a particular track for a given click-drag movement.
+        """
+        try:
+            x_loc, y_loc = self.view.main.mouse(event)
+            trackNo, updated_track = self.model.updateTrackClick(x_loc, y_loc)
+            self.view.main.updateTrack(trackNo, updated_track)
+            self.view.main.updateTracks()
+            self.locked_track = trackNo
+        except TypeError:
+            return
+    
+    def drag(self, event):
+        """
+        Similar functionality to click() above, except chooses the
+        locked_track-th track instead of the closest to the mouse, and does not
+        update the locked_track. 
+        """
+        if event.button == 1:
+            try:
+                x_loc, y_loc = self.view.main.mouse(event)
+                trackNo, updated_track = self.model.updateTrackDrag(x_loc,
+                                                                    y_loc, 
+                                                                    self.locked_track)
+                self.view.main.updateTrack(trackNo, updated_track)
+                self.view.main.updateTracks()
+            except TypeError:
+                return       
+        else:
+            return
 
     def run(self):
         self.view.mainloop()
