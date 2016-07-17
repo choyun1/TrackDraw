@@ -44,12 +44,6 @@ class Controller:
         def spec_check_callback(event):
             # Just a test function to display messages
             print(self.model.loaded_sound.nsamples)
-            
-        def test_callback(event):
-            self.view.main.test()
-            
-        def clear_callback(event):
-            self.view.main.clear()
 
         # Bind the button callbacks
         self.view.load_but.bind("<Button-1>", load_callback)
