@@ -85,10 +85,10 @@ class MainView(tk.Frame):
         # Create tracks
         self.tracks = []
 
-        # Create inv object for use in finding nearest vertex
+        # Create inv as attribute for use in finding nearest vertex
         self.inv = self.ax.transData.inverted()
         
-        # Create bakckground object
+        # Create background attribute for later use
         self.background = None
 
     def mouse(self, event):
