@@ -42,16 +42,32 @@ class View(tk.Tk):
         self.spec.grid(row=1, column=0)
         self.main.grid(row=1, column=1)
 
-        # Side pane initialization
-        self.load_but = ttk.Button(self.frame_R, text="Load",\
-                                                 style="side.TButton")
-        self.quit_but = ttk.Button(self.frame_R, text="Quit",\
-                                                 style="side.TButton")
-        self.spec_check = ttk.Checkbutton(self.frame_R, style="side.TButton")
-        self.load_but.pack(side="top")
-        self.quit_but.pack(side="top")
-        self.spec_check.pack(side="top")
-
+        # Button initializations
+        self.plot_loaded_but = ttk.Button(self.frame_R, text="Plot Input Spectrogram")
+        self.load_but = ttk.Button(self.frame_R, text="Load Waveform")
+        self.synth_but = ttk.Button(self.frame_R, text="Synthesize Waveform")
+        self.plot_synth_but = ttk.Button(self.frame_R, text="Plot Synth Spectrogram")
+        self.quit_but = ttk.Button(self.frame_R, text="Quit")
+        self.play_loaded_but = ttk.Button(self.frame_R, text="Play Input Waveform")
+        self.play_synth_but = ttk.Button(self.frame_R, text="Play Synthesized Waveform")
+        
+        # Scale initializations
+        self.fft_length_scale = tk.Scale(self, label="DFT Window Length", from_=64,
+                                 to=512, resolution=4, orient="horizontal")
+        self.fft_length_scale.set(256)
+        
+        # Pack buttons
+        self.load_but.pack(side="top", fill=tk.BOTH)
+        self.plot_loaded_but.pack(side="top", fill=tk.BOTH)
+        self.play_loaded_but.pack(side="top", fill=tk.BOTH)
+        self.synth_but.pack(side="top", fill=tk.BOTH)
+        self.plot_synth_but.pack(side="top", fill=tk.BOTH)
+        self.play_synth_but.pack(side="top", fill=tk.BOTH)
+        self.quit_but.pack(side="top", fill=tk.BOTH)
+        
+        # Pack scales
+        self.fft_length_scale.pack()
+        
 class WaveView(tk.Frame):
     """
     Helpful docstring
@@ -85,8 +101,10 @@ class MainView(tk.Frame):
         # Create tracks
         self.tracks = []
 
-        # Create inv as attribute for use in finding nearest vertex
+        # Create utilities as attributes for tracks
         self.inv = self.ax.transData.inverted()
+        self.x_low = 0
+        self.x_high = 40
         
         # Create background attribute for later use
         self.background = None
@@ -100,8 +118,8 @@ class MainView(tk.Frame):
         """
         x_loc, y_loc = self.inv.transform((event.x, event.y))
         if 0 < x_loc < 1 and 0 < y_loc < 1:
-            x_loc = x_loc * 40
-            y_loc = y_loc * 5000
+            x_loc = x_loc*self.x_high
+            y_loc = y_loc*5000
             return(x_loc, y_loc)
         else:
             return
@@ -115,17 +133,17 @@ class MainView(tk.Frame):
         self.getBackground()
         for i in range(5):
             self.tracks.append(self.ax.plot(tracks[i].points, color="blue", marker='+'))
-        self.ax.set_xlim(0,40)
-        self.ax.set_ylim(0,5000)
+        self.ax.set_xlim(0, 40)
+        self.ax.set_ylim(0, 5000)
         self.canvas.draw()
     
     def getBackground(self):
         self.background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
-            
+        
     def updateTrack(self, trackNo, updated_track):
         self.tracks[trackNo][0].set_ydata(updated_track)
    
-    def updateTracks(self):
+    def redrawTracks(self):
         """
         Restores empty background (doesn't have to redraw everything and waste
         time), then redraws only lines.
@@ -134,3 +152,15 @@ class MainView(tk.Frame):
         for i in range(5):
             self.ax.draw_artist(self.tracks[i][0])
         self.fig.canvas.blit(self.ax.bbox)        
+        
+    def rescaleTracks(self):
+        """
+        Changes the x-data in the tracks to scale them (visually) in the x-dimension.
+        """
+        self.ax.set_xlim(0, self.x_high)
+        self.ax.set_ylim(0, 5000)
+        self.canvas.draw()
+        self.getBackground()
+        for i in range(5):
+            self.tracks[i][0].set_xdata(np.arange(0, self.x_high, self.x_high/40))
+        self.redrawTracks()
