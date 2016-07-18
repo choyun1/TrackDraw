@@ -10,9 +10,10 @@ version: 0.1.0
 
 import time
 import numpy as np
-import tkinter.filedialog as fdialog
 from scipy import signal
 from scipy.io import wavfile
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
 
 class Controller:
@@ -22,47 +23,41 @@ class Controller:
     def __init__(self, model, view):
         self.model = model
         self.view  = view
+        self.appWindow = view.appWindow
 
-        # Define callback functions for the buttons in the sidepanel
-        def load_callback(event):
-            file_opt = {}
-            file_opt["defaultextension"] = ".wav"
-            file_opt["filetypes"] = [("wave files", ".wav")]
-            file_opt["title"] = "Load wav file"
-            filename = fdialog.askopenfilename(**file_opt)
-            if filename:
-                old_fs, x = wavfile.read(filename)
+        # Callbacks for menu items
+        def file_menu_open():
+            fname = QFileDialog.getOpenFileName(self.appWindow, "Open file")
+            if fname[0]:
+                old_fs, x = wavfile.read(fname[0])
                 new_fs = model.default_parms.resample_fs
                 new_n  = round(new_fs/old_fs*len(x))
                 new_x  = signal.resample(x, new_n)
-
                 self.model.loaded_sound.waveform = new_x
                 self.model.loaded_sound.fs = new_fs
-            return
+                self.appWindow.wave_cv.ax.plot(new_x)
+        def file_menu_quit():
+            self.appWindow.close()
+        def help_menu_about():
+            QMessageBox.about(self.appWindow, "About",\
+"""
+<b>TrackDraw v0.1.0</b>
+Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
+""")
 
-        def clear_callback(event):
-            self.model.loaded_sound.waveform = np.array([])
-            self.model.loaded_sound.fs = self.model.default_parms.resample_fs
+        # Bind the menu callbacks
+        self.appWindow.file_menu.addAction("&Open file", file_menu_open,\
+                                           QtCore.Qt.CTRL + QtCore.Qt.Key_O)
+        self.appWindow.file_menu.addAction('&Quit', file_menu_quit,\
+                                           QtCore.Qt.CTRL + QtCore.Qt.Key_Q)
+        self.appWindow.help_menu.addAction('&About', help_menu_about)
 
-        def quit_callback(event):
-            self.view.destroy()
-
-        def spec_check_callback(event):
-            # Just a test function to display messages
-            pass
-
-        # Bind the button callbacks
-        self.view.load_but.bind("<Button-1>", load_callback)
-        self.view.quit_but.bind("<Button-1>", quit_callback)
-        self.view.clear_but.bind("<Button-1>", clear_callback)
-        self.view.spec_check.bind("<Button-1>", spec_check_callback)
-        
-        # Bind the canvas callbacks
-        self.view.main.canvas.mpl_connect('button_press_event', self.click)
-        self.view.main.canvas.mpl_connect('motion_notify_event', self.drag)
+        # Bind the spectrogram canvas callbacks
+        self.appWindow.spec_cv.mpl_connect('button_press_event', self.click)
+        self.appWindow.spec_cv.mpl_connect('motion_notify_event', self.drag)
         
         # Send default tracks to view
-        self.view.main.startTracks(self.model.tracks)
+        self.appWindow.spec_cv.startTracks(self.model.tracks)
         self.locked_track = 0
             
     def click(self, event):
@@ -77,10 +72,10 @@ class Controller:
         uses to lock to a particular track for a given click-drag movement.
         """
         try:
-            x_loc, y_loc = self.view.main.mouse(event)
+            x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
             trackNo, updated_track = self.model.updateTrackClick(x_loc, y_loc)
-            self.view.main.updateTrack(trackNo, updated_track)
-            self.view.main.updateTracks()
+            self.appWindow.spec_cv.updateTrack(trackNo, updated_track)
+            self.appWindow.spec_cv.updateTracks()
             self.locked_track = trackNo
         except TypeError:
             pass
@@ -93,14 +88,15 @@ class Controller:
         """
         if event.button:
             try:
-                x_loc, y_loc = self.view.main.mouse(event)
+                x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
                 trackNo, updated_track =\
                     self.model.updateTrackDrag(x_loc, y_loc, self.locked_track)
-                self.view.main.updateTrack(trackNo, updated_track)
-                self.view.main.updateTracks()
+                self.appWindow.spec_cv.updateTrack(trackNo, updated_track)
+                self.appWindow.spec_cv.updateTracks()
             except TypeError:
                 pass
 
     def run(self):
-        self.view.mainloop()
+        self.appWindow.show()
+        self.view.exec_()
 

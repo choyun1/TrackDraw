@@ -8,6 +8,7 @@ date:    07/15/2016
 version: 0.1.0
 """
 
+import sys
 import model
 import view
 import controller
@@ -15,7 +16,7 @@ import controller
 
 if __name__ == "__main__":
     TrackDraw_model = model.Model()
-    TrackDraw_view  = view.View()
+    TrackDraw_view  = view.View(sys.argv)
     control = controller.Controller(TrackDraw_model, TrackDraw_view)
     control.run()
 

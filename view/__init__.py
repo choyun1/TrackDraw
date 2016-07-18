@@ -9,110 +9,136 @@ version: 0.1.0
 """
 
 import numpy as np
-import tkinter as tk
-from tkinter import ttk
+import matplotlib
+matplotlib.use("Qt5Agg")
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigCanvas
+from scipy.io import wavfile
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget,
+                             QHBoxLayout,  QVBoxLayout, QGridLayout,
+                             QMenu,        QPushButton, QDesktopWidget)
 
 
-class View(tk.Tk):
+class View(QApplication):
+    def __init__(self, *arg, **kwarg):
+        QApplication.__init__(self, *arg, **kwarg)
+        self.appWindow = AppMainWindow()
+
+class AppMainWindow(QMainWindow):
     """
-    Helpful docstring
-    The left frame contains all representations of sound
-    The right frame contains all buttons
+    The left widget contains all representations of the sound.
+    The right widget contains all buttons.
     """
-    def __init__(self, *args, **kwargs):
-        tk.Tk.__init__(self, *args, **kwargs)
-        self.style = ttk.Style()
-        self.style.configure("side.TButton",\
-                             foreground="#333333",\
-                             background="#cccccc",\
-                             font=("Arial", 14))
+    def __init__(self):
+        QMainWindow.__init__(self)
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        self.setWindowTitle("TrackDraw")
 
-        # Main container frames
-        self.frame_L = tk.Frame(self)
-        self.frame_R = tk.Frame(self)
-        self.frame_L.pack(side="left")
-        self.frame_R.pack(side="right")
+        # Center window when initializing
+        screen_width  = QDesktopWidget().availableGeometry().size().width()
+        screen_height = QDesktopWidget().availableGeometry().size().height()
+        screen_center = QDesktopWidget().availableGeometry().center()
+        self.resize(0.75*screen_width, 0.75*screen_height)
+        window_geometry = self.frameGeometry()
+        window_geometry.moveCenter(screen_center)
+        self.move(window_geometry.topLeft())
 
-        self.wave = WaveView(self.frame_L)
-        self.spec = SpecView(self.frame_L)
-        self.main = MainView(self.frame_L)
-        self.wave.grid(row=0, column=1)
-        self.spec.grid(row=1, column=0)
-        self.main.grid(row=1, column=1)
+        # Menu bar setup
+        self.file_menu = QMenu('&File', self)
+        self.help_menu = QMenu('&Help', self)
+        self.menuBar().addMenu(self.file_menu)
+        self.menuBar().addMenu(self.help_menu)
 
-        # Side pane initialization
-        self.load_but  = ttk.Button(self.frame_R, text="Load",\
-                                                  style="side.TButton")
-        self.clear_but = ttk.Button(self.frame_R, text="Clear",\
-                                                  style="side.TButton")
-        self.quit_but  = ttk.Button(self.frame_R, text="Quit",\
-                                                  style="side.TButton")
-        self.spec_check = ttk.Checkbutton(self.frame_R, style="side.TButton")
-        self.load_but.pack(side="top")
-        self.clear_but.pack(side="top")
-        self.quit_but.pack(side="top")
-        self.spec_check.pack(side="top")
+        # Main window widget
+        self.main_widget = QWidget(self)
+        self.main_widget.setFocus()
+        self.setCentralWidget(self.main_widget)
+
+        # Break the main widget into left and right
+        main_layout = QHBoxLayout(self.main_widget)
+        sound_widget = QWidget(self.main_widget)
+        buttn_widget = QWidget(self.main_widget)
+        main_layout.addWidget(sound_widget)
+        main_layout.addWidget(buttn_widget)
+
+        # Left widget is for displaying sound info
+        sound_layout = QGridLayout(sound_widget)
+        self.wave_cv = WaveCanvas(sound_widget, width=5, height=4, dpi=100)
+        self.stft_cv = STFTCanvas(sound_widget, width=5, height=4, dpi=100)
+        self.spec_cv = SpecCanvas(sound_widget, width=5, height=4, dpi=100)
+        sound_layout.addWidget(self.wave_cv, 0, 1)
+        sound_layout.addWidget(self.stft_cv, 1, 0)
+        sound_layout.addWidget(self.spec_cv, 1, 1)
+
+        # Right widget is for buttons
+        buttn_names  = ['test1', 'test2', 'test3']
+        buttn_layout = QVBoxLayout(buttn_widget)
+        for name in buttn_names:
+            buttn = QPushButton(name)
+            buttn_layout.addWidget(buttn)
+
+        # Status bar
+        self.statusBar().showMessage("Welcome to TrackDraw!")
 
 
-class WaveView(tk.Frame):
-    """
-    Helpful docstring
-    """
-    def __init__(self, *args, **kwargs):
-        tk.Frame.__init__(self, *args, **kwargs)
+class WaveCanvas(FigCanvas):
+    """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
+    def __init__(self, parent=None, width=5, height=4, dpi=100):
+        fig = Figure(figsize=(width, height), dpi=dpi)
+        self.ax = fig.add_subplot(111)
+        self.ax.hold(False)
+        self.compute_initial_figure()
+
+        FigCanvas.__init__(self, fig)
+        self.setParent(parent)
+
+    def compute_initial_figure(self):
+        t = np.arange(0.0, 3.0, 0.01)
+        s = np.sin(2*np.pi*t)
+        self.ax.plot(t, s)
 
 
-class SpecView(tk.Frame):
-    """
-    Helpful docstring
-    """
-    def __init__(self, *args, **kwargs):
-        tk.Frame.__init__(self, *args, **kwargs)
+class STFTCanvas(FigCanvas):
+    """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
+    def __init__(self, parent=None, width=5, height=4, dpi=100):
+        fig = Figure(figsize=(width, height), dpi=dpi)
+        self.ax = fig.add_subplot(111)
+        self.compute_initial_figure()
+
+        FigCanvas.__init__(self, fig)
+        self.setParent(parent)
+
+    def compute_initial_figure(self):
+        t = np.arange(0.0, 3.0, 0.01)
+        s = np.sin(2*np.pi*t)
+        self.ax.plot(t, s)
 
 
-class MainView(tk.Frame):
-    """
-    Helpful docstring
-    """
-    def __init__(self, *args, **kwargs):
-        
-        # Initialize frame, figure, axes, canvas
-        tk.Frame.__init__(self, *args, **kwargs)
-        self.fig = Figure(figsize=(8, 8), dpi=80)
-        self.ax  = self.fig.add_axes((0.1, 0.1, 0.8, 0.8),\
-                                     axisbg=(0.5, 0.5, 0.5),\
-                                     frameon=False)
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
-        self.canvas.get_tk_widget().pack()
-        
-        # Create tracks
+class SpecCanvas(FigCanvas):
+    """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
+    def __init__(self, parent=None, width=5, height=4, dpi=100):
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        self.ax  = self.fig.add_subplot(111)
+        FigCanvas.__init__(self, self.fig)
+        self.setParent(parent)
+
         self.tracks = []
-
-        # Create inv as attribute for use in finding nearest vertex
+        self.locked_track = 0
         self.inv = self.ax.transData.inverted()
-        
-        # Create background attribute for later use
         self.background = None
 
     def mouse(self, event):
-        """
-        Simply converts mouse location to data dimensions and returns them if 
-        mouse location is within the plot area
-        
-        Something wonky is going on with self.inv - Daniel 07/16
-        """
         x_loc, y_loc = self.inv.transform((event.x, event.y))
         if 0 < x_loc < 1 and 0 < y_loc < 1:
             return 40*x_loc, 5000*y_loc
-            
+
     def startTracks(self, tracks):
         """
         Draws canvas without tracks and grabs the background, then plots tracks,
         sets limits, and renders the plot again (so tracks are seen on startup)
         """
-        self.canvas.draw()
+        self.draw()
         self.getBackground()
         self.tracks = [self.ax.plot(track.points,\
                                     marker="o",\
@@ -120,7 +146,7 @@ class MainView(tk.Frame):
                        for track in tracks]
         self.ax.set_xlim(0, 40)
         self.ax.set_ylim(0, 5000)
-        self.canvas.draw()
+        self.draw()
     
     def getBackground(self):
         self.background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
@@ -136,5 +162,4 @@ class MainView(tk.Frame):
         self.fig.canvas.restore_region(self.background)
         for i in range(len(self.tracks)):
             self.ax.draw_artist(self.tracks[i][0])
-        self.fig.canvas.blit(self.ax.bbox)        
 
