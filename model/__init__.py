@@ -37,23 +37,25 @@ class Model:
         self.synth_sound  = Sound(np.array([]), synth_fs, 1)
         
     def updateTrackClick(self, x_loc, y_loc, x_high):
-        track_index = (np.abs(np.arange(0,x_high,x_high/40)-x_loc)).argmin()
-        temp = np.zeros([5])
-        for i in range(5):
-            temp[i] = self.tracks[i].points[track_index]
-        trackNo = (np.abs(temp-y_loc)).argmin()
-        self.tracks[trackNo].points[track_index] = y_loc
-        return(trackNo, self.tracks[trackNo].points)
+        dist_to_x_pts = np.abs(np.arange(0,x_high,x_high/40) - x_loc)
+        nearest_x_idx = dist_to_x_pts.argmin()
+        y_coords_at_nearest_x = np.array(\
+                [track.points[nearest_x_idx] for track in self.tracks])
+        dist_to_y_pts = np.abs(y_coords_at_nearest_x - y_loc)
+        trackNo = dist_to_y_pts.argmin()
+        self.tracks[trackNo].points[nearest_x_idx] = y_loc
+        return trackNo, self.tracks[trackNo].points
         
-    def updateTrackDrag(self, x_loc, y_loc, x_high, trackNo):
-        track_index = (np.abs(np.arange(0,x_high,x_high/40)-x_loc)).argmin()
-        self.tracks[trackNo].points[track_index] = y_loc
-        return(trackNo, self.tracks[trackNo].points)
-        
+    def updateTrackDrag(self, x_loc, y_loc, trackNo, x_high):
+        dist_to_x_pts = np.abs(np.arange(0,x_high,x_high/40) - x_loc)
+        nearest_x_idx = dist_to_x_pts.argmin()
+        self.tracks[trackNo].points[nearest_x_idx] = y_loc
+        return trackNo, self.tracks[trackNo].points
+
     def getTracks(self):
-        output = np.array([40, 5])
-        for i in range(5):
-            output[0:40,i] = self.tracks[i][0].points
+        output = np.zeros([40, len(self.tracks)])
+        for i in range(len(self.tracks)):
+            output[0:40, i] = self.tracks[i].points
         return(output)
 
 class Sound:
@@ -65,7 +67,7 @@ class Sound:
     def __init__(self, waveform, fs, nchannels):
         self.waveform = waveform
         self.fs = fs
-        self.nchannels = nchannels 
+        self.nchannels = nchannels
 
     @property
     def waveform(self):
@@ -91,12 +93,15 @@ class Parameters:
     """
     def __init__(self, F0=100,\
                        FF=[800, 1600, 2400, 3200, 4000],\
-                       BW=[20, 20, 20, 20, 20],\
+                       BW=np.array([[50, 100, 100, 200, 200], [50, 100, 100, 200, 200]]),\
                        resample_fs=10000,\
                        synth_fs=10000,\
                        track_npoints=40,\
-                       voicing=0,\
-                       window_len=256):
+                       voicing=1,\
+                       window_len=256,\
+                       dur=1,\
+                       inc_ms=5,\
+                       envelope=np.array([0, 1, 1, 1, 0])):
         self.F0 = F0
         self.FF = FF
         self.BW = BW
@@ -105,4 +110,7 @@ class Parameters:
         self.track_npoints = track_npoints
         self.voicing = voicing
         self.window_len = window_len
+        self.dur = dur
+        self.inc_ms = inc_ms
+        self.envelope = envelope
 

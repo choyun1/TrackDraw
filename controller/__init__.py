@@ -8,13 +8,15 @@ date:    07/17/2016
 version: 0.1.0
 """
 
-import tkinter.filedialog as fdialog
 from scipy import signal
 from scipy.io import wavfile
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QFileDialog, QMessageBox
 import matplotlib.pyplot as plt
 import numpy as np
 import sounddevice as sd
-import time
+import controller.synth as synth
+
 
 class Controller:
     """
@@ -23,69 +25,89 @@ class Controller:
     def __init__(self, model, view):
         self.model = model
         self.view  = view
+        self.appWindow = view.appWindow
 
-        # Define callback functions for the buttons in the sidepanel
-        def load_callback(event):
-            file_opt = {}
-            file_opt["defaultextension"] = ".wav"
-            file_opt["filetypes"] = [("wave files", ".wav")]
-            file_opt["title"] = "Load wav file"
-            filename = fdialog.askopenfilename(**file_opt)
-            if filename:
-                old_fs, x = wavfile.read(filename)
+        # Callbacks for menu items
+        def file_menu_open():
+            fname = QFileDialog.getOpenFileName(self.appWindow, "Open file")
+            if fname[0]:
+                old_fs, x = wavfile.read(fname[0])
                 new_fs = model.default_parms.resample_fs
                 new_n  = round(new_fs/old_fs*len(x))
                 new_x  = signal.resample(x, new_n)
+                self.model.loaded_sound.waveform = new_x
+                self.model.loaded_sound.fs = new_fs
+                self.appWindow.wave_cv.ax.plot(new_x)
+        def file_menu_quit():
+            self.appWindow.close()
+        def help_menu_about():
+            QMessageBox.about(self.appWindow, "About",\
+"""
+<b>TrackDraw v0.1.0</b>
+Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
+""")
 
-                model.loaded_sound.waveform = new_x
-                model.loaded_sound.fs = new_fs
+        # Bind the menu callbacks
+        self.appWindow.file_menu.addAction("&Open file", file_menu_open,\
+                                           QtCore.Qt.CTRL + QtCore.Qt.Key_O)
+        self.appWindow.file_menu.addAction('&Quit', file_menu_quit,\
+                                           QtCore.Qt.CTRL + QtCore.Qt.Key_Q)
+        self.appWindow.help_menu.addAction('&About', help_menu_about)
 
-        def quit_callback(event):
-            self.view.destroy()
-
-        def spec_check_callback(event):
-            # Just a test function to display messages
-            print(self.model.loaded_sound.nsamples)
-            
-        def plot_loaded_callback(event):
+        # Bind the spectrogram canvas callbacks
+        self.appWindow.spec_cv.mpl_connect('button_press_event', self.click)
+        self.appWindow.spec_cv.mpl_connect('motion_notify_event', self.drag)
+        self.appWindow.spec_cv.mpl_connect('motion_notify_event', self.stft)
+        
+        # Callbacks for buttons
+        def plot_loaded_callback():
             self.plot_tag = "loaded"
             self.plot()
             
-        def plot_synth_callback(event):
+        def plot_synth_callback():
             self.plot_tag = "synth"
             self.plot()
             
-        def fft_length_callback(event):
-            self.model.current_parms.window_len = self.view.fft_length_scale.get()
-            self.plot()
-            
-        def play_loaded_callback(event):
+        def play_loaded_callback():
             self.play_tag = "loaded"
             self.play()
             
-        def play_synth_callback(event):
+        def play_synth_callback():
             self.play_tag = "synth"
             self.play()
-
+        
         # Bind the button callbacks
-        self.view.load_but.bind("<Button-1>", load_callback)
-        self.view.quit_but.bind("<Button-1>", quit_callback)
-        self.view.plot_loaded_but.bind("<Button-1>", plot_loaded_callback)
-        self.view.fft_length_scale.bind("<B1-Motion>", fft_length_callback)
-        self.view.play_loaded_but.bind("<Button-1>", play_loaded_callback)
-        self.view.play_synth_but.bind("<Button-1>", play_synth_callback)
+        self.appWindow.plot_loaded_but.clicked.connect(plot_loaded_callback)
+        self.appWindow.synth_but.clicked.connect(self.synth)
+        self.appWindow.plot_synth_but.clicked.connect(plot_synth_callback)
+        self.appWindow.play_loaded_but.clicked.connect(play_loaded_callback)
+        self.appWindow.play_synth_but.clicked.connect(play_synth_callback)
         
-        # Bind the canvas callbacks
-        self.view.main.canvas.mpl_connect('button_press_event', self.click)
-        self.view.main.canvas.mpl_connect('motion_notify_event', self.drag)
+        # Callbacks for sliders/checkboxes
+            
+        def update_parms_callback():
+            self.model.current_parms.window_len = self.appWindow.fft_length_slider.value()
+            self.model.current_parms.F0 = self.appWindow.f0_slider.value()
+            self.model.current_parms.dur = 0.5*self.appWindow.dur_slider.value()
+            if self.appWindow.voicing_check.checkState() == 0:
+                self.model.current_parms.voicing = 0
+            elif self.appWindow.voicing_check.checkState() == 2:
+                self.model.current_parms.voicing = 1
+            self.plot()
+            
+        # Bind the slider/checkbox callbacks
+        self.appWindow.fft_length_slider.sliderReleased.connect(update_parms_callback)
+        self.appWindow.voicing_check.stateChanged.connect(update_parms_callback)
+        self.appWindow.f0_slider.sliderReleased.connect(update_parms_callback)
+        self.appWindow.dur_slider.sliderReleased.connect(update_parms_callback)
         
-        # Send default tracks to view, create useful attributes for track/plot
-        self.view.main.startTracks(self.model.tracks)
+        # Send default tracks to view, create useful plotting attributes
+        self.appWindow.spec_cv.startTracks(self.model.tracks)
         self.locked_track = 0
-        self.x_low = 0
         self.x_high = 40
-        self.plot_tag = None
-        self.play_tag = None
+        self.plot_tag = "loaded"
+        self.play_tag = "loaded"
+        update_parms_callback()
             
     def click(self, event):
         """
@@ -98,15 +120,12 @@ class Controller:
         At the end, the selected track is stored in locked_track, which drag()
         uses to lock to a particular track for a given click-drag movement.
         """
-        try:
-            x_loc, y_loc = self.view.main.mouse(event)
-            trackNo, updated_track = self.model.updateTrackClick(x_loc, y_loc,
-                                                                 self.x_high)
-            self.view.main.updateTrack(trackNo, updated_track)
-            self.view.main.redrawTracks()
-            self.locked_track = trackNo
-        except TypeError:
-            return
+        x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
+        trackNo, updated_track = self.model.updateTrackClick(x_loc, y_loc,\
+                                                             self.x_high)
+        self.appWindow.spec_cv.updateTrack(trackNo, updated_track)
+        self.appWindow.spec_cv.redrawTracks()
+        self.locked_track = trackNo
     
     def drag(self, event):
         """
@@ -114,19 +133,50 @@ class Controller:
         locked_track-th track instead of the closest to the mouse, and does not
         update the locked_track. 
         """
-        if event.button == 1:
+        if event.button:
             try:
-                x_loc, y_loc = self.view.main.mouse(event)
-                trackNo, updated_track = self.model.updateTrackDrag(x_loc,
-                                                                    y_loc,
-                                                                    self.x_high,
-                                                                    self.locked_track)
-                self.view.main.updateTrack(trackNo, updated_track)
-                self.view.main.redrawTracks()
+                x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
+                trackNo, updated_track =\
+                    self.model.updateTrackDrag(x_loc, y_loc,\
+                                               self.locked_track, self.x_high)
+                self.appWindow.spec_cv.updateTrack(trackNo, updated_track)
+                self.appWindow.spec_cv.redrawTracks()
             except TypeError:
-                return       
-        else:
-            return
+                pass
+            
+    def stft(self, event):
+        if self.appWindow.stft_check.checkState() == 2:
+            try:
+                x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
+                if self.plot_tag == "loaded":
+                    waveform = self.model.loaded_sound.waveform
+                    fs = self.model.loaded_sound.fs
+                elif self.plot_tag == "synth": 
+                    waveform = self.model.synth_sound.waveform
+                    fs = self.model.synth_sound.fs
+                if len(waveform) == 0:
+                    return
+                nearest_sample = round(x_loc*fs)
+                waveform = waveform/np.max(np.abs(waveform))
+                stspec = np.fft.rfft(waveform[nearest_sample-128:nearest_sample+128])
+                stspec = 20*np.log10(stspec)
+                self.appWindow.stft_cv.updateSTFT(stspec)
+                self.appWindow.stft_cv.redrawSTFT()
+            except TypeError:
+                pass
+            
+    def synth(self):
+        self.model.current_parms.FF = self.model.getTracks()
+        self.model.synth_sound.waveform = (synth.klatt.klattmake(
+                                   self.model.current_parms.FF,                      
+                                   self.model.current_parms.BW,
+                                   self.model.current_parms.envelope,
+                                   self.model.current_parms.F0,
+                                   self.model.current_parms.voicing,
+                                   self.model.current_parms.inc_ms,
+                                   self.model.current_parms.dur,
+                                   self.model.current_parms.synth_fs
+                                   ))
             
     def plot(self):
         if self.plot_tag == "loaded":
@@ -137,34 +187,33 @@ class Controller:
             waveform = self.model.synth_sound.waveform
             fs = self.model.synth_sound.fs
             nsamples = self.model.synth_sound.nsamples
+        if len(waveform) == 0:
+            return
         window_len = self.model.current_parms.window_len
-        self.view.main.ax.clear()
+        
+        self.appWindow.spec_cv.ax.clear()
         self.x_high = nsamples/fs
-        self.view.main.x_high = self.x_high
-        self.view.main.ax.specgram(waveform, NFFT=window_len,
-                                   Fs=fs, noverlap=window_len*0.75, 
-                                   cmap = plt.cm.gist_heat)
-        self.view.main.rescaleTracks()    
+        self.appWindow.spec_cv.x_high = self.x_high
+        self.appWindow.spec_cv.ax.specgram(waveform, NFFT=window_len,
+                                           Fs=fs, noverlap=window_len*0.75, 
+                                           cmap = plt.cm.gist_heat)
+        self.appWindow.spec_cv.rescaleTracks()
+        
+        self.appWindow.wave_cv.ax.plot(waveform)
+        self.appWindow.wave_cv.ax.set_xlim(0,len(waveform))
+        self.appWindow.wave_cv.fig.canvas.draw()
         
     def play(self):
-        self.normalize()
         if self.play_tag == "loaded":
             waveform = self.model.loaded_sound.waveform
             fs = self.model.loaded_sound.fs
-            nsamples = self.model.loaded_sound.nsamples
         elif self.play_tag == "synth":
             waveform = self.model.synth_sound.waveform
             fs = self.model.synth_sound.fs
-            nsamples = self.model.synth_sound.nsamples
+        waveform = waveform/np.max(np.abs(waveform))
         sd.play(waveform, fs)
-        time.sleep((1/fs)*nsamples)
-        
-    def normalize(self):
-        self.model.loaded_sound.waveform = (self.model.loaded_sound.waveform/
-                                            np.max(np.abs(self.model.loaded_sound.waveform)))
-#        self.model.synth_sound.waveform = (self.model.synth_sound.waveform/
-#                                           np.max(np.abs(self.model.synth_sound.waveform)))
-
+            
     def run(self):
-        self.view.mainloop()
+        self.appWindow.show()
+        self.view.exec_()
 
