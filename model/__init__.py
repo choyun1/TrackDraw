@@ -36,8 +36,8 @@ class Model:
         self.loaded_sound = Sound(np.array([]), resample_fs, 1)
         self.synth_sound  = Sound(np.array([]), synth_fs, 1)
         
-    def updateTrackClick(self, x_loc, y_loc):
-        dist_to_x_pts = np.abs(np.arange(40) - x_loc)
+    def updateTrackClick(self, x_loc, y_loc, x_high):
+        dist_to_x_pts = np.abs(np.arange(0,x_high,x_high/40) - x_loc)
         nearest_x_idx = dist_to_x_pts.argmin()
         y_coords_at_nearest_x = np.array(\
                 [track.points[nearest_x_idx] for track in self.tracks])
@@ -46,12 +46,17 @@ class Model:
         self.tracks[trackNo].points[nearest_x_idx] = y_loc
         return trackNo, self.tracks[trackNo].points
         
-    def updateTrackDrag(self, x_loc, y_loc, trackNo):
-        dist_to_x_pts = np.abs(np.arange(40) - x_loc)
+    def updateTrackDrag(self, x_loc, y_loc, trackNo, x_high):
+        dist_to_x_pts = np.abs(np.arange(0,x_high,x_high/40) - x_loc)
         nearest_x_idx = dist_to_x_pts.argmin()
         self.tracks[trackNo].points[nearest_x_idx] = y_loc
         return trackNo, self.tracks[trackNo].points
 
+    def getTracks(self):
+        output = np.zeros([40, len(self.tracks)])
+        for i in range(len(self.tracks)):
+            output[0:40, i] = self.tracks[i].points
+        return(output)
 
 class Sound:
     """
@@ -88,11 +93,15 @@ class Parameters:
     """
     def __init__(self, F0=100,\
                        FF=[800, 1600, 2400, 3200, 4000],\
-                       BW=[20, 20, 20, 20, 20],\
+                       BW=np.array([[50, 100, 100, 200, 200], [50, 100, 100, 200, 200]]),\
                        resample_fs=10000,\
                        synth_fs=10000,\
                        track_npoints=40,\
-                       voicing=0):
+                       voicing=1,\
+                       window_len=256,\
+                       dur=1,\
+                       inc_ms=5,\
+                       envelope=np.array([0, 1, 1, 1, 0])):
         self.F0 = F0
         self.FF = FF
         self.BW = BW
@@ -100,4 +109,8 @@ class Parameters:
         self.synth_fs = synth_fs
         self.track_npoints = track_npoints
         self.voicing = voicing
+        self.window_len = window_len
+        self.dur = dur
+        self.inc_ms = inc_ms
+        self.envelope = envelope
 
