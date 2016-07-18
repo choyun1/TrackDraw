@@ -9,6 +9,7 @@ version: 0.1.0
 """
 
 import time
+import numpy as np
 import tkinter.filedialog as fdialog
 from scipy import signal
 from scipy.io import wavfile
@@ -35,19 +36,25 @@ class Controller:
                 new_n  = round(new_fs/old_fs*len(x))
                 new_x  = signal.resample(x, new_n)
 
-                model.loaded_sound.waveform = new_x
-                model.loaded_sound.fs = new_fs
+                self.model.loaded_sound.waveform = new_x
+                self.model.loaded_sound.fs = new_fs
+            return
+
+        def clear_callback(event):
+            self.model.loaded_sound.waveform = np.array([])
+            self.model.loaded_sound.fs = self.model.default_parms.resample_fs
 
         def quit_callback(event):
             self.view.destroy()
 
         def spec_check_callback(event):
             # Just a test function to display messages
-            print(self.model.loaded_sound.nsamples)
+            pass
 
         # Bind the button callbacks
         self.view.load_but.bind("<Button-1>", load_callback)
         self.view.quit_but.bind("<Button-1>", quit_callback)
+        self.view.clear_but.bind("<Button-1>", clear_callback)
         self.view.spec_check.bind("<Button-1>", spec_check_callback)
         
         # Bind the canvas callbacks

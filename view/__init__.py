@@ -27,7 +27,7 @@ class View(tk.Tk):
         self.style.configure("side.TButton",\
                              foreground="#333333",\
                              background="#cccccc",\
-                             font=("Helvetica", 16))
+                             font=("Arial", 14))
 
         # Main container frames
         self.frame_L = tk.Frame(self)
@@ -43,12 +43,15 @@ class View(tk.Tk):
         self.main.grid(row=1, column=1)
 
         # Side pane initialization
-        self.load_but = ttk.Button(self.frame_R, text="Load",\
-                                                 style="side.TButton")
-        self.quit_but = ttk.Button(self.frame_R, text="Quit",\
-                                                 style="side.TButton")
+        self.load_but  = ttk.Button(self.frame_R, text="Load",\
+                                                  style="side.TButton")
+        self.clear_but = ttk.Button(self.frame_R, text="Clear",\
+                                                  style="side.TButton")
+        self.quit_but  = ttk.Button(self.frame_R, text="Quit",\
+                                                  style="side.TButton")
         self.spec_check = ttk.Checkbutton(self.frame_R, style="side.TButton")
         self.load_but.pack(side="top")
+        self.clear_but.pack(side="top")
         self.quit_but.pack(side="top")
         self.spec_check.pack(side="top")
 
@@ -77,10 +80,11 @@ class MainView(tk.Frame):
         
         # Initialize frame, figure, axes, canvas
         tk.Frame.__init__(self, *args, **kwargs)
-        self.fig = Figure(figsize = (8, 8), dpi = 80)
-        self.ax = self.fig.add_axes((0.1, 0.1, 0.8, 0.8), axisbg =
-                                    (0.5, 0.5, 0.5), frameon = False)
-        self.canvas = FigureCanvasTkAgg(self.fig, master = self)
+        self.fig = Figure(figsize=(8, 8), dpi=80)
+        self.ax  = self.fig.add_axes((0.1, 0.1, 0.8, 0.8),\
+                                     axisbg=(0.5, 0.5, 0.5),\
+                                     frameon=False)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.get_tk_widget().pack()
         
         # Create tracks
@@ -101,9 +105,7 @@ class MainView(tk.Frame):
         """
         x_loc, y_loc = self.inv.transform((event.x, event.y))
         if 0 < x_loc < 1 and 0 < y_loc < 1:
-            x_loc = x_loc * 40
-            y_loc = y_loc * 5000
-            return(x_loc, y_loc)
+            return 40*x_loc, 5000*y_loc
             
     def startTracks(self, tracks):
         """
@@ -112,10 +114,12 @@ class MainView(tk.Frame):
         """
         self.canvas.draw()
         self.getBackground()
-        for i in range(5):
-            self.tracks.append(self.ax.plot(tracks[i].points, color="blue", marker='+'))
-        self.ax.set_xlim(0,40)
-        self.ax.set_ylim(0,5000)
+        self.tracks = [self.ax.plot(track.points,\
+                                    marker="o",\
+                                    markeredgewidth=0.0)\
+                       for track in tracks]
+        self.ax.set_xlim(0, 40)
+        self.ax.set_ylim(0, 5000)
         self.canvas.draw()
     
     def getBackground(self):
@@ -130,7 +134,7 @@ class MainView(tk.Frame):
         time), then redraws only lines.
         """
         self.fig.canvas.restore_region(self.background)
-        for i in range(5):
+        for i in range(len(self.tracks)):
             self.ax.draw_artist(self.tracks[i][0])
         self.fig.canvas.blit(self.ax.bbox)        
 
