@@ -71,14 +71,11 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         At the end, the selected track is stored in locked_track, which drag()
         uses to lock to a particular track for a given click-drag movement.
         """
-        try:
-            x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
-            trackNo, updated_track = self.model.updateTrackClick(x_loc, y_loc)
-            self.appWindow.spec_cv.updateTrack(trackNo, updated_track)
-            self.appWindow.spec_cv.updateTracks()
-            self.locked_track = trackNo
-        except TypeError:
-            pass
+        x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
+        trackNo, updated_track = self.model.updateTrackClick(x_loc, y_loc)
+        self.appWindow.spec_cv.updateTrack(trackNo, updated_track)
+        self.appWindow.spec_cv.updateTracks()
+        self.locked_track = trackNo
     
     def drag(self, event):
         """

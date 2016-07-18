@@ -25,6 +25,7 @@ class View(QApplication):
         QApplication.__init__(self, *arg, **kwarg)
         self.appWindow = AppMainWindow()
 
+
 class AppMainWindow(QMainWindow):
     """
     The left widget contains all representations of the sound.
@@ -39,7 +40,7 @@ class AppMainWindow(QMainWindow):
         screen_width  = QDesktopWidget().availableGeometry().size().width()
         screen_height = QDesktopWidget().availableGeometry().size().height()
         screen_center = QDesktopWidget().availableGeometry().center()
-        self.resize(0.75*screen_width, 0.75*screen_height)
+        self.resize(0.6*screen_width, 0.8*screen_height)
         window_geometry = self.frameGeometry()
         window_geometry.moveCenter(screen_center)
         self.move(window_geometry.topLeft())
@@ -64,9 +65,9 @@ class AppMainWindow(QMainWindow):
 
         # Left widget is for displaying sound info
         sound_layout = QGridLayout(sound_widget)
-        self.wave_cv = WaveCanvas(sound_widget, width=5, height=4, dpi=100)
-        self.stft_cv = STFTCanvas(sound_widget, width=5, height=4, dpi=100)
-        self.spec_cv = SpecCanvas(sound_widget, width=5, height=4, dpi=100)
+        self.wave_cv = WaveCanvas(sound_widget, width=8, height=1, dpi=100)
+        self.stft_cv = STFTCanvas(sound_widget, width=1, height=5, dpi=100)
+        self.spec_cv = SpecCanvas(sound_widget, width=8, height=5, dpi=100)
         sound_layout.addWidget(self.wave_cv, 0, 1)
         sound_layout.addWidget(self.stft_cv, 1, 0)
         sound_layout.addWidget(self.spec_cv, 1, 1)
@@ -85,34 +86,30 @@ class AppMainWindow(QMainWindow):
 class WaveCanvas(FigCanvas):
     """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
     def __init__(self, parent=None, width=5, height=4, dpi=100):
-        fig = Figure(figsize=(width, height), dpi=dpi)
-        self.ax = fig.add_subplot(111)
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        self.ax  = self.fig.add_subplot(111)
         self.ax.hold(False)
-        self.compute_initial_figure()
-
-        FigCanvas.__init__(self, fig)
+        self.ax.xaxis.set_visible(False)
+        self.ax.yaxis.set_visible(False)
+        FigCanvas.__init__(self, self.fig)
         self.setParent(parent)
-
-    def compute_initial_figure(self):
-        t = np.arange(0.0, 3.0, 0.01)
-        s = np.sin(2*np.pi*t)
-        self.ax.plot(t, s)
 
 
 class STFTCanvas(FigCanvas):
     """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
     def __init__(self, parent=None, width=5, height=4, dpi=100):
-        fig = Figure(figsize=(width, height), dpi=dpi)
-        self.ax = fig.add_subplot(111)
-        self.compute_initial_figure()
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        self.ax  = self.fig.add_subplot(111)
+        self.ax.hold(False)
+        self.ax.xaxis.set_visible(False)
+        self.ax.yaxis.set_visible(False)
 
-        FigCanvas.__init__(self, fig)
-        self.setParent(parent)
-
-    def compute_initial_figure(self):
         t = np.arange(0.0, 3.0, 0.01)
         s = np.sin(2*np.pi*t)
-        self.ax.plot(t, s)
+        self.ax.plot(s, t)
+
+        FigCanvas.__init__(self, self.fig)
+        self.setParent(parent)
 
 
 class SpecCanvas(FigCanvas):
@@ -128,6 +125,12 @@ class SpecCanvas(FigCanvas):
         self.inv = self.ax.transData.inverted()
         self.background = None
 
+        # Testing background
+        t = np.linspace(0, 40, 1000)
+        x = 2500*np.sin(t) + 2500
+        self.ax.plot(t, x)
+
+
     def mouse(self, event):
         x_loc, y_loc = self.inv.transform((event.x, event.y))
         if 0 < x_loc < 1 and 0 < y_loc < 1:
@@ -135,22 +138,18 @@ class SpecCanvas(FigCanvas):
 
     def startTracks(self, tracks):
         """
-        Draws canvas without tracks and grabs the background, then plots tracks,
-        sets limits, and renders the plot again (so tracks are seen on startup)
+        Draws canvas without tracks and grabs the background. Then plots
+        tracks, sets limits, and renders the plot again.
         """
-        self.draw()
-        self.getBackground()
+        #self.background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
         self.tracks = [self.ax.plot(track.points,\
                                     marker="o",\
+                                    markersize=4,\
                                     markeredgewidth=0.0)\
                        for track in tracks]
-        self.ax.set_xlim(0, 40)
+        self.ax.set_xlim(0, 39)
         self.ax.set_ylim(0, 5000)
-        self.draw()
     
-    def getBackground(self):
-        self.background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
-            
     def updateTrack(self, trackNo, updated_track):
         self.tracks[trackNo][0].set_ydata(updated_track)
    
@@ -159,7 +158,8 @@ class SpecCanvas(FigCanvas):
         Restores empty background (doesn't have to redraw everything and waste
         time), then redraws only lines.
         """
-        self.fig.canvas.restore_region(self.background)
+        #self.fig.canvas.restore_region(self.background)
         for i in range(len(self.tracks)):
             self.ax.draw_artist(self.tracks[i][0])
+        self.draw()
 
