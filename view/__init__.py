@@ -13,7 +13,6 @@ import matplotlib
 matplotlib.use("Qt5Agg")
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigCanvas
-from scipy.io import wavfile
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout,  QVBoxLayout, QGridLayout,
@@ -65,12 +64,12 @@ class AppMainWindow(QMainWindow):
 
         # Left widget is for displaying sound info
         sound_layout = QGridLayout(sound_widget)
-        self.wave_cv = WaveCanvas(sound_widget, width=8, height=1, dpi=100)
-        self.stft_cv = STFTCanvas(sound_widget, width=1, height=5, dpi=100)
-        self.spec_cv = SpecCanvas(sound_widget, width=8, height=5, dpi=100)
-        sound_layout.addWidget(self.wave_cv, 0, 1)
-        sound_layout.addWidget(self.stft_cv, 1, 0)
-        sound_layout.addWidget(self.spec_cv, 1, 1)
+        self.wave_canv = WaveCanvas(sound_widget, width=8, height=1)
+        self.stft_canv = STFTCanvas(sound_widget, width=1, height=6)
+        self.spec_canv = SpecCanvas(sound_widget, width=8, height=6)
+        sound_layout.addWidget(self.wave_canv, 0, 1)
+        sound_layout.addWidget(self.stft_canv, 1, 0)
+        sound_layout.addWidget(self.spec_canv, 1, 1)
 
         # Right widget is for buttons
         buttn_names  = ['test1', 'test2', 'test3']
@@ -85,8 +84,10 @@ class AppMainWindow(QMainWindow):
 
 class WaveCanvas(FigCanvas):
     """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
+    def __init__(self, parent, *arg, **kwarg):
+        width  = kwarg["width"]
+        height = kwarg["height"]
+        self.fig = Figure(figsize=(width, height))
         self.ax  = self.fig.add_subplot(111)
         self.ax.hold(False)
         self.ax.xaxis.set_visible(False)
@@ -97,8 +98,10 @@ class WaveCanvas(FigCanvas):
 
 class STFTCanvas(FigCanvas):
     """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
+    def __init__(self, parent, *arg, **kwarg):
+        width  = kwarg["width"]
+        height = kwarg["height"]
+        self.fig = Figure(figsize=(width, height))
         self.ax  = self.fig.add_subplot(111)
         self.ax.hold(False)
         self.ax.xaxis.set_visible(False)
@@ -114,8 +117,10 @@ class STFTCanvas(FigCanvas):
 
 class SpecCanvas(FigCanvas):
     """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
+    def __init__(self, parent, *arg, **kwarg):
+        width  = kwarg["width"]
+        height = kwarg["height"]
+        self.fig = Figure(figsize=(width, height))
         self.ax  = self.fig.add_subplot(111)
         FigCanvas.__init__(self, self.fig)
         self.setParent(parent)

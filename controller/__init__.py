@@ -9,7 +9,6 @@ version: 0.1.0
 """
 
 import time
-import numpy as np
 from scipy import signal
 from scipy.io import wavfile
 from PyQt5 import QtCore
@@ -35,7 +34,8 @@ class Controller:
                 new_x  = signal.resample(x, new_n)
                 self.model.loaded_sound.waveform = new_x
                 self.model.loaded_sound.fs = new_fs
-                self.appWindow.wave_cv.ax.plot(new_x)
+                self.appWindow.wave_canv.ax.plot(new_x)
+                self.appWindow.wave_canv.draw()
         def file_menu_quit():
             self.appWindow.close()
         def help_menu_about():
@@ -53,11 +53,11 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         self.appWindow.help_menu.addAction('&About', help_menu_about)
 
         # Bind the spectrogram canvas callbacks
-        self.appWindow.spec_cv.mpl_connect('button_press_event', self.click)
-        self.appWindow.spec_cv.mpl_connect('motion_notify_event', self.drag)
+        self.appWindow.spec_canv.mpl_connect('button_press_event', self.click)
+        self.appWindow.spec_canv.mpl_connect('motion_notify_event', self.drag)
         
         # Send default tracks to view
-        self.appWindow.spec_cv.startTracks(self.model.tracks)
+        self.appWindow.spec_canv.startTracks(self.model.tracks)
         self.locked_track = 0
             
     def click(self, event):
@@ -71,10 +71,10 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         At the end, the selected track is stored in locked_track, which drag()
         uses to lock to a particular track for a given click-drag movement.
         """
-        x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
+        x_loc, y_loc = self.appWindow.spec_canv.mouse(event)
         trackNo, updated_track = self.model.updateTrackClick(x_loc, y_loc)
-        self.appWindow.spec_cv.updateTrack(trackNo, updated_track)
-        self.appWindow.spec_cv.updateTracks()
+        self.appWindow.spec_canv.updateTrack(trackNo, updated_track)
+        self.appWindow.spec_canv.updateTracks()
         self.locked_track = trackNo
     
     def drag(self, event):
@@ -85,11 +85,11 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         """
         if event.button:
             try:
-                x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
+                x_loc, y_loc = self.appWindow.spec_canv.mouse(event)
                 trackNo, updated_track =\
                     self.model.updateTrackDrag(x_loc, y_loc, self.locked_track)
-                self.appWindow.spec_cv.updateTrack(trackNo, updated_track)
-                self.appWindow.spec_cv.updateTracks()
+                self.appWindow.spec_canv.updateTrack(trackNo, updated_track)
+                self.appWindow.spec_canv.updateTracks()
             except TypeError:
                 pass
 
