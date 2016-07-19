@@ -9,3 +9,4 @@ Created on Thu Jul  7 12:48:00 2016
 print('Testing - controller.synth loaded successfully')
 import controller.synth.klatt
 import controller.synth.util
+import controller.synth.sine

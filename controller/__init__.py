@@ -82,6 +82,7 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         self.appWindow.plot_synth_but.clicked.connect(plot_synth_callback)
         self.appWindow.play_loaded_but.clicked.connect(play_loaded_callback)
         self.appWindow.play_synth_but.clicked.connect(play_synth_callback)
+        self.appWindow.default_but.clicked.connect(self.appWindow.setDefaults)
         
         # Callbacks for sliders/checkboxes
             
@@ -93,13 +94,30 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
                 self.model.current_parms.voicing = 0
             elif self.appWindow.voicing_check.checkState() == 2:
                 self.model.current_parms.voicing = 1
+            if self.appWindow.radiation_check.checkState() == 0:
+                self.model.current_parms.radiation = 0
+            elif self.appWindow.radiation_check.checkState() == 2:
+                self.model.current_parms.radiation = 1
+            self.model.current_parms.BW[0:1,0] = self.appWindow.bw1_slider.value()
+            self.model.current_parms.BW[0:1,1] = self.appWindow.bw2_slider.value()
+            self.model.current_parms.BW[0:1,2] = self.appWindow.bw3_slider.value()
+            self.model.current_parms.BW[0:1,3] = self.appWindow.bw4_slider.value()
+            self.model.current_parms.BW[0:1,4] = self.appWindow.bw5_slider.value()
+            self.model.current_parms.synthesis_type = self.appWindow.synth_dropdown.currentText()
             self.plot()
             
-        # Bind the slider/checkbox callbacks
+        # Bind the slider/checkbox/combobox callbacks
         self.appWindow.fft_length_slider.sliderReleased.connect(update_parms_callback)
         self.appWindow.voicing_check.stateChanged.connect(update_parms_callback)
         self.appWindow.f0_slider.sliderReleased.connect(update_parms_callback)
         self.appWindow.dur_slider.sliderReleased.connect(update_parms_callback)
+        self.appWindow.radiation_check.stateChanged.connect(update_parms_callback)
+        self.appWindow.bw1_slider.sliderReleased.connect(update_parms_callback)
+        self.appWindow.bw2_slider.sliderReleased.connect(update_parms_callback)
+        self.appWindow.bw3_slider.sliderReleased.connect(update_parms_callback)
+        self.appWindow.bw4_slider.sliderReleased.connect(update_parms_callback)
+        self.appWindow.bw5_slider.sliderReleased.connect(update_parms_callback)
+        self.appWindow.synth_dropdown.currentIndexChanged.connect(update_parms_callback)
         
         # Send default tracks to view, create useful plotting attributes
         self.appWindow.spec_cv.startTracks(self.model.tracks)
@@ -167,17 +185,26 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
             
     def synth(self):
         self.model.current_parms.FF = self.model.getTracks()
-        self.model.synth_sound.waveform = (synth.klatt.klattmake(
-                                   self.model.current_parms.FF,                      
-                                   self.model.current_parms.BW,
-                                   self.model.current_parms.envelope,
-                                   self.model.current_parms.F0,
-                                   self.model.current_parms.voicing,
-                                   self.model.current_parms.inc_ms,
-                                   self.model.current_parms.dur,
-                                   self.model.current_parms.synth_fs
-                                   ))
-            
+        if self.model.current_parms.synthesis_type == "Klatt 1980":
+            self.model.synth_sound.waveform = (synth.klatt.klattmake(
+                                       self.model.current_parms.FF,                      
+                                       self.model.current_parms.BW,
+                                       self.model.current_parms.envelope,
+                                       self.model.current_parms.F0,
+                                       self.model.current_parms.voicing,
+                                       self.model.current_parms.inc_ms,
+                                       self.model.current_parms.dur,
+                                       self.model.current_parms.synth_fs,
+                                       self.model.current_parms.radiation
+                                       ))
+        elif self.model.current_parms.synthesis_type == "Sine Wave":
+            self.model.synth_sound.waveform = (synth.sine.sinemake(
+                                               self.model.current_parms.FF,
+                                               self.model.current_parms.envelope,
+                                               self.model.current_parms.dur,
+                                               self.model.current_parms.synth_fs
+                                               ))
+
     def plot(self):
         if self.plot_tag == "loaded":
             waveform = self.model.loaded_sound.waveform
@@ -210,6 +237,8 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         elif self.play_tag == "synth":
             waveform = self.model.synth_sound.waveform
             fs = self.model.synth_sound.fs
+        if len(waveform) == 0:
+            return
         waveform = waveform/np.max(np.abs(waveform))
         sd.play(waveform, fs)
             

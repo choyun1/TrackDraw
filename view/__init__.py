@@ -18,7 +18,8 @@ from PyQt5 import QtCore
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout,  QVBoxLayout, QGridLayout,
                              QMenu,        QPushButton, QDesktopWidget,
-                             QLabel,       QSlider,     QCheckBox)
+                             QLabel,       QSlider,     QCheckBox,
+                             QComboBox)
 
 
 class View(QApplication):
@@ -82,6 +83,7 @@ class AppMainWindow(QMainWindow):
         self.plot_synth_but = QPushButton("Plot Synth")
         self.play_loaded_but = QPushButton("Play Input Waveform")
         self.play_synth_but = QPushButton("Play Synth Waveform")
+        self.default_but = QPushButton("Restore Defaults")
         
         # Define sliders
         fft_length_label = QLabel("Spectrogram Window Length")
@@ -99,10 +101,42 @@ class AppMainWindow(QMainWindow):
         self.dur_slider.setMinimum(1)
         self.dur_slider.setMaximum(10)
         self.dur_slider.setSingleStep(1)
+        bw1_label = QLabel("First Formant Bandwidth")
+        bw2_label = QLabel("Second Formant Bandwidth")
+        bw3_label = QLabel("Third Formant Bandwidth")
+        bw4_label = QLabel("Fourth Formant Bandwidth")
+        bw5_label = QLabel("Fifth Formant Bandwidth")
+        self.bw1_slider = QSlider(QtCore.Qt.Horizontal)
+        self.bw1_slider.setMinimum(50)
+        self.bw1_slider.setMaximum(400)
+        self.bw1_slider.setSingleStep(5)      
+        self.bw2_slider = QSlider(QtCore.Qt.Horizontal)
+        self.bw2_slider.setMinimum(50)
+        self.bw2_slider.setMaximum(400)
+        self.bw2_slider.setSingleStep(5)  
+        self.bw3_slider = QSlider(QtCore.Qt.Horizontal)
+        self.bw3_slider.setMinimum(50)
+        self.bw3_slider.setMaximum(400)
+        self.bw3_slider.setSingleStep(5)   
+        self.bw4_slider = QSlider(QtCore.Qt.Horizontal)
+        self.bw4_slider.setMinimum(50)
+        self.bw4_slider.setMaximum(400)
+        self.bw4_slider.setSingleStep(5)  
+        self.bw5_slider = QSlider(QtCore.Qt.Horizontal)
+        self.bw5_slider.setMinimum(50)
+        self.bw5_slider.setMaximum(400)
+        self.bw5_slider.setSingleStep(5)   
+        
+        # Define comboboxes
+        synth_dropdown_label = QLabel("Synthesis Type")
+        self.synth_dropdown = QComboBox()
+        self.synth_dropdown.addItem("Klatt 1980")
+        self.synth_dropdown.addItem("Sine Wave")
         
         # Define checkboxes
         self.stft_check = QCheckBox("STFT Display (on/off)")
         self.voicing_check = QCheckBox("Voicing (on/off)")
+        self.radiation_check = QCheckBox("Radiation characteristic (on/off)")
         
         # Define organizational labels
         input_label = QLabel("Input")
@@ -116,6 +150,7 @@ class AppMainWindow(QMainWindow):
         
         # Arrange buttons/sliders/labels
         buttn_layout.addStretch(1.0)
+        buttn_layout.addWidget(self.default_but)
         buttn_layout.addWidget(input_label)
         buttn_layout.addWidget(self.plot_loaded_but)
         buttn_layout.addWidget(self.play_loaded_but)
@@ -130,21 +165,42 @@ class AppMainWindow(QMainWindow):
         buttn_layout.addWidget(self.fft_length_slider)
         buttn_layout.addSpacing(25)        
         buttn_layout.addWidget(parms_label)
+        buttn_layout.addWidget(synth_dropdown_label)
+        buttn_layout.addWidget(self.synth_dropdown)
         buttn_layout.addWidget(self.voicing_check)
+        buttn_layout.addWidget(self.radiation_check)
         buttn_layout.addWidget(f0_label)
         buttn_layout.addWidget(self.f0_slider)
         buttn_layout.addWidget(dur_label)
         buttn_layout.addWidget(self.dur_slider)
+        buttn_layout.addWidget(bw1_label)
+        buttn_layout.addWidget(self.bw1_slider)
+        buttn_layout.addWidget(bw2_label)
+        buttn_layout.addWidget(self.bw2_slider)        
+        buttn_layout.addWidget(bw3_label)
+        buttn_layout.addWidget(self.bw3_slider)
+        buttn_layout.addWidget(bw4_label)
+        buttn_layout.addWidget(self.bw4_slider)
+        buttn_layout.addWidget(bw5_label)
+        buttn_layout.addWidget(self.bw5_slider)
         buttn_layout.addStretch(1.0)
         
         # Set sliders to defaults
+        self.setDefaults()
+
+        # Status bar
+        self.statusBar().showMessage("Welcome to TrackDraw!")
+        
+    def setDefaults(self):
         self.fft_length_slider.setValue(256)
         self.f0_slider.setValue(100)
         self.dur_slider.setValue(2)
         self.voicing_check.setChecked(True)
-
-        # Status bar
-        self.statusBar().showMessage("Welcome to TrackDraw!")
+        self.bw1_slider.setValue(50)
+        self.bw2_slider.setValue(100)
+        self.bw3_slider.setValue(100)
+        self.bw4_slider.setValue(200)
+        self.bw5_slider.setValue(250)
 
 
 class WaveCanvas(FigCanvas):
