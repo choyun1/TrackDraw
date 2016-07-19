@@ -8,14 +8,14 @@ date:    07/17/2016
 version: 0.1.0
 """
 
+import numpy as np
+import matplotlib.pyplot as plt
+import sounddevice as sd
+import controller.synth as synth
 from scipy import signal
 from scipy.io import wavfile
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
-import matplotlib.pyplot as plt
-import numpy as np
-import sounddevice as sd
-import controller.synth as synth
 
 
 class Controller:
@@ -126,7 +126,7 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         # Send default tracks to view, create useful plotting attributes
         self.appWindow.spec_cv.startTracks(self.model.tracks)
         self.locked_track = 0
-        self.x_high = 40
+        self.x_high = 39
         self.plot_tag = "loaded"
         self.play_tag = "loaded"
         update_parms_callback()
@@ -158,6 +158,7 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         if event.button:
             try:
                 x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
+                print(x_loc, y_loc)
                 trackNo, updated_track =\
                     self.model.updateTrackDrag(x_loc, y_loc,\
                                                self.locked_track, self.x_high)
@@ -243,7 +244,7 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
             fs = self.model.synth_sound.fs
         if len(waveform) == 0:
             return
-        waveform = waveform/np.max(np.abs(waveform))
+        waveform = waveform/np.max(np.abs(waveform))*0.9
         sd.play(waveform, fs)
             
     def run(self):
