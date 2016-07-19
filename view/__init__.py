@@ -274,12 +274,6 @@ class SpecCanvas(FigCanvas):
         self.background = None
         self.x_high = 39
 
-        # Testing background
-        t = np.linspace(0, 40, 1000)
-        x = 2500*np.sin(t) + 2500
-        self.ax.plot(t, x)
-
-
     def mouse(self, event):
         x_loc, y_loc = self.inv.transform((event.x, event.y))
         if 0 < x_loc < 1 and 0 < y_loc < 1:
