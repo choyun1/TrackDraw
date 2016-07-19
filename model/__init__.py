@@ -93,7 +93,7 @@ class Parameters:
     """
     def __init__(self, F0=100,\
                        FF=[800, 1600, 2400, 3200, 4000],\
-                       BW=np.array([[50, 100, 100, 200, 200], [50, 100, 100, 200, 200]]),\
+                       BW=np.array([[50, 100, 100, 200, 250], [50, 100, 100, 200, 250]]),\
                        resample_fs=10000,\
                        synth_fs=10000,\
                        track_npoints=40,\
@@ -101,7 +101,9 @@ class Parameters:
                        window_len=256,\
                        dur=1,\
                        inc_ms=5,\
-                       envelope=np.array([0, 1, 1, 1, 0])):
+                       envelope=np.array([0, 1, 1, 1, 0]),\
+                       radiation=0,\
+                       synthesis_type="Klatt 1980"):
         self.F0 = F0
         self.FF = FF
         self.BW = BW
@@ -113,4 +115,6 @@ class Parameters:
         self.dur = dur
         self.inc_ms = inc_ms
         self.envelope = envelope
+        self.radiation = radiation
+        self.synthesis_type = synthesis_type
 

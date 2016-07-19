@@ -110,7 +110,7 @@ def klattinterpolate(x, n_inc, inc_samples, n_samples):
 
     return(vector_out)
 
-def klattvoice(f0, n_samples, Fs):
+def klattvoice(f0, n_samples, Fs, envelope):
     
     # Imports
     import numpy as np
@@ -122,6 +122,8 @@ def klattvoice(f0, n_samples, Fs):
         if i%inc == 0:
             voice[i] = 1
 
+    voice = voice*envelope
+    
     # Generate resonator parameters and apply resonator
     frequency = np.zeros([n_samples, 1])
     bandwidth = np.ones([n_samples, 1]) * 100
@@ -136,7 +138,7 @@ def klattvoice(f0, n_samples, Fs):
     
     return(voice)
     
-def klattnoise(n_samples, Fs):
+def klattnoise(n_samples, Fs, envelope):
     
     # Imports
     import numpy as np
@@ -152,15 +154,17 @@ def klattnoise(n_samples, Fs):
             temp[j] = noise_big[i*8+j]
         noise[i] = np.mean(temp)
         
+    noise = noise*envelope   
+        
     # Apply 6 dB/oct filter
     noise_out = np.zeros([n_samples])
-    noise_out[0] = noise[0]
+    noise_out[0] = (1/2)*noise[0]
     for i in range(1, n_samples, 1):
-        noise_out[i] = noise[i] + noise[i-1]
+        noise_out[i] = (1/2)*(noise[i] + noise[i-1])
 
     return(noise)
     
-def klattsynthesize(formant_track, bandwidth_track, f0, voicing, dur, n_samples, Fs):
+def klattsynthesize(formant_track, bandwidth_track, f0, voicing, dur, n_samples, Fs, radiation, envelope):
     
     # Imports
     import numpy as np
@@ -170,18 +174,26 @@ def klattsynthesize(formant_track, bandwidth_track, f0, voicing, dur, n_samples,
 
     # Generate voicing waveform
     if voicing == 1:
-        voice = klattvoice(f0, n_samples, Fs)
+        voice = klattvoice(f0, n_samples, Fs, envelope)
     elif voicing == 0:
-        voice = klattnoise(n_samples, Fs)
-    
+        voice = klattnoise(n_samples, Fs, envelope)
+        
     # Apply filter cascade
     for i in range(0,n_formants):
         voice = klattresonate(voice, np.column_stack((formant_track[:,i],
                                                       bandwidth_track[:,i])), 
                                                         Fs)
-    return(voice)
+    if radiation == 1: 
+        # Apply radiation characteristic
+        voice_out = np.zeros([n_samples])
+        voice_out[0] = voice[0]
+        for i in range(1, n_samples):
+            voice_out[i] = (voice[i] - voice[i-1])   
+        return(voice_out)
+    else:
+        return(voice)
 
-def klattmake(input_formants, input_bandwidths, input_envelope, f0, voicing, inc_ms, dur, Fs):
+def klattmake(input_formants, input_bandwidths, input_envelope, f0, voicing, inc_ms, dur, Fs, radiation):
 
     # Import
     import numpy as np
@@ -206,9 +218,7 @@ def klattmake(input_formants, input_bandwidths, input_envelope, f0, voicing, inc
         interpolated_envelope = klattinterpolate(input_envelope, n_inc, inc_samples, n_samples)
     
     # Synthesize
-    vowel = klattsynthesize(interpolated_formants, interpolated_bandwidths, f0, voicing, dur, n_samples, Fs)
-    
-    # Apply envelope
-    vowel = vowel*interpolated_envelope
+    vowel = klattsynthesize(interpolated_formants, interpolated_bandwidths, f0,
+                            voicing, dur, n_samples, Fs, radiation, interpolated_envelope)
     
     return(vowel)
