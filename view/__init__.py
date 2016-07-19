@@ -272,7 +272,7 @@ class SpecCanvas(FigCanvas):
         self.locked_track = 0
         self.inv = self.ax.transData.inverted()
         self.background = None
-        self.x_high = 40
+        self.x_high = 39
 
         # Testing background
         t = np.linspace(0, 40, 1000)
