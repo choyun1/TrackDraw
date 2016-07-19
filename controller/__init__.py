@@ -158,7 +158,6 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         if event.button:
             try:
                 x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
-                print(x_loc, y_loc)
                 trackNo, updated_track =\
                     self.model.updateTrackDrag(x_loc, y_loc,\
                                                self.locked_track, self.x_high)
