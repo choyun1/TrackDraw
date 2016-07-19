@@ -205,7 +205,7 @@ class AppMainWindow(QMainWindow):
 
 class WaveCanvas(FigCanvas):
     """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
-    def __init__(self, parent=None, width=5, height=1, dpi=100):
+    def __init__(self, parent, width, height, dpi=100):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         self.ax  = self.fig.add_subplot(111)
         self.ax.hold(False)
@@ -273,11 +273,6 @@ class SpecCanvas(FigCanvas):
         self.inv = self.ax.transData.inverted()
         self.background = None
         self.x_high = 39
-
-        # Testing background
-        t = np.linspace(0, 40, 1000)
-        x = 2500*np.sin(t) + 2500
-        self.ax.plot(t, x)
 
 
     def mouse(self, event):
