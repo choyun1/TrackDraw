@@ -75,6 +75,10 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         def play_synth_callback():
             self.play_tag = "synth"
             self.play()
+            
+        def default_callback():
+            self.appWindow.setDefaults()
+            update_parms_callback()
         
         # Bind the button callbacks
         self.appWindow.plot_loaded_but.clicked.connect(plot_loaded_callback)
@@ -82,7 +86,7 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         self.appWindow.plot_synth_but.clicked.connect(plot_synth_callback)
         self.appWindow.play_loaded_but.clicked.connect(play_loaded_callback)
         self.appWindow.play_synth_but.clicked.connect(play_synth_callback)
-        self.appWindow.default_but.clicked.connect(self.appWindow.setDefaults)
+        self.appWindow.default_but.clicked.connect(default_callback)
         
         # Callbacks for sliders/checkboxes
             
