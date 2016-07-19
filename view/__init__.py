@@ -327,4 +327,5 @@ class SpecCanvas(FigCanvas):
         for i in range(len(self.tracks)):
             self.tracks[i][0].set_xdata(np.arange(0, self.x_high, self.x_high/40))
         self.redrawTracks()
+        
 
