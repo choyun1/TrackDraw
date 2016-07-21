@@ -70,9 +70,11 @@ class AppMainWindow(QMainWindow):
         self.wave_cv = WaveCanvas(sound_widget, width=8, height=1, dpi=100)
         self.stft_cv = STFTCanvas(sound_widget, width=1, height=5, dpi=100)
         self.spec_cv = SpecCanvas(sound_widget, width=8, height=5, dpi=100)
+        self.f0_cv = F0Canvas(sound_widget, width=8, height=1, dpi=100)
         sound_layout.addWidget(self.wave_cv, 0, 1)
         sound_layout.addWidget(self.stft_cv, 1, 0)
         sound_layout.addWidget(self.spec_cv, 1, 1)
+        sound_layout.addWidget(self.f0_cv, 2, 1)
 
         # Right widget is for buttons and sliders
         buttn_layout = QVBoxLayout(buttn_widget)
@@ -213,7 +215,51 @@ class WaveCanvas(FigCanvas):
         self.ax.yaxis.set_visible(False)
         FigCanvas.__init__(self, self.fig)
         self.setParent(parent)
-
+        
+class F0Canvas(FigCanvas):
+    """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
+    def __init__(self, parent, width, height, dpi=100):
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        self.ax  = self.fig.add_subplot(111)
+        self.ax.hold(False)
+        self.ax.xaxis.set_visible(False)
+        self.ax.yaxis.set_visible(False)
+        FigCanvas.__init__(self, self.fig)
+        self.setParent(parent)
+        
+        self.f0_track = None
+        self.background = None
+        self.inv = self.ax.transData.inverted()
+        self.startF0()
+        
+    def mouse(self, event):
+        x_loc, y_loc = self.inv.transform((event.x, event.y))
+        if 0 < x_loc < 1 and 0 < y_loc < 1.925:
+            vect_1 = np.linspace(0,2,200)
+            vect_2 = np.linspace(90,150,200)
+            dist = np.abs(vect_1 - y_loc)
+            idx = dist.argmin()
+            y_val = vect_2[idx]
+            return 39*x_loc, y_val
+    
+    def getBackground(self):
+        self.background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
+        
+    def startF0(self):
+        self.fig.canvas.draw()
+        self.getBackground()
+        x_vector = np.arange(0,40,1)
+        self.f0_track = self.ax.plot(x_vector,np.ones([40])*100)
+        self.ax.set_xlim(0, 39)
+        self.ax.set_ylim(90,150)
+                         
+    def updateF0(self, updated_f0):
+        self.f0_track[0].set_ydata(updated_f0)
+        
+    def redrawF0(self):
+        self.fig.canvas.restore_region(self.background)
+        self.ax.draw_artist(self.f0_track[0])
+        self.fig.canvas.blit(self.ax.bbox)
 
 class STFTCanvas(FigCanvas):
     """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""

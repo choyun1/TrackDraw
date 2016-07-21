@@ -58,6 +58,8 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         self.appWindow.spec_cv.mpl_connect('button_press_event', self.click)
         self.appWindow.spec_cv.mpl_connect('motion_notify_event', self.drag)
         self.appWindow.spec_cv.mpl_connect('motion_notify_event', self.stft)
+        self.appWindow.f0_cv.mpl_connect('button_press_event', self.mouse_f0)
+        self.appWindow.f0_cv.mpl_connect('motion_notify_event', self.mouse_f0)
         
         # Callbacks for buttons
         def plot_loaded_callback():
@@ -135,7 +137,7 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         """
         When an area in the main canvas is clicked, mouse() returns the click's
         location in terms of the data dimensions if the click was within the
-        plot region. This location is passed to model by updateTrackClick(), 
+        plot region. This location is passed to model by updateTracksClick(), 
         which finds the nearest track/vertex to the click and updates the track
         data accordingly. Data from the updated track is then passed to the view,
         which updates the appropriate track in the view and redraws everything.
@@ -144,7 +146,7 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         """
         try:
             x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
-            trackNo, updated_track = self.model.updateTrackClick(x_loc, y_loc,\
+            trackNo, updated_track = self.model.updateTracksClick(x_loc, y_loc,\
                                                                  self.x_high)
             self.appWindow.spec_cv.updateTrack(trackNo, updated_track)
             self.appWindow.spec_cv.redrawTracks()
@@ -163,7 +165,7 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
                 x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
                 print(x_loc, y_loc)
                 trackNo, updated_track =\
-                    self.model.updateTrackDrag(x_loc, y_loc,\
+                    self.model.updateTracksDrag(x_loc, y_loc,\
                                                self.locked_track, self.x_high)
                 self.appWindow.spec_cv.updateTrack(trackNo, updated_track)
                 self.appWindow.spec_cv.redrawTracks()
@@ -191,20 +193,21 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
             except TypeError:
                 pass
             
+    def mouse_f0(self, event):
+        if event.button:
+            try:
+                x_loc, y_loc = self.appWindow.f0_cv.mouse(event)
+                updated_f0 = self.model.updateTrackClickDrag_F0(x_loc, y_loc)
+                self.appWindow.f0_cv.updateF0(updated_f0)
+                self.appWindow.f0_cv.redrawF0()
+            except TypeError:
+                pass
+            
     def synth(self):
         self.model.current_parms.FF = self.model.getTracks()
+        self.model.current_parms.F0 = self.model.getTrack_F0()
         if self.model.current_parms.synthesis_type == "Klatt 1980":
-            self.model.synth_sound.waveform = (synth.klatt.klattmake(
-                                       self.model.current_parms.FF,                      
-                                       self.model.current_parms.BW,
-                                       self.model.current_parms.envelope,
-                                       self.model.current_parms.F0,
-                                       self.model.current_parms.voicing,
-                                       self.model.current_parms.inc_ms,
-                                       self.model.current_parms.dur,
-                                       self.model.current_parms.synth_fs,
-                                       self.model.current_parms.radiation
-                                       ))
+            self.model.synth_sound.waveform = synth.klatt_experimental.klatt_make(self.model.current_parms)
         elif self.model.current_parms.synthesis_type == "Sine Wave":
             self.model.synth_sound.waveform = (synth.sine.sinemake(
                                                self.model.current_parms.FF,

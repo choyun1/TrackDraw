@@ -10,3 +10,4 @@ print('Testing - controller.synth loaded successfully')
 import controller.synth.klatt
 import controller.synth.util
 import controller.synth.sine
+import controller.synth.klatt_experimental
