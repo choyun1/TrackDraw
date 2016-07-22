@@ -146,8 +146,8 @@ class klatt_synth:
             for form in range(self.n_form):
                 a, b, c = self.calc_coef(current_form=form)
                 self.forms[form].resonate(a, b, c)
+                self.radiation_characteristic()
             self.update_inv()
-        self.radiation_characteristic()
         self.reset()
             
     def impulse_gen(self):
@@ -157,6 +157,22 @@ class klatt_synth:
                 self.output[self.current_ind+i] = 1
                 self.last_glot_pulse = self.current_ind+i
         self.perpetuate()
+        
+    def radiation_characteristic(self):
+        if self.current_inv == 0:
+            self.output[0] = self.input[0]
+            for n in range(1, self.inv_samp):
+                self.output[n] = self.input[n] - self.input[n-1]
+        else:
+            for n in range(0, self.inv_samp):
+                self.output[self.current_ind+n] =\
+                     self.input[self.current_ind+n]\
+                     - self.input[self.current_ind+n-1]
+
+#    def radiation_characteristic(self):
+#        self.output[0] = self.input[0]
+#        for n in range(1, len(self.input)):
+#            self.output[n] = self.input[n] - self.input[n-1]
         
 #    def noise_gen(self):
 #        noise_big = np.random.uniform(low = 0.0, high = 1.0, size = self.inv_samp*16)
@@ -208,11 +224,6 @@ class klatt_synth:
         self.current_ind = self.current_inv*self.inv_samp
         self.next_ind = self.next_inv*self.inv_samp
         self.input = [0] * self.n_inv*self.inv_samp
-        
-    def radiation_characteristic(self):
-        self.output[0] = self.input[0]
-        for n in range(1, len(self.input)):
-            self.output[n] = self.input[n] - self.input[n-1]
 
 class Resonator(object):
     """
