@@ -11,13 +11,15 @@
     klatt_synth. klatt_make accepts a Parameters object from the TrackDraw 2016
     program and extracts necessary synthesis parameters from the object.
     klatt_bridge accepts these extracted synthesis parameters, converts them 
-    to a format better suited for Klatt synthesis, and passes them to
-    klatt_synth. klatt_synth synthesizes a voice waveform and returns it. The 
-    waveform is in turn returned by klatt_bridge to klatt_make, which in turn
-    returns in to TrackDraw 2016.
+    to a format better suited for Klatt synthesis, and passes them to an
+    instance of a klatt_synth object. Then, klatt_bridge calls the object's
+    synth() method, which synthesizes the waveform. Finally, klatt_bridge takes
+    the object's output and returns it to klatt_make, which in turn returns it
+    to TrackDraw 2016.
     
     klatt.py is based on Klatt (1980), but only includes the portions necessary
-    for synthesis of isolated vowels.
+    for synthesis of isolated vowels. The main synthesis procedure synthesizes 
+    the output vowel waveform in small intervals (default 50 samples).
     
     Klatt, D. (1980). Software for a cascade/parallel formant synthesizer. 
     The Journal Of The Acoustical Society Of America, 67(3), 971. 
@@ -79,8 +81,24 @@ def klatt_bridge(f0, ff, bw, fs, dur, env, inv_samp=50):
     return(synth.output)
     
 class klatt_synth:
-
+    """
+    klatt_synth accepts a variety of synthesis parameters and synthesizes an
+    output waveform when called with the synth() method. klatt_synth expects
+    the inputs f0 and env to be lists of length n_inv, and expects ff and bw
+    to be lists containing n_form lists each length n_inv. 
     
+    As of version 0.2, klatt_synth contains default values for the rgp and rgz
+    components of the Klatt (1980) synthesizer, and synthesizes vowels with 
+    time-varying formant and fundamental frequency contours. Support for
+    voicing amplitude, noise source, nasal resonators, etc., has not yet been
+    added.
+    
+    The output vowel waveform is synthesized in intervals of length inv_samp.
+    Each resonator and antiresonator is represented by an instance of either a
+    Resonator or Antiresonator object. Other necessary functions (impulse 
+    generation, coefficient calculation, index updating, etc.) are contained 
+    within methods of the klatt_synth class. [This will likely change!]
+    """
     def __init__(self, f0, ff, bw, env, fs, n_inv, n_form, inv_samp):
         import math
         # Initialize time-varying synthesis parameters
@@ -104,9 +122,9 @@ class klatt_synth:
         
         # Initialize trackers
         self.last_glot_pulse = 0
-        self.current_inv = 0
+        self.current_inv = 0 # Index in terms of intervals
         self.next_inv = 1
-        self.current_ind = self.current_inv*self.inv_samp
+        self.current_ind = self.current_inv*self.inv_samp # Index in terms of samples
         self.next_ind = self.next_inv*self.inv_samp
         
         # Initialize input/output vectors
@@ -130,6 +148,7 @@ class klatt_synth:
                 self.forms[form].resonate(a, b, c)
             self.update_inv()
         self.radiation_characteristic()
+        self.reset()
             
     def impulse_gen(self):
         glot_period = round(self.fs/self.f0[self.current_inv])
@@ -164,6 +183,12 @@ class klatt_synth:
         return(a, b, c)
         
     def perpetuate(self):
+        """
+        Makes the input of the current interval the output of the current
+        interval. As each component of the synthesizer completes its job, it 
+        calls this function so that the next component receives the output of
+        the previous component.
+        """
         self.input[self.current_ind:self.next_ind] = self.output[self.current_ind:self.next_ind]    
                 
     def update_inv(self):
@@ -172,9 +197,17 @@ class klatt_synth:
         self.current_ind = self.current_inv*self.inv_samp
         self.next_ind = self.next_inv*self.inv_samp
         
-    def reset_inv(self):
+    def reset(self):
+        """
+        Probably not necessary, but resets the current interval and input so
+        that if updated parameters are passed to the object, synth() can be 
+        called again. 
+        """
         self.current_inv = 0
         self.next_inv = 1
+        self.current_ind = self.current_inv*self.inv_samp
+        self.next_ind = self.next_inv*self.inv_samp
+        self.input = [0] * self.n_inv*self.inv_samp
         
     def radiation_characteristic(self):
         self.output[0] = self.input[0]
@@ -182,6 +215,17 @@ class klatt_synth:
             self.output[n] = self.input[n] - self.input[n-1]
 
 class Resonator(object):
+    """
+    Resonator ala Klatt (1980). If the interval being processed is the first
+    interval, the first fifty samples are calculated assuming that input(-1)
+    and input(-2) are zero. Then, the two final calculated samples of the 
+    interval are stored in self.delay. These samples are used in calculation of
+    the first two samples of the next interval, since the difference equation 
+    contains a maximum delay of two samples. Operation continues in this 
+    pattern (calculating inv_samp samples, storing the final two calculated in
+    the delay, using the samples in the delay to calculate the first two
+    samples of the next interval, etc. etc.).
+    """
     def __init__(self, mast):
         self.mast = mast
         self.delay = [0] * 2
@@ -211,6 +255,10 @@ class Resonator(object):
         self.mast.perpetuate()
         
 class Antiresonator(object):
+    """
+    Functions similarly to Resonator, but with -dB in place of dB. See Klatt
+    (1980) for more information.
+    """
     def __init__(self, mast):
         self.mast = mast
         self.delay = [0] * 2
