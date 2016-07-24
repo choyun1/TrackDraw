@@ -10,10 +10,12 @@ version: 0.1.0
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.mlab as mlab
 import sounddevice as sd
 import controller.synth as synth
 from scipy import signal
 from scipy.io import wavfile
+import time
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
@@ -54,14 +56,7 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
                                            QtCore.Qt.CTRL + QtCore.Qt.Key_Q)
         self.appWindow.help_menu.addAction('&About', help_menu_about)
 
-        # Bind the spectrogram canvas callbacks
-        self.appWindow.spec_cv.mpl_connect('button_press_event', self.click)
-        self.appWindow.spec_cv.mpl_connect('motion_notify_event', self.drag)
-        self.appWindow.spec_cv.mpl_connect('motion_notify_event', self.stft)
-        self.appWindow.f0_cv.mpl_connect('button_press_event', self.mouse_f0)
-        self.appWindow.f0_cv.mpl_connect('motion_notify_event', self.mouse_f0)
-        
-        # Callbacks for buttons
+        # Callbacks for interface items
         def plot_loaded_callback():
             self.plot_tag = "loaded"
             self.plot()
@@ -81,6 +76,23 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         def default_callback():
             self.appWindow.setDefaults()
             update_parms_callback()
+            
+        def update_parms_callback():
+            self.model.current_parms.window_len = self.appWindow.fft_length_slider.value()
+            self.model.current_parms.dur = 0.5*self.appWindow.dur_slider.value()
+            if self.appWindow.voicing_check.checkState() == 0:
+                self.model.current_parms.voicing = 0
+            elif self.appWindow.voicing_check.checkState() == 2:
+                self.model.current_parms.voicing = 1
+            self.model.current_parms.synthesis_type = self.appWindow.synth_dropdown.currentText()
+            self.plot()
+            
+        # Bind the spectrogram canvas callbacks
+        self.appWindow.spec_cv.mpl_connect('button_press_event', self.click)
+        self.appWindow.spec_cv.mpl_connect('motion_notify_event', self.drag)
+        self.appWindow.spec_cv.mpl_connect('motion_notify_event', self.stft)
+        self.appWindow.f0_cv.mpl_connect('button_press_event', self.f0_mouse)
+        self.appWindow.f0_cv.mpl_connect('motion_notify_event', self.f0_mouse)
         
         # Bind the button callbacks
         self.appWindow.plot_loaded_but.clicked.connect(plot_loaded_callback)
@@ -89,86 +101,59 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         self.appWindow.play_loaded_but.clicked.connect(play_loaded_callback)
         self.appWindow.play_synth_but.clicked.connect(play_synth_callback)
         self.appWindow.default_but.clicked.connect(default_callback)
-        
-        # Callbacks for sliders/checkboxes
-            
-        def update_parms_callback():
-            self.model.current_parms.window_len = self.appWindow.fft_length_slider.value()
-            self.model.current_parms.F0 = self.appWindow.f0_slider.value()
-            self.model.current_parms.dur = 0.5*self.appWindow.dur_slider.value()
-            if self.appWindow.voicing_check.checkState() == 0:
-                self.model.current_parms.voicing = 0
-            elif self.appWindow.voicing_check.checkState() == 2:
-                self.model.current_parms.voicing = 1
-            if self.appWindow.radiation_check.checkState() == 0:
-                self.model.current_parms.radiation = 0
-            elif self.appWindow.radiation_check.checkState() == 2:
-                self.model.current_parms.radiation = 1
-            self.model.current_parms.BW[0:1,0] = self.appWindow.bw1_slider.value()
-            self.model.current_parms.BW[0:1,1] = self.appWindow.bw2_slider.value()
-            self.model.current_parms.BW[0:1,2] = self.appWindow.bw3_slider.value()
-            self.model.current_parms.BW[0:1,3] = self.appWindow.bw4_slider.value()
-            self.model.current_parms.BW[0:1,4] = self.appWindow.bw5_slider.value()
-            self.model.current_parms.synthesis_type = self.appWindow.synth_dropdown.currentText()
-            self.plot()
             
         # Bind the slider/checkbox/combobox callbacks
         self.appWindow.fft_length_slider.sliderReleased.connect(update_parms_callback)
         self.appWindow.voicing_check.stateChanged.connect(update_parms_callback)
-        self.appWindow.f0_slider.sliderReleased.connect(update_parms_callback)
         self.appWindow.dur_slider.sliderReleased.connect(update_parms_callback)
-        self.appWindow.radiation_check.stateChanged.connect(update_parms_callback)
-        self.appWindow.bw1_slider.sliderReleased.connect(update_parms_callback)
-        self.appWindow.bw2_slider.sliderReleased.connect(update_parms_callback)
-        self.appWindow.bw3_slider.sliderReleased.connect(update_parms_callback)
-        self.appWindow.bw4_slider.sliderReleased.connect(update_parms_callback)
-        self.appWindow.bw5_slider.sliderReleased.connect(update_parms_callback)
         self.appWindow.synth_dropdown.currentIndexChanged.connect(update_parms_callback)
         
-        # Send default tracks to view, create useful plotting attributes
-        self.appWindow.spec_cv.startTracks(self.model.tracks)
+        # Create tracker attributes and grab current parms
         self.locked_track = 0
-        self.x_high = 39
         self.plot_tag = "loaded"
         self.play_tag = "loaded"
         update_parms_callback()
             
     def click(self, event):
         """
-        When an area in the main canvas is clicked, mouse() returns the click's
-        location in terms of the data dimensions if the click was within the
-        plot region. This location is passed to model by updateTracksClick(), 
-        which finds the nearest track/vertex to the click and updates the track
-        data accordingly. Data from the updated track is then passed to the view,
-        which updates the appropriate track in the view and redraws everything.
-        At the end, the selected track is stored in locked_track, which drag()
-        uses to lock to a particular track for a given click-drag movement.
+        Explain!
         """
         try:
             x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
-            trackNo, updated_track = self.model.updateTracksClick(x_loc, y_loc,\
-                                                                 self.x_high)
-            self.appWindow.spec_cv.updateTrack(trackNo, updated_track)
-            self.appWindow.spec_cv.redrawTracks()
+            dist_to_x_pts = np.abs(np.linspace(0,39,40) - x_loc)
+            nearest_x_idx = dist_to_x_pts.argmin()
+            y_coords_at_nearest_x = np.array(\
+                    [track.points[nearest_x_idx] for track in self.model.tracks])
+            dist_to_y_pts = np.abs(y_coords_at_nearest_x - y_loc)
+            trackNo = dist_to_y_pts.argmin()
+            self.model.tracks[trackNo].points[nearest_x_idx] = y_loc
+            self.appWindow.spec_cv.update_track(self.model.tracks[trackNo].points, trackNo)
             self.locked_track = trackNo
         except TypeError:
             pass
     
     def drag(self, event):
         """
-        Similar functionality to click() above, except chooses the
-        locked_track-th track instead of the closest to the mouse, and does not
-        update the locked_track. 
+        Explain!
         """
         if event.button:
             try:
                 x_loc, y_loc = self.appWindow.spec_cv.mouse(event)
-                print(x_loc, y_loc)
-                trackNo, updated_track =\
-                    self.model.updateTracksDrag(x_loc, y_loc,\
-                                               self.locked_track, self.x_high)
-                self.appWindow.spec_cv.updateTrack(trackNo, updated_track)
-                self.appWindow.spec_cv.redrawTracks()
+                dist_to_x_pts = np.abs(np.linspace(0,39,40) - x_loc)
+                nearest_x_idx = dist_to_x_pts.argmin()
+                self.model.tracks[self.locked_track].points[nearest_x_idx] = y_loc
+                self.appWindow.spec_cv.update_track(self.model.tracks[self.locked_track].points, self.locked_track)
+            except TypeError:
+                pass
+            
+    def f0_mouse(self, event):
+        if event.button:
+            try:
+                x_loc, y_loc = self.appWindow.f0_cv.mouse(event)
+                dist_to_x_pts = np.abs(np.linspace(0,39,40) - x_loc)
+                nearest_x_idx = dist_to_x_pts.argmin()
+                self.model.f0_track.points[nearest_x_idx] = y_loc
+                self.appWindow.f0_cv.update_track(self.model.f0_track.points)
             except TypeError:
                 pass
             
@@ -179,35 +164,30 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
                 if self.plot_tag == "loaded":
                     waveform = self.model.loaded_sound.waveform
                     fs = self.model.loaded_sound.fs
+                    nsamples = self.model.loaded_sound.nsamples
                 elif self.plot_tag == "synth": 
                     waveform = self.model.synth_sound.waveform
                     fs = self.model.synth_sound.fs
+                    nsamples = self.model.synth_sound.nsamples
                 if len(waveform) == 0:
                     return
-                nearest_sample = round(x_loc*fs)
+                nearest_sample = round(x_loc*nsamples/39)
                 waveform = waveform/np.max(np.abs(waveform))
-                stspec = np.fft.rfft(waveform[nearest_sample-128:nearest_sample+128])
-                stspec = 20*np.log10(stspec)
-                self.appWindow.stft_cv.updateSTFT(stspec)
-                self.appWindow.stft_cv.redrawSTFT()
-            except TypeError:
-                pass
-            
-    def mouse_f0(self, event):
-        if event.button:
-            try:
-                x_loc, y_loc = self.appWindow.f0_cv.mouse(event)
-                updated_f0 = self.model.updateTrackClickDrag_F0(x_loc, y_loc)
-                self.appWindow.f0_cv.updateF0(updated_f0)
-                self.appWindow.f0_cv.redrawF0()
+                try:
+                    stspec = np.fft.rfft(waveform[nearest_sample-128:nearest_sample+128])
+                    stspec = 20*np.log10(stspec)
+                    self.appWindow.stft_cv.update_stft(stspec[0:128])
+                except ValueError:
+                    pass
             except TypeError:
                 pass
             
     def synth(self):
         self.model.current_parms.FF = self.model.getTracks()
-        self.model.current_parms.F0 = self.model.getTrack_F0()
+        self.model.current_parms.F0 = self.model.getF0Track()
         if self.model.current_parms.synthesis_type == "Klatt 1980":
-            self.model.synth_sound.waveform = synth.klatt_experimental.klatt_make(self.model.current_parms)
+            self.model.synth_sound.waveform =\
+                    synth.klatt_experimental.klatt_make(self.model.current_parms)
         elif self.model.current_parms.synthesis_type == "Sine Wave":
             self.model.synth_sound.waveform = (synth.sine.sinemake(
                                                self.model.current_parms.FF,
@@ -220,40 +200,37 @@ Copyright (c) 2016 Adrian Y. Cho and Daniel R Guest
         if self.plot_tag == "loaded":
             waveform = self.model.loaded_sound.waveform
             fs = self.model.loaded_sound.fs
-            nsamples = self.model.loaded_sound.nsamples
         elif self.plot_tag == "synth":
             waveform = self.model.synth_sound.waveform
             fs = self.model.synth_sound.fs
-            nsamples = self.model.synth_sound.nsamples
         if len(waveform) == 0:
             return
         window_len = self.model.current_parms.window_len
-        
-        self.appWindow.spec_cv.ax.clear()
-        self.x_high = nsamples/fs
-        self.appWindow.spec_cv.x_high = self.x_high
-        self.appWindow.spec_cv.ax.specgram(waveform, NFFT=window_len,
-                                           Fs=fs, noverlap=window_len*0.75, 
-                                           cmap = plt.cm.gist_heat)
-        self.appWindow.spec_cv.rescaleTracks()
-        
+        xmin, xmax = self.appWindow.spec_cv.plot_specgram(waveform, fs,
+                                                 window_len, self.model.tracks)
         self.appWindow.wave_cv.ax.plot(waveform)
-        self.appWindow.wave_cv.ax.set_xlim(0,len(waveform))
+        self.appWindow.wave_cv.ax.set_xlim(0, len(waveform))
         self.appWindow.wave_cv.fig.canvas.draw()
         
     def play(self):
         if self.play_tag == "loaded":
             waveform = self.model.loaded_sound.waveform
             fs = self.model.loaded_sound.fs
+            nsamples = self.model.loaded_sound.nsamples
         elif self.play_tag == "synth":
             waveform = self.model.synth_sound.waveform
             fs = self.model.synth_sound.fs
+            nsamples = self.model.synth_sound.nsamples
         if len(waveform) == 0:
             return
         waveform = waveform/np.max(np.abs(waveform))*0.9
         sd.play(waveform, fs)
+        time.sleep(nsamples/fs)
             
     def run(self):
         self.appWindow.show()
+        self.appWindow.stft_cv.start()
+        self.appWindow.f0_cv.start(self.model.f0_track)
+        self.appWindow.spec_cv.start(self.model.tracks, n_form=5)
         self.view.exec_()
 

@@ -153,7 +153,7 @@ class klatt_synth:
     def impulse_gen(self):
         glot_period = round(self.fs/self.f0[self.current_inv])
         for i in range(self.inv_samp):
-            if (self.current_ind+i)-self.last_glot_pulse == glot_period:
+            if (self.current_ind+i)-self.last_glot_pulse >= glot_period:
                 self.output[self.current_ind+i] = 1
                 self.last_glot_pulse = self.current_ind+i
         self.perpetuate()
@@ -168,11 +168,6 @@ class klatt_synth:
                 self.output[self.current_ind+n] =\
                      self.input[self.current_ind+n]\
                      - self.input[self.current_ind+n-1]
-
-#    def radiation_characteristic(self):
-#        self.output[0] = self.input[0]
-#        for n in range(1, len(self.input)):
-#            self.output[n] = self.input[n] - self.input[n-1]
         
 #    def noise_gen(self):
 #        noise_big = np.random.uniform(low = 0.0, high = 1.0, size = self.inv_samp*16)

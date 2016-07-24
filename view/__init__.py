@@ -12,8 +12,8 @@ import numpy as np
 import matplotlib
 matplotlib.use("Qt5Agg")
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigCanvas
-from scipy.io import wavfile
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout,  QVBoxLayout, QGridLayout,
@@ -42,7 +42,7 @@ class AppMainWindow(QMainWindow):
         screen_width  = QDesktopWidget().availableGeometry().size().width()
         screen_height = QDesktopWidget().availableGeometry().size().height()
         screen_center = QDesktopWidget().availableGeometry().center()
-        self.resize(0.6*screen_width, 0.8*screen_height)
+#        self.resize(0.6*screen_width, 0.8*screen_height)
         window_geometry = self.frameGeometry()
         window_geometry.moveCenter(screen_center)
         self.move(window_geometry.topLeft())
@@ -67,10 +67,10 @@ class AppMainWindow(QMainWindow):
 
         # Left widget is for displaying sound info
         sound_layout = QGridLayout(sound_widget)
-        self.wave_cv = WaveCanvas(sound_widget, width=8, height=1, dpi=100)
-        self.stft_cv = STFTCanvas(sound_widget, width=1, height=5, dpi=100)
-        self.spec_cv = SpecCanvas(sound_widget, width=8, height=5, dpi=100)
-        self.f0_cv = F0Canvas(sound_widget, width=8, height=1, dpi=100)
+        self.wave_cv = WaveCanvas(sound_widget, width=8, height=1)
+        self.stft_cv = STFTCanvas(sound_widget, width=1, height=5)
+        self.spec_cv = SpecCanvas(sound_widget, width=8, height=5)
+        self.f0_cv = F0Canvas(sound_widget, width=8, height=1)
         sound_layout.addWidget(self.wave_cv, 0, 1)
         sound_layout.addWidget(self.stft_cv, 1, 0)
         sound_layout.addWidget(self.spec_cv, 1, 1)
@@ -93,21 +93,11 @@ class AppMainWindow(QMainWindow):
         self.fft_length_slider.setMinimum(64)
         self.fft_length_slider.setMaximum(512)
         self.fft_length_slider.setSingleStep(4)
-        f0_label = QLabel("Fundamental Frequency")
-        self.f0_slider = QSlider(QtCore.Qt.Horizontal)
-        self.f0_slider.setMinimum(90)
-        self.f0_slider.setMaximum(200)
-        self.f0_slider.setSingleStep(1)
         dur_label = QLabel("Duration")
         self.dur_slider = QSlider(QtCore.Qt.Horizontal)
         self.dur_slider.setMinimum(1)
         self.dur_slider.setMaximum(10)
         self.dur_slider.setSingleStep(1)
-        bw1_label = QLabel("First Formant Bandwidth")
-        bw2_label = QLabel("Second Formant Bandwidth")
-        bw3_label = QLabel("Third Formant Bandwidth")
-        bw4_label = QLabel("Fourth Formant Bandwidth")
-        bw5_label = QLabel("Fifth Formant Bandwidth")
         self.bw1_slider = QSlider(QtCore.Qt.Horizontal)
         self.bw1_slider.setMinimum(50)
         self.bw1_slider.setMaximum(400)
@@ -138,7 +128,6 @@ class AppMainWindow(QMainWindow):
         # Define checkboxes
         self.stft_check = QCheckBox("STFT Display (on/off)")
         self.voicing_check = QCheckBox("Voicing (on/off)")
-        self.radiation_check = QCheckBox("Radiation characteristic (on/off)")
         
         # Define organizational labels
         input_label = QLabel("Input")
@@ -170,21 +159,8 @@ class AppMainWindow(QMainWindow):
         buttn_layout.addWidget(synth_dropdown_label)
         buttn_layout.addWidget(self.synth_dropdown)
         buttn_layout.addWidget(self.voicing_check)
-        buttn_layout.addWidget(self.radiation_check)
-        buttn_layout.addWidget(f0_label)
-        buttn_layout.addWidget(self.f0_slider)
         buttn_layout.addWidget(dur_label)
         buttn_layout.addWidget(self.dur_slider)
-        buttn_layout.addWidget(bw1_label)
-        buttn_layout.addWidget(self.bw1_slider)
-        buttn_layout.addWidget(bw2_label)
-        buttn_layout.addWidget(self.bw2_slider)        
-        buttn_layout.addWidget(bw3_label)
-        buttn_layout.addWidget(self.bw3_slider)
-        buttn_layout.addWidget(bw4_label)
-        buttn_layout.addWidget(self.bw4_slider)
-        buttn_layout.addWidget(bw5_label)
-        buttn_layout.addWidget(self.bw5_slider)
         buttn_layout.addStretch(1.0)
         
         # Set sliders to defaults
@@ -195,178 +171,143 @@ class AppMainWindow(QMainWindow):
         
     def setDefaults(self):
         self.fft_length_slider.setValue(256)
-        self.f0_slider.setValue(100)
         self.dur_slider.setValue(2)
         self.voicing_check.setChecked(True)
-        self.bw1_slider.setValue(50)
-        self.bw2_slider.setValue(100)
-        self.bw3_slider.setValue(100)
-        self.bw4_slider.setValue(200)
-        self.bw5_slider.setValue(250)
 
 
 class WaveCanvas(FigCanvas):
     """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
-    def __init__(self, parent, width, height, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
+    def __init__(self, parent, width, height):
+        self.fig = Figure(figsize=(width, height))
         self.ax  = self.fig.add_subplot(111)
         self.ax.hold(False)
         self.ax.xaxis.set_visible(False)
         self.ax.yaxis.set_visible(False)
         FigCanvas.__init__(self, self.fig)
         self.setParent(parent)
-        
+
 class F0Canvas(FigCanvas):
     """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
-    def __init__(self, parent, width, height, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
+    def __init__(self, parent, width, height):
+        self.fig = Figure(figsize=(width, height))
         self.ax  = self.fig.add_subplot(111)
         self.ax.hold(False)
         self.ax.xaxis.set_visible(False)
-        self.ax.yaxis.set_visible(False)
         FigCanvas.__init__(self, self.fig)
         self.setParent(parent)
         
         self.f0_track = None
-        self.background = None
-        self.inv = self.ax.transData.inverted()
-        self.startF0()
+        self.background = None     
+        
+    def start(self, f0_track):
+        self.ax.clear()
+        self.ax.set_xlim(0,39)
+        self.ax.set_ylim(90,150)     
+        self.fig.canvas.draw()
+        self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
+        self.f0_track = self.ax.plot(f0_track.points, color = "blue", marker="o")
+        self.ax.set_xlim(0,39)
+        self.ax.set_ylim(90,150) 
         
     def mouse(self, event):
-        x_loc, y_loc = self.inv.transform((event.x, event.y))
-        if 0 < x_loc < 1 and 0 < y_loc < 1.925:
-            vect_1 = np.linspace(0,2,200)
-            vect_2 = np.linspace(90,150,200)
-            dist = np.abs(vect_1 - y_loc)
-            idx = dist.argmin()
-            y_val = vect_2[idx]
-            return 39*x_loc, y_val
+        x_loc, y_loc = self.ax.transData.inverted().transform((event.x, event.y))
+        xmin, xmax = self.ax.get_xlim()
+        ymin, ymax = self.ax.get_ylim()
+        if xmin < x_loc < xmax and ymin < y_loc < ymax:
+            return(x_loc, y_loc)
     
-    def getBackground(self):
-        self.background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
-        
-    def startF0(self):
-        self.fig.canvas.draw()
-        self.getBackground()
-        x_vector = np.arange(0,40,1)
-        self.f0_track = self.ax.plot(x_vector,np.ones([40])*100)
-        self.ax.set_xlim(0, 39)
-        self.ax.set_ylim(90,150)
-                         
-    def updateF0(self, updated_f0):
-        self.f0_track[0].set_ydata(updated_f0)
-        
-    def redrawF0(self):
+    def update_track(self, new_track):
         self.fig.canvas.restore_region(self.background)
+        self.f0_track[0].set_ydata(new_track)
         self.ax.draw_artist(self.f0_track[0])
-        self.fig.canvas.blit(self.ax.bbox)
+        self.fig.canvas.blit(self.ax.clipbox)
 
 class STFTCanvas(FigCanvas):
     """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
-    def __init__(self, parent=None, width=1, height=4, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
+    def __init__(self, parent=None, width=1, height=4):
+        self.fig = Figure(figsize=(width, height))
         self.ax  = self.fig.add_subplot(111)
         self.ax.hold(False)
         self.ax.xaxis.set_visible(False)
         self.ax.yaxis.set_visible(False)
-
         FigCanvas.__init__(self, self.fig)
         self.setParent(parent)
-
+        
         self.stft = None
         self.background = None
-        self.startSTFT()
         
-    def getBackground(self):
-        self.background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
-        
-    def startSTFT(self):
-        self.fig.canvas.draw()
-        self.getBackground()
-        x_vector = np.arange(0,128,1)
-        self.stft = self.ax.plot(np.zeros([128]), x_vector)
+    def start(self):
+        self.ax.clear()
         self.ax.set_xlim(-20, 40)
-        self.ax.set_ylim(2,128)
+        self.ax.set_ylim(2, 128)
+        self.fig.canvas.draw()
+        self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
+        self.stft, = self.ax.plot(np.linspace(-20, -20, 128), np.arange(0, 128, 1))
+        self.ax.set_xlim(-20, 40)
+        self.ax.set_ylim(2, 128)
         
-    def updateSTFT(self, updated_stft):
-        x_vector = np.arange(0,len(updated_stft),1)
-        self.stft[0].set_data(updated_stft, x_vector)
-        
-    def redrawSTFT(self):
+    def update_stft(self, new_stft):
         self.fig.canvas.restore_region(self.background)
-        self.ax.draw_artist(self.stft[0])
-        self.fig.canvas.blit(self.ax.bbox)
-        
-    def rescaleSTFT(self, length):
-        self.ax.set_xlim(-20, 40)
-        self.ax.set_ylim(2, length)
-        self.fig.canvas.draw()
-        self.getBackground()
-        self.redrawTracks()
+        try:
+            self.stft.set_xdata(new_stft)
+            self.ax.draw_artist(self.stft)
+        except (RuntimeError, ValueError):
+            pass
+        self.fig.canvas.blit(self.ax.clipbox)
         
 class SpecCanvas(FigCanvas):
     """Ultimately, this is a QWidget (as well as a FigCanvasAgg, etc.)."""
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
-#        self.ax = self.fig.add_axes((0.1, 0.1, 0.8, 0.8), axisbg =
-#                                    (0.5, 0.5, 0.5), frameon = False)
+    def __init__(self, parent=None, width=5, height=4):
+        self.fig = Figure(figsize=(width, height))
         self.ax = self.fig.add_subplot(111)
         FigCanvas.__init__(self, self.fig)
         self.setParent(parent)
-
+        
         self.tracks = []
-        self.locked_track = 0
-        self.inv = self.ax.transData.inverted()
         self.background = None
-        self.x_high = 39
-
-
+        self.n_form = 0
+        
+    def start(self, tracks, n_form):
+        self.ax.clear()
+        self.n_form = n_form
+        self.ax.set_xlim(0,39)
+        self.ax.set_ylim(0,5000)
+        self.fig.canvas.draw()
+        self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
+        for i in range(self.n_form):
+            self.tracks.append(self.ax.plot(tracks[i].points, color = "blue", marker="o"))
+        
     def mouse(self, event):
-        x_loc, y_loc = self.inv.transform((event.x, event.y))
-        if 0 < x_loc < 1 and 0 < y_loc < 1:
-            return self.x_high*x_loc, 5000*y_loc
-
-    def startTracks(self, tracks):
-        """
-        Draws canvas without tracks and grabs the background. Then plots
-        tracks, sets limits, and renders the plot again.
-        """
+        x_loc, y_loc = self.ax.transData.inverted().transform((event.x, event.y))
+        xmin, xmax = self.ax.get_xlim()
+        ymin, ymax = self.ax.get_ylim()
+        if xmin < x_loc < xmax and ymin < y_loc < ymax:
+            return(x_loc, y_loc)
+            
+    def update_track(self, new_track=0, trackNo=0, redraw=0):
+        if redraw == 0:
+            self.fig.canvas.restore_region(self.background)
+            self.tracks[trackNo][0].set_ydata(new_track)
+            for i in range(len(self.tracks)):
+                self.ax.draw_artist(self.tracks[i][0])
+            self.fig.canvas.blit(self.ax.clipbox)
+        else:
+            self.fig.canvas.restore_region(self.background)
+            for i in range(len(self.tracks)):
+                self.ax.draw_artist(self.tracks[i][0])
+            self.fig.canvas.blit(self.ax.clipbox)
+        
+    def plot_specgram(self, waveform, fs, window_len, tracks):
+        self.ax.clear()
+        self.tracks = []
+        self.ax.specgram(waveform, NFFT=window_len, Fs=fs,
+                         noverlap=window_len*0.75, cmap = plt.cm.gist_heat)
+        xmin, xmax = self.ax.get_xlim()
         self.fig.canvas.draw()
-        self.getBackground()
-        self.tracks = [self.ax.plot(track.points,\
-                                    marker="o",\
-                                    markersize=4,\
-                                    markeredgewidth=0.0)\
-                       for track in tracks]
-        self.ax.set_xlim(0, self.x_high)
-        self.ax.set_ylim(0, 5000)
-    
-    def updateTrack(self, trackNo, updated_track):
-        self.tracks[trackNo][0].set_ydata(updated_track)
+        self.ax.set_xlim(0,39)
+        self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
+        for i in range(self.n_form):
+            self.tracks.append(self.ax.plot(tracks[i].points, color = "blue", marker="o"))
+        self.update_track(redraw=1)
+        return(xmin, xmax)
         
-    def getBackground(self):
-        self.background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
-   
-    def redrawTracks(self):
-        """
-        Restores empty background (doesn't have to redraw everything and waste
-        time), then redraws only lines.
-        """
-        self.fig.canvas.restore_region(self.background)
-        for i in range(len(self.tracks)):
-            self.ax.draw_artist(self.tracks[i][0])
-        self.fig.canvas.blit(self.ax.bbox)  
-        
-    def rescaleTracks(self):
-        """
-        Changes the x-data in the tracks to scale them visually in the x-dimension
-        """
-        self.ax.set_xlim(0, self.x_high)
-        self.ax.set_ylim(0, 5000)
-        self.fig.canvas.draw()
-        self.getBackground()
-        for i in range(len(self.tracks)):
-            self.tracks[i][0].set_xdata(np.arange(0, self.x_high, self.x_high/40))
-        self.redrawTracks()
-        
-

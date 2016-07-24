@@ -37,22 +37,6 @@ class Model:
         synth_fs = self.default_parms.synth_fs
         self.loaded_sound = Sound(np.array([]), resample_fs, 1)
         self.synth_sound  = Sound(np.array([]), synth_fs, 1)
-        
-    def updateTracksClick(self, x_loc, y_loc, x_high):
-        dist_to_x_pts = np.abs(np.arange(0,x_high,x_high/40) - x_loc)
-        nearest_x_idx = dist_to_x_pts.argmin()
-        y_coords_at_nearest_x = np.array(\
-                [track.points[nearest_x_idx] for track in self.tracks])
-        dist_to_y_pts = np.abs(y_coords_at_nearest_x - y_loc)
-        trackNo = dist_to_y_pts.argmin()
-        self.tracks[trackNo].points[nearest_x_idx] = y_loc
-        return trackNo, self.tracks[trackNo].points
-        
-    def updateTracksDrag(self, x_loc, y_loc, trackNo, x_high):
-        dist_to_x_pts = np.abs(np.arange(0,x_high,x_high/40) - x_loc)
-        nearest_x_idx = dist_to_x_pts.argmin()
-        self.tracks[trackNo].points[nearest_x_idx] = y_loc
-        return trackNo, self.tracks[trackNo].points
 
     def getTracks(self):
         output = np.zeros([40, len(self.tracks)])
@@ -60,18 +44,11 @@ class Model:
             output[0:40, i] = self.tracks[i].points
         return(output)
         
-    def updateTrackClickDrag_F0(self, x_loc, y_loc):
-        dist_to_x_pts = np.abs(np.arange(0,40,1) - x_loc)
-        nearest_x_idx = dist_to_x_pts.argmin()
-        self.f0_track.points[nearest_x_idx] = y_loc
-        return self.f0_track.points
-        
-    def getTrack_F0(self):
+    def getF0Track(self):
         output = np.zeros([40])
-        for i in range(40):
-            output[i] = self.f0_track.points[i]
+        output[:] = self.f0_track.points
         return(output)
-        
+
 class Sound:
     """
     The Sound class now automatically updates n_samples whenever the waveform
