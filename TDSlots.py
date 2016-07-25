@@ -14,7 +14,8 @@ from scipy.io import wavfile
 
 @pyqtSlot()
 def audioOpen(*arg, parent=None, **kwarg):
-    fname = QFileDialog.getOpenFileName(parent, "Open file", "Wav (*.wav)")
+    fname = QFileDialog.getOpenFileName(parent, "Open a wave file", "",
+            "Wav files (*.wav)")
     if fname[0]:
         old_fs, x = wavfile.read(fname[0])
         #new_fs = model.default_parms.resample_fs
@@ -27,11 +28,28 @@ def audioOpen(*arg, parent=None, **kwarg):
 
 @pyqtSlot()
 def audioSave(*arg, parent=None, **kwarg):
-    return 0
+    fname = QFileDialog.getSaveFileName(parent, "Save the synthesized sound",
+            "", "Wav files (*.wav)")
+    print(fname)
 
 
 @pyqtSlot()
 def helpAbout(*arg, parent=None, **kwarg):
     aboutText = """<b>TrackDraw v0.2.0</b>\nCopyright (c) 2016"""
     QMessageBox.about(parent, "About", aboutText)
+
+
+@pyqtSlot()
+def clearPlots(*arg, parent=None, **kwarg):
+    print(0)
+
+
+@pyqtSlot()
+def applyAnalysis(*arg, parent=None, **kwarg):
+    print(0)
+
+
+@pyqtSlot()
+def synthesize(*arg, parent=None, **kwarg):
+    print(0)
 

@@ -19,10 +19,14 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(TDWidgets.TDCanvases(self))
 
         ##### Menus #####
-        # File menu
+        # Partial function application to create appropriate callbacks
         audioOpen = partial(TDSlots.audioOpen, parent=self)
         audioSave = partial(TDSlots.audioSave, parent=self)
         helpAbout = partial(TDSlots.helpAbout, parent=self)
+        clearPlots = partial(TDSlots.clearPlots, parent=self)
+        applyAnalysis = partial(TDSlots.applyAnalysis, parent=self)
+        synthesize = partial(TDSlots.synthesize, parent=self)
+        # File menu
         fileMenuActions = [\
                 self.createMenuAction("&Open a sound file...", 
                     audioOpen, QKeySequence.Open, None,
@@ -31,13 +35,24 @@ class MainWindow(QMainWindow):
                     QKeySequence.Save, None, "Save the synthesized sound file"),
                 "|",
                 self.createMenuAction("&Quit", self.close, "Ctrl+Q", None,
-                    "Close TrackDraw") ]
+                    "Close TrackDraw")]
         self.fileMenu = self.menuBar().addMenu("&File")
         for action in fileMenuActions:
             if action == "|":
                 self.fileMenu.addSeparator()
             else:
                 self.fileMenu.addAction(action)
+        # Analysis/Synthesis menu
+        ASMenuActions = [\
+                self.createMenuAction("C&lear plots", clearPlots, "Ctrl+L",
+                    None, "Clear all plots"),
+                self.createMenuAction("Apply analysis settings", applyAnalysis,
+                    "Ctrl+R", None, "Apply analysis settings and refresh"),
+                self.createMenuAction("S&ynthesize", synthesize,
+                    "Ctrl+Y", None, "Synthesize using current settings")]
+        self.ASMenu = self.menuBar().addMenu("A&nalysis/Synthesis")
+        for action in ASMenuActions:
+            self.ASMenu.addAction(action)
         # Help menu
         helpMenuActions = [\
                 self.createMenuAction("&About", helpAbout,
@@ -47,27 +62,33 @@ class MainWindow(QMainWindow):
             self.helpMenu.addAction(action)
         ##### End menu setup #####
 
-        ##### Docks on the left hand side #####
+        ##### Docks on the right hand side #####
         displayDock = TDWidgets.DisplayDock(parent=self)
-        displayDock.setAllowedAreas(Qt.LeftDockWidgetArea)
+        displayDock.setAllowedAreas(Qt.RightDockWidgetArea)
         displayDock.setFeatures(QDockWidget.DockWidgetMovable)
         analysisDock = TDWidgets.AnalysisDock(parent=self)
-        analysisDock.setAllowedAreas(Qt.LeftDockWidgetArea)
+        analysisDock.setAllowedAreas(Qt.RightDockWidgetArea)
         analysisDock.setFeatures(QDockWidget.DockWidgetMovable)
         synthesisDock = TDWidgets.SynthesisDock(parent=self)
-        synthesisDock.setAllowedAreas(Qt.LeftDockWidgetArea)
+        synthesisDock.setAllowedAreas(Qt.RightDockWidgetArea)
         synthesisDock.setFeatures(QDockWidget.DockWidgetMovable)
 
-        self.addDockWidget(Qt.LeftDockWidgetArea, displayDock)
-        self.addDockWidget(Qt.LeftDockWidgetArea, analysisDock)
-        self.addDockWidget(Qt.LeftDockWidgetArea, synthesisDock)
+        self.addDockWidget(Qt.RightDockWidgetArea, displayDock)
+        self.addDockWidget(Qt.RightDockWidgetArea, analysisDock)
+        self.addDockWidget(Qt.RightDockWidgetArea, synthesisDock)
         self.tabifyDockWidget(displayDock, analysisDock)
         self.tabifyDockWidget(analysisDock, synthesisDock)
 
-        self.setTabPosition(Qt.LeftDockWidgetArea, 2)
+        self.setTabPosition(Qt.RightDockWidgetArea, 3)
         ##### End dock setup #####
 
         ##### Status bar #####
+        self.sizeLabel = QLabel()
+        self.sizeLabel.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
+        status = self.statusBar()
+        status.setSizeGripEnabled(False)
+        status.addPermanentWidget(self.sizeLabel)
+        status.showMessage("Welcome to TrackDraw!", 5000)
         ##### End status bar setup #####
 
     
@@ -91,8 +112,8 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("TrackDraw")
-    form = MainWindow()
-    form.show()
+    mainWindow = MainWindow()
+    mainWindow.show()
     app.exec_()
 
 

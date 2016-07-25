@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
+from functools import partial
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
+import TDSlots
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
@@ -58,7 +60,11 @@ class DisplayDock(QDockWidget):
         showFTCheckBox = QCheckBox("Show formant tracks")
         showFTCheckBox.setChecked(True)
 
-        clearButton = QPushButton("Clear plots")
+        clearButton = QPushButton("Clear plots (Ctrl+L)")
+        clearButton.setToolTip("Clear all plots")
+        clearButton.setStatusTip("Clear all plots")
+        clearPlots = partial(TDSlots.clearPlots, self)
+        clearButton.clicked.connect(clearPlots)
 
         mainVBox.addWidget(dispGroupBox)
         mainVBox.addWidget(STFTCheckBox)
@@ -142,7 +148,11 @@ class AnalysisDock(QDockWidget):
         specVBox.addWidget(overlapGroup)
         specVBox.addWidget(thresholdGroup)
         #
-        applyButton = QPushButton("Apply")
+        applyButton = QPushButton("Apply settings (Ctrl+R)")
+        applyButton.setToolTip("Apply analysis settings")
+        applyButton.setStatusTip("Apply analysis settings")
+        applyAnalysis = partial(TDSlots.applyAnalysis, parent=self)
+        applyButton.clicked.connect(applyAnalysis)
         ###
 
         mainVBox.addWidget(methodGroup)
@@ -204,12 +214,16 @@ class SynthesisDock(QDockWidget):
         klattVBox.addWidget(F4BandwidthGroup)
         klattVBox.addWidget(F5BandwidthGroup)
         #
-        applyButton = QPushButton("Synthesize")
+        synthButton = QPushButton("Synthesize (Ctrl+Y)")
+        synthButton.setToolTip("Synthesize using current settings")
+        synthButton.setStatusTip("Synthesize using current settings")
+        synthesize = partial(TDSlots.synthesize, parent=self)
+        synthButton.clicked.connect(synthesize)
         ###
 
         mainVBox.addWidget(methodGroup)
         mainVBox.addWidget(klattGroup)
-        mainVBox.addWidget(applyButton)
+        mainVBox.addWidget(synthButton)
         mainVBox.addStretch()
         self.setWidget(mainWidget)
 
