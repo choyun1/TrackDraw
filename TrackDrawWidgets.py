@@ -7,6 +7,8 @@ from functools import partial
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
+import matplotlib
+matplotlib.use("QT5Agg")
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
@@ -27,16 +29,62 @@ class CanvasGrid(QWidget):
         mainGrid.setRowStretch(1, 20)
         mainGrid.setRowStretch(2, 6)
         mainGrid.setColumnStretch(0, 1)
-        mainGrid.setColumnStretch(1, 6)
+        mainGrid.setColumnStretch(1, 7)
 
-        canvas1 = FigureCanvas(Figure())
-        canvas2 = FigureCanvas(Figure())
-        canvas3 = FigureCanvas(Figure())
-        canvas4 = FigureCanvas(Figure())
+        canvas1 = WaveCanvas(self)
+        canvas2 = STFTCanvas(self)
+        canvas3 = SpecCanvas(self)
+        canvas4 = F0Canvas(self)
         mainGrid.addWidget(canvas1, 0, 1)
         mainGrid.addWidget(canvas2, 1, 0)
         mainGrid.addWidget(canvas3, 1, 1)
         mainGrid.addWidget(canvas4, 2, 1)
+
+
+class WaveCanvas(FigureCanvas):
+    def __init__(self, parent=None):
+        self.fig = Figure()
+        self.ax  = self.fig.add_subplot(111)
+        self.ax.hold(False)
+        self.ax.xaxis.set_visible(False)
+        self.ax.yaxis.set_visible(False)
+        self.fig.subplots_adjust(left=0.08, right=0.95) 
+        FigureCanvas.__init__(self, self.fig)
+        self.setParent(parent)
+
+
+class STFTCanvas(FigureCanvas):
+    def __init__(self, parent=None):
+        self.fig = Figure()
+        self.ax  = self.fig.add_subplot(111)
+        self.ax.hold(False)
+        self.ax.xaxis.set_visible(False)
+        self.ax.yaxis.set_visible(False)
+        self.fig.subplots_adjust(top=0.95, bottom=0.1)
+        FigureCanvas.__init__(self, self.fig)
+        self.setParent(parent)
+
+
+class SpecCanvas(FigureCanvas):
+    def __init__(self, parent=None):
+        self.fig = Figure()
+        self.ax  = self.fig.add_subplot(111)
+        self.ax.set_xlabel("Time [s]")
+        self.ax.set_ylabel("Frequency [Hz]")
+        self.fig.subplots_adjust(left=0.08, top=0.95, right=0.95, bottom=0.1)
+        FigureCanvas.__init__(self, self.fig)
+        self.setParent(parent)
+
+
+class F0Canvas(FigureCanvas):
+    def __init__(self, parent=None):
+        self.fig = Figure()
+        self.ax  = self.fig.add_subplot(111)
+        self.ax.hold(False)
+        self.ax.xaxis.set_visible(False)
+        self.fig.subplots_adjust(left=0.08, right=0.95) 
+        FigureCanvas.__init__(self, self.fig)
+        self.setParent(parent)
 
 
 class DisplayDock(QDockWidget):
@@ -98,6 +146,7 @@ class AnalysisDock(QDockWidget):
         methodLabel = QLabel("Method:")
         self.methodComboBox = QComboBox()
         self.methodComboBox.addItems(["Spectrogram", "Wavelet"])
+        self.methodComboBox.setCurrentIndex(0)
         self.methodComboBox.currentIndexChanged.connect(self.changeAnalysis)
 
         methodVBox.addWidget(resampleLabel)
@@ -117,8 +166,10 @@ class AnalysisDock(QDockWidget):
         windowLabel = QLabel("Window function:")
         windowComboBox = QComboBox()
         windowComboBox.addItems(["Hanning", "Rectangular"])
+        windowComboBox.setCurrentIndex(0)
         windowVBox.addWidget(windowLabel)
         windowVBox.addWidget(windowComboBox)
+
 
         frameSizeGroup = SliderGroup(label="Frame size:", units="samples",
                 minimum=5, maximum=10, stepDouble=True, value=8)
@@ -129,10 +180,13 @@ class AnalysisDock(QDockWidget):
         thresholdGroup = SliderGroup(label="Threshold:", units="dB",
                 minimum=0, maximum=10, stepSize=1, value=3)
 
+        reassignCheckBox = QCheckBox("T-F reassignment")
+
         specVBox.addWidget(windowGroup)
         specVBox.addWidget(frameSizeGroup)
         specVBox.addWidget(overlapGroup)
         specVBox.addWidget(thresholdGroup)
+        specVBox.addWidget(reassignCheckBox)
         ###
 
         ### Wavelet settings group box
@@ -193,6 +247,7 @@ class SynthesisDock(QDockWidget):
         methodLabel = QLabel("Method:")
         self.methodComboBox = QComboBox()
         self.methodComboBox.addItems(["Klatt 1980", "Sine wave"])
+        self.methodComboBox.setCurrentIndex(0)
         self.methodComboBox.currentIndexChanged.connect(self.changeSynthesis)
 
         methodVBox.addWidget(synthesisLabel)
@@ -216,6 +271,18 @@ class SynthesisDock(QDockWidget):
         klattVBox = QVBoxLayout()
         self.klattGroup.setLayout(klattVBox)
 
+        voicingGroup = QWidget()
+        voicingVBox = QVBoxLayout()
+        voicingGroup.setLayout(voicingVBox)
+        voicingLabel = QLabel("Voicing source:")
+        self.voicingComboBox = QComboBox()
+        self.voicingComboBox.addItems(\
+                ["Pulse train", "Sinusoidal", "White noise",
+                 "Liljencrants-Fant", "Rosenberg++"])
+        self.voicingComboBox.setCurrentIndex(0)
+        voicingVBox.addWidget(voicingLabel)
+        voicingVBox.addWidget(self.voicingComboBox)
+
         F1BandwidthGroup = SliderGroup(label="F1 bandwidth:", units="Hz",
                 minimum=5, maximum=20, value=10)
         F2BandwidthGroup = SliderGroup(label="F2 bandwidth:", units="Hz",
@@ -227,11 +294,24 @@ class SynthesisDock(QDockWidget):
         F5BandwidthGroup = SliderGroup(label="F5 bandwidth:", units="Hz",
                 minimum=5, maximum=20, value=10)
 
-        klattVBox.addWidget(F1BandwidthGroup)
-        klattVBox.addWidget(F2BandwidthGroup)
-        klattVBox.addWidget(F3BandwidthGroup)
-        klattVBox.addWidget(F4BandwidthGroup)
-        klattVBox.addWidget(F5BandwidthGroup)
+        FFBandwidthGroup = SliderGroup2(\
+                labels=["F1 bandwidth:", "F2 bandwidth:", "F3 bandwidth:",
+                       "F4 bandwidth:", "F5 bandwidth:"],
+                units=["Hz", "Hz", "Hz", "Hz", "Hz"],
+                mins=[5, 5, 5, 5, 5],
+                maxs=[20, 20, 20, 20, 20],
+                values=[10, 10, 10, 10, 10],
+                stepSizes=[1, 1, 1, 1, 1],
+                stepDoubles=[False, False, False, False, False])
+
+        klattVBox.addWidget(voicingLabel)
+        klattVBox.addWidget(voicingGroup)
+        #klattVBox.addWidget(F1BandwidthGroup)
+        #klattVBox.addWidget(F2BandwidthGroup)
+        #klattVBox.addWidget(F3BandwidthGroup)
+        #klattVBox.addWidget(F4BandwidthGroup)
+        #klattVBox.addWidget(F5BandwidthGroup)
+        klattVBox.addWidget(FFBandwidthGroup)
         ###
 
         ### Sine wave synthesis settings group box
@@ -325,6 +405,54 @@ class SliderGroup(QWidget):
             self.currValue = 2**self.slider.value()
         else:
             self.currValue = self.stepSize*self.slider.value()
+        newTopTxt = self.labelTxt + "  " + str(self.currValue)\
+                  + " " + self.unitsTxt
+        self.topLabel.setText(newTopTxt)
+
+
+class SliderGroup2(QWidget):
+    """
+    A convenience widget for displaying slider information (minimum, maximum,
+    and current value). Set stepDouble=True to create a slider that doubles
+    its value each step.
+    """
+    def __init__(self, labels, units, mins, maxs, values, stepSizes,
+            stepDoubles, parent=None, slots=None):
+        super(SliderGroup2, self).__init__(parent)
+        SliderGrid = QGridLayout()
+        self.setLayout(SliderGrid)
+
+        for i in range(len(labels)):
+            self.stepSize = stepSizes[i]
+            self.stepDouble = stepDoubles[i]
+            if stepDoubles[i]:
+                self.currValue = 2**values[i]
+                minLabel = QLabel(str(2**mins[i]))
+                maxLabel = QLabel(str(2**maxs[i]))
+            else:
+                self.currValue = self.stepSize*values[i]
+                minLabel = QLabel(str(self.stepSize*mins[i]))
+                maxLabel = QLabel(str(self.stepSize*maxs[i]))
+
+            self.labelTxt = labels[i]
+            self.unitsTxt = units[i]
+            self.topLabel = QLabel(self.labelTxt + "  " + str(self.currValue)\
+                          + " " + self.unitsTxt)
+            self.botSlider = QSlider(minimum=mins[i], maximum=maxs[i],
+                    value=values[i], orientation=Qt.Horizontal)
+            self.botSlider.valueChanged.connect(self.updateValueLabel)
+
+            SliderGrid.addWidget(self.topLabel,  2*i, 0, 1, 3)
+            SliderGrid.addWidget(minLabel,  2*i + 1, 0)
+            SliderGrid.addWidget(self.botSlider, 2*i + 1, 1)
+            SliderGrid.addWidget(maxLabel,  2*i + 1, 2)
+
+    @pyqtSlot()
+    def updateValueLabel(self):
+        if self.stepDouble:
+            self.currValue = 2**self.botSlider.value()
+        else:
+            currValue = self.stepSize*self.botSlider.value()
         newTopTxt = self.labelTxt + "  " + str(self.currValue)\
                   + " " + self.unitsTxt
         self.topLabel.setText(newTopTxt)

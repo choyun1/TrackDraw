@@ -66,13 +66,13 @@ class MainWindow(QMainWindow):
         ##### Docks on the right hand side #####
         displayDock = TDW.DisplayDock(parent=self)
         displayDock.setAllowedAreas(Qt.RightDockWidgetArea)
-        displayDock.setFeatures(QDockWidget.DockWidgetMovable)
+        displayDock.setFeatures(QDockWidget.NoDockWidgetFeatures)
         analysisDock = TDW.AnalysisDock(parent=self)
         analysisDock.setAllowedAreas(Qt.RightDockWidgetArea)
-        analysisDock.setFeatures(QDockWidget.DockWidgetMovable)
+        analysisDock.setFeatures(QDockWidget.NoDockWidgetFeatures)
         synthesisDock = TDW.SynthesisDock(parent=self)
         synthesisDock.setAllowedAreas(Qt.RightDockWidgetArea)
-        synthesisDock.setFeatures(QDockWidget.DockWidgetMovable)
+        synthesisDock.setFeatures(QDockWidget.NoDockWidgetFeatures)
 
         self.addDockWidget(Qt.RightDockWidgetArea, displayDock)
         self.addDockWidget(Qt.RightDockWidgetArea, analysisDock)
