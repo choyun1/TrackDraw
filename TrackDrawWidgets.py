@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import TrackDrawData as TDD
 import TrackDrawSlots as TDS
+from TrackDrawData import DEFAULT_PARAMS
 from functools import partial
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
@@ -86,7 +86,6 @@ class F0Canvas(FigureCanvas):
         FigureCanvas.__init__(self, self.fig)
         self.setParent(parent)
 
-
 class DisplayDock(QDockWidget):
     def __init__(self, parent=None):
         super(DisplayDock, self).__init__(parent)
@@ -141,7 +140,7 @@ class AnalysisDock(QDockWidget):
         methodGroup = QWidget()
         methodVBox = QVBoxLayout()
         methodGroup.setLayout(methodVBox)
-        resample_fs = TDD.CURRENT_PARAMS.resample_fs
+        resample_fs = DEFAULT_PARAMS.resample_fs
         resampleLabel = QLabel("Resample rate:  " + str(resample_fs) + " Hz")
         methodLabel = QLabel("Method:")
         self.methodComboBox = QComboBox()
@@ -242,7 +241,7 @@ class SynthesisDock(QDockWidget):
         methodGroup = QWidget()
         methodVBox = QVBoxLayout()
         methodGroup.setLayout(methodVBox)
-        synthesis_fs = TDD.CURRENT_PARAMS.synth_fs
+        synthesis_fs = DEFAULT_PARAMS.synth_fs
         synthesisLabel = QLabel("Synthesis rate:  " + str(synthesis_fs) + " Hz")
         methodLabel = QLabel("Method:")
         self.methodComboBox = QComboBox()
@@ -421,6 +420,8 @@ class SliderGroup2(QWidget):
         super(SliderGroup2, self).__init__(parent)
         SliderGrid = QGridLayout()
         self.setLayout(SliderGrid)
+
+        self.sliders = []
 
         for i in range(len(labels)):
             self.stepSize = stepSizes[i]

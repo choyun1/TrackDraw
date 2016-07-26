@@ -59,6 +59,10 @@ def synthesize(*arg, parent=None, **kwarg):
     print(0)
 
 
+def mvpoint(*arg, parent=None, **kwarg):
+    return 0
+
+
 def drawSpec(x):
     return 0
 
