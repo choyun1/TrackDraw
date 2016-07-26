@@ -1,12 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
+import TrackDrawWidgets as TDW
+import TrackDrawSlots as TDS
 import sys
 from functools import partial
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
-import TDWidgets
-import TDSlots
 
 
 __version__ = "0.2.0"
@@ -16,16 +17,16 @@ class MainWindow(QMainWindow):
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
-        self.setCentralWidget(TDWidgets.TDCanvases(self))
+        self.setCentralWidget(TDW.CanvasGrid(self))
 
         ##### Menus #####
         # Partial function application to create appropriate callbacks
-        audioOpen = partial(TDSlots.audioOpen, parent=self)
-        audioSave = partial(TDSlots.audioSave, parent=self)
-        helpAbout = partial(TDSlots.helpAbout, parent=self)
-        clearPlots = partial(TDSlots.clearPlots, parent=self)
-        applyAnalysis = partial(TDSlots.applyAnalysis, parent=self)
-        synthesize = partial(TDSlots.synthesize, parent=self)
+        audioOpen = partial(TDS.audioOpen, parent=self)
+        audioSave = partial(TDS.audioSave, parent=self)
+        helpAbout = partial(TDS.helpAbout, parent=self)
+        clearPlots = partial(TDS.clearPlots, parent=self)
+        applyAnalysis = partial(TDS.applyAnalysis, parent=self)
+        synthesize = partial(TDS.synthesize, parent=self)
         # File menu
         fileMenuActions = [\
                 self.createMenuAction("&Open a sound file...", 
@@ -63,13 +64,13 @@ class MainWindow(QMainWindow):
         ##### End menu setup #####
 
         ##### Docks on the right hand side #####
-        displayDock = TDWidgets.DisplayDock(parent=self)
+        displayDock = TDW.DisplayDock(parent=self)
         displayDock.setAllowedAreas(Qt.RightDockWidgetArea)
         displayDock.setFeatures(QDockWidget.DockWidgetMovable)
-        analysisDock = TDWidgets.AnalysisDock(parent=self)
+        analysisDock = TDW.AnalysisDock(parent=self)
         analysisDock.setAllowedAreas(Qt.RightDockWidgetArea)
         analysisDock.setFeatures(QDockWidget.DockWidgetMovable)
-        synthesisDock = TDWidgets.SynthesisDock(parent=self)
+        synthesisDock = TDW.SynthesisDock(parent=self)
         synthesisDock.setAllowedAreas(Qt.RightDockWidgetArea)
         synthesisDock.setFeatures(QDockWidget.DockWidgetMovable)
 

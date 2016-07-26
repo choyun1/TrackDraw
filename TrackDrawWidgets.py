@@ -1,15 +1,17 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
+import TrackDrawData as TDD
+import TrackDrawSlots as TDS
 from functools import partial
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
-import TDSlots
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 
-class TDCanvases(QWidget):
+class CanvasGrid(QWidget):
     def __init__(self, parent=None):
         super(QWidget, self).__init__(parent)
 
@@ -41,10 +43,8 @@ class DisplayDock(QDockWidget):
     def __init__(self, parent=None):
         super(DisplayDock, self).__init__(parent)
         self.setWindowTitle("Display settings")
-        mainWidget = QWidget()
-        mainVBox = QVBoxLayout()
-        mainWidget.setLayout(mainVBox)
 
+        ### Select display group
         dispGroupBox = QGroupBox("Display")
         dispGroupVBox = QVBoxLayout()
         dispGroupBox.setLayout(dispGroupVBox)
@@ -53,20 +53,30 @@ class DisplayDock(QDockWidget):
         synthedRadioButton = QRadioButton("Synthesized sound")
         dispGroupVBox.addWidget(loadedRadioButton)
         dispGroupVBox.addWidget(synthedRadioButton)
+        ###
+        waveCheckBox = QCheckBox("Show waveform")
+        waveCheckBox.setChecked(True)
 
         STFTCheckBox = QCheckBox("Show STFT")
         STFTCheckBox.setChecked(True)
 
         showFTCheckBox = QCheckBox("Show formant tracks")
         showFTCheckBox.setChecked(True)
-
+        ### Clear plots button
         clearButton = QPushButton("Clear plots (Ctrl+L)")
         clearButton.setToolTip("Clear all plots")
         clearButton.setStatusTip("Clear all plots")
-        clearPlots = partial(TDSlots.clearPlots, self)
+        clearPlots = partial(TDS.clearPlots, self)
         clearButton.clicked.connect(clearPlots)
+        ###
+
+        ### Set up main widget
+        mainWidget = QWidget()
+        mainVBox = QVBoxLayout()
+        mainWidget.setLayout(mainVBox)
 
         mainVBox.addWidget(dispGroupBox)
+        mainVBox.addWidget(waveCheckBox)
         mainVBox.addWidget(STFTCheckBox)
         mainVBox.addWidget(showFTCheckBox)
         mainVBox.addWidget(clearButton)
@@ -78,24 +88,28 @@ class AnalysisDock(QDockWidget):
     def __init__(self, parent=None):
         super(AnalysisDock, self).__init__(parent)
         self.setWindowTitle("Analysis settings")
-        mainWidget = QWidget()
-        mainVBox = QVBoxLayout()
-        mainWidget.setLayout(mainVBox)
 
-        ###
+        ### Select analysis method group
         methodGroup = QWidget()
         methodVBox = QVBoxLayout()
         methodGroup.setLayout(methodVBox)
+        resample_fs = TDD.CURRENT_PARAMS.resample_fs
+        resampleLabel = QLabel("Resample rate:  " + str(resample_fs) + " Hz")
         methodLabel = QLabel("Method:")
-        methodComboBox = QComboBox()
-        methodComboBox.addItems(["Spectrogram", "Wavelet"])
-        methodVBox.addWidget(methodLabel)
-        methodVBox.addWidget(methodComboBox)
+        self.methodComboBox = QComboBox()
+        self.methodComboBox.addItems(["Spectrogram", "Wavelet"])
+        self.methodComboBox.currentIndexChanged.connect(self.changeAnalysis)
 
-        # Spectrogram settings group box
-        specGroup = QGroupBox("Spectrogram settings")
+        methodVBox.addWidget(resampleLabel)
+        methodVBox.addSpacing(15)
+        methodVBox.addWidget(methodLabel)
+        methodVBox.addWidget(self.methodComboBox)
+        ###
+
+        ### Spectrogram settings group box
+        self.specGroup = QGroupBox("Spectrogram settings")
         specVBox = QVBoxLayout()
-        specGroup.setLayout(specVBox)
+        self.specGroup.setLayout(specVBox)
 
         windowGroup = QWidget()
         windowVBox = QVBoxLayout()
@@ -106,84 +120,86 @@ class AnalysisDock(QDockWidget):
         windowVBox.addWidget(windowLabel)
         windowVBox.addWidget(windowComboBox)
 
-        #slidersGroup = QWidget()
-        #slidersGrid = QGridLayout()
-        #slidersGroup.setLayout(slidersGrid)
+        frameSizeGroup = SliderGroup(label="Frame size:", units="samples",
+                minimum=5, maximum=10, stepDouble=True, value=8)
 
-        #frameSizeLabel = QLabel("Frame size (samples):")
-        #frameSizeValueLabel = QLabel("7")
-        #frameSizeMinLabel = QLabel("5")
-        #frameSizeSlider = QSlider(minimum=5, maximum=10, value=7, orientation=Qt.Horizontal)
-        #frameSizeMaxLabel = QLabel("10")
+        overlapGroup = SliderGroup(label="Frame overlap:", units="%",
+                minimum=5, maximum=15, stepSize=5, value=10)
 
-        #overlapSizeLabel = QLabel("Frame overlap (%):")
-        #overlapSizeValueLabel = QLabel("25")
-        #overlapSizeMinLabel = QLabel("50")
-        #overlapSizeSlider = QSlider(minimum=25, maximum=1075, value=50, orientation=Qt.Horizontal)
-        #overlapSizeMaxLabel = QLabel("1075")
+        thresholdGroup = SliderGroup(label="Threshold:", units="dB",
+                minimum=0, maximum=10, stepSize=1, value=3)
 
-        #slidersGrid.addWidget(frameSizeLabel, 0, 0, 1, 2)
-        #slidersGrid.addWidget(frameSizeValueLabel, 0, 2)
-        #slidersGrid.addWidget(frameSizeMinLabel, 1, 0)
-        #slidersGrid.addWidget(frameSizeSlider, 1, 1)
-        #slidersGrid.addWidget(frameSizeMaxLabel, 1, 2)
-        #slidersGrid.addWidget(overlapSizeLabel, 2, 0, 1, 2)
-        #slidersGrid.addWidget(overlapSizeValueLabel, 2, 2)
-        #slidersGrid.addWidget(overlapSizeMinLabel, 3, 0)
-        #slidersGrid.addWidget(overlapSizeSlider, 3, 1)
-        #slidersGrid.addWidget(overlapSizeMaxLabel, 3, 2)
-
-        frameSizeGroup = SliderGroup(name="Frame size (samples):", minimum=5,
-                maximum=10, stepDouble=True, value=8)
-
-        overlapGroup = SliderGroup(name="Frame overlap (%):", minimum=5,
-                maximum=15, stepSize=5, value=10)
-
-        thresholdGroup = SliderGroup(name="Threshold (dB):", minimum=0,
-                maximum=10, stepSize=1, value=3)
-
-        #specVBox.addWidget(windowGroup)
-        #specVBox.addWidget(slidersGroup)
+        specVBox.addWidget(windowGroup)
         specVBox.addWidget(frameSizeGroup)
         specVBox.addWidget(overlapGroup)
         specVBox.addWidget(thresholdGroup)
-        #
+        ###
+
+        ### Wavelet settings group box
+        self.waveletGroup = QGroupBox("Wavelet settings")
+        waveletVBox = QVBoxLayout()
+        self.waveletGroup.setLayout(waveletVBox)
+
+        settingGroup = QWidget()
+        settingVBox = QVBoxLayout(settingGroup)
+
+        waveletVBox.addWidget(settingGroup)
+        ###
+
+        ### Apply button
         applyButton = QPushButton("Apply settings (Ctrl+R)")
         applyButton.setToolTip("Apply analysis settings")
         applyButton.setStatusTip("Apply analysis settings")
-        applyAnalysis = partial(TDSlots.applyAnalysis, parent=self)
+        applyAnalysis = partial(TDS.applyAnalysis, parent=self)
         applyButton.clicked.connect(applyAnalysis)
         ###
 
+        ### Set up main widget
+        mainWidget = QWidget()
+        mainVBox = QVBoxLayout()
+        mainWidget.setLayout(mainVBox)
+
         mainVBox.addWidget(methodGroup)
-        mainVBox.addWidget(specGroup)
+        mainVBox.addWidget(self.specGroup)
+        mainVBox.addWidget(self.waveletGroup)
+        self.waveletGroup.setHidden(True)
         mainVBox.addWidget(applyButton)
         mainVBox.addStretch()
         self.setWidget(mainWidget)
+        ###
+
+    @pyqtSlot()
+    def changeAnalysis(self):
+        currIdx = self.methodComboBox.currentIndex()
+        if currIdx == 0:
+            self.specGroup.setHidden(False)
+            self.waveletGroup.setHidden(True)
+        elif currIdx == 1:
+            self.specGroup.setHidden(True)
+            self.waveletGroup.setHidden(False)
 
 
 class SynthesisDock(QDockWidget):
     def __init__(self, parent=None):
         super(SynthesisDock, self).__init__(parent)
         self.setWindowTitle("Synthesis settings")
-        mainWidget = QWidget()
-        mainVBox = QVBoxLayout()
-        mainWidget.setLayout(mainVBox)
 
-        ###
+        ### Select synthesis method group
         methodGroup = QWidget()
         methodVBox = QVBoxLayout()
         methodGroup.setLayout(methodVBox)
+        synthesis_fs = TDD.CURRENT_PARAMS.synth_fs
+        synthesisLabel = QLabel("Synthesis rate:  " + str(synthesis_fs) + " Hz")
         methodLabel = QLabel("Method:")
-        methodComboBox = QComboBox()
-        methodComboBox.addItems(["Klatt 1980", "Sine wave"])
-        methodVBox.addWidget(methodLabel)
-        methodVBox.addWidget(methodComboBox)
+        self.methodComboBox = QComboBox()
+        self.methodComboBox.addItems(["Klatt 1980", "Sine wave"])
+        self.methodComboBox.currentIndexChanged.connect(self.changeSynthesis)
 
-        # Klatt synthesis settings group box
-        klattGroup = QGroupBox("Klatt settings")
-        klattVBox = QVBoxLayout()
-        klattGroup.setLayout(klattVBox)
+        methodVBox.addWidget(synthesisLabel)
+        methodVBox.addSpacing(15)
+        methodVBox.addWidget(methodLabel)
+        methodVBox.addWidget(self.methodComboBox)
+        ###
 
         nformantGroup = QWidget()
         nformantVBox = QVBoxLayout()
@@ -195,62 +211,98 @@ class SynthesisDock(QDockWidget):
         nformantVBox.addWidget(nformantLabel)
         nformantVBox.addWidget(nformantComboBox)
 
-        F1BandwidthGroup = SliderGroup(name="F1 bandwidth (Hz):", minimum=5,
-                maximum=20, value=10)
-        F2BandwidthGroup = SliderGroup(name="F2 bandwidth (Hz):", minimum=5,
-                maximum=20, value=10)
-        F3BandwidthGroup = SliderGroup(name="F3 bandwidth (Hz):", minimum=5,
-                maximum=20, value=10)
-        F4BandwidthGroup = SliderGroup(name="F4 bandwidth (Hz):", minimum=5,
-                maximum=20, value=10)
-        F5BandwidthGroup = SliderGroup(name="F5 bandwidth (Hz):", minimum=5,
-                maximum=20, value=10)
-        #F5BandwidthGroup.setEnabled(False)
+        ### Klatt synthesis settings group box
+        self.klattGroup = QGroupBox("Klatt synthesizer settings")
+        klattVBox = QVBoxLayout()
+        self.klattGroup.setLayout(klattVBox)
 
-        klattVBox.addWidget(nformantGroup)
+        F1BandwidthGroup = SliderGroup(label="F1 bandwidth:", units="Hz",
+                minimum=5, maximum=20, value=10)
+        F2BandwidthGroup = SliderGroup(label="F2 bandwidth:", units="Hz",
+                minimum=5, maximum=20, value=10)
+        F3BandwidthGroup = SliderGroup(label="F3 bandwidth:", units="Hz",
+                minimum=5, maximum=20, value=10)
+        F4BandwidthGroup = SliderGroup(label="F4 bandwidth:", units="Hz",
+                minimum=5, maximum=20, value=10)
+        F5BandwidthGroup = SliderGroup(label="F5 bandwidth:", units="Hz",
+                minimum=5, maximum=20, value=10)
+
         klattVBox.addWidget(F1BandwidthGroup)
         klattVBox.addWidget(F2BandwidthGroup)
         klattVBox.addWidget(F3BandwidthGroup)
         klattVBox.addWidget(F4BandwidthGroup)
         klattVBox.addWidget(F5BandwidthGroup)
-        #
+        ###
+
+        ### Sine wave synthesis settings group box
+        self.sineGroup = QGroupBox("Sine wave synthesizer settings")
+        sineVBox = QVBoxLayout()
+        self.sineGroup.setLayout(sineVBox)
+        ###
+
+        ### Synthesize button
         synthButton = QPushButton("Synthesize (Ctrl+Y)")
         synthButton.setToolTip("Synthesize using current settings")
         synthButton.setStatusTip("Synthesize using current settings")
-        synthesize = partial(TDSlots.synthesize, parent=self)
+        synthesize = partial(TDS.synthesize, parent=self)
         synthButton.clicked.connect(synthesize)
         ###
 
+        ### Set up main widget
+        mainWidget = QWidget()
+        mainVBox = QVBoxLayout()
+        mainWidget.setLayout(mainVBox)
+
         mainVBox.addWidget(methodGroup)
-        mainVBox.addWidget(klattGroup)
+        mainVBox.addWidget(nformantGroup)
+        mainVBox.addWidget(self.klattGroup)
+        mainVBox.addWidget(self.sineGroup)
+        self.sineGroup.setHidden(True)
         mainVBox.addWidget(synthButton)
         mainVBox.addStretch()
         self.setWidget(mainWidget)
+        ###
+
+    @pyqtSlot()
+    def changeSynthesis(self):
+        currIdx = self.methodComboBox.currentIndex()
+        if currIdx == 0:
+            self.klattGroup.setHidden(False)
+            self.sineGroup.setHidden(True)
+        elif currIdx == 1:
+            self.klattGroup.setHidden(True)
+            self.sineGroup.setHidden(False)
 
 
 class SliderGroup(QWidget):
-    def __init__(self, parent=None, name="", minimum=1, maximum=99, value=1,
-            stepSize=1, stepDouble=False, orientation=Qt.Horizontal):
+    """
+    A convenience widget for displaying slider information (minimum, maximum,
+    and current value). Set stepDouble=True to create a slider that doubles
+    its value each step.
+    """
+    def __init__(self, parent=None, label="", units="", minimum=1, maximum=99,
+            value=1, stepSize=1, stepDouble=False, orientation=Qt.Horizontal):
         super(SliderGroup, self).__init__(parent)
+        self.labelTxt = label
+        self.unitsTxt = units
         self.stepSize = stepSize
         self.stepDouble = stepDouble
-        if stepDouble:
+        if self.stepDouble:
             self.currValue = 2**value
-            self.valueLabel = QLabel(str(self.currValue))
             minLabel = QLabel(str(2**minimum))
             maxLabel = QLabel(str(2**maximum))
         else:
             self.currValue = self.stepSize*value
-            self.valueLabel = QLabel(str(self.currValue))
             minLabel = QLabel(str(self.stepSize*minimum))
             maxLabel = QLabel(str(self.stepSize*maximum))
 
         topContainer = QWidget()
         topHBox = QHBoxLayout()
         topContainer.setLayout(topHBox)
-        nameLabel = QLabel(name)
-        topHBox.addWidget(nameLabel)
-        topHBox.addWidget(self.valueLabel)
+        topTxt = self.labelTxt + "  " + str(self.currValue)\
+               + " " + self.unitsTxt
+        self.topLabel = QLabel(topTxt)
+        topHBox.addWidget(self.topLabel)
 
         botContainer = QWidget()
         botHBox = QHBoxLayout()
@@ -265,9 +317,6 @@ class SliderGroup(QWidget):
         vBox = QVBoxLayout()
         self.setLayout(vBox)
         vBox.addWidget(topContainer)
-        #vBox.addWidget(nameLabel)
-        #vBox.addWidget(self.valueLabel)
-        #vBox.addWidget(self.slider)
         vBox.addWidget(botContainer)
 
     @pyqtSlot()
@@ -276,5 +325,7 @@ class SliderGroup(QWidget):
             self.currValue = 2**self.slider.value()
         else:
             self.currValue = self.stepSize*self.slider.value()
-        self.valueLabel.setText(str(self.currValue))
+        newTopTxt = self.labelTxt + "  " + str(self.currValue)\
+                  + " " + self.unitsTxt
+        self.topLabel.setText(newTopTxt)
 
