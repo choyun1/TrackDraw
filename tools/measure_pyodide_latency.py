@@ -129,6 +129,7 @@ async ([indexUrl, sonoreVersion, benchmark]) => {
   timings.import_sonore_s = (performance.now() - start) / 1000;
   timings.python = pyodide.runPython("import sys; sys.version");
   timings.pyodide = pyodide.version;
+  timings.browser = { userAgent: navigator.userAgent, cores: navigator.hardwareConcurrency };
   timings.synthesis = JSON.parse(pyodide.runPython(benchmark));
   return timings;
 }

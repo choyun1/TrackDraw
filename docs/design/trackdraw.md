@@ -180,18 +180,31 @@ Most of the time goes to the voiced source (70 to 80 harmonics below 7.2 kHz,
 each with its amplitude function evaluated per sample), not to the
 per-sample resonator loop: moving formants add only 0.02–0.10 s.
 
-**M6. Synthesis speed in a browser: not yet measured.**
-`tools/measure_pyodide_latency.py` is written and runs headless Chromium
-through Playwright, but this cloud container's network policy refuses
-`cdn.jsdelivr.net`, where Pyodide is served (PyPI is reachable). As the brief
-asked, I did not look for a workaround. Cho, please run it locally (commands
-in its docstring); it prints load, install and import times with a cold and
-a warm browser cache, and the M5 table under Pyodide. What can be said
-without it: all four of sonore's dependencies (numpy 2.4.6, scipy 1.18.0,
-matplotlib 3.10.8, soundfile 0.12.1) have recipes in `pyodide-recipes`
-(checked on GitHub, 2026-10-03), and sonore's own wheel is 195 kB. How much
-slower Pyodide runs this code is an open number; the measurement replaces
-any estimate.
+**M6. Synthesis speed in a browser.** [measure] Cho ran
+`tools/measure_pyodide_latency.py` locally on 2026-10-03 (the cloud
+container cannot reach the Pyodide CDN). Pyodide 314.0.7 (Python 3.14.2),
+headless Chromium; the machine was not recorded, so these numbers are not
+directly comparable with M5, which ran on the cloud container. Raw results:
+`docs/design/measurements/pyodide-2026-10-03.json`.
+
+| Page load | Load Pyodide | Install sonore | Import sonore | Total |
+|---|---|---|---|---|
+| Cold browser cache | 3.20 s | 8.60 s | 3.90 s | 15.7 s |
+| Warm browser cache | 1.83 s | 2.59 s | 4.23 s | 8.6 s |
+
+| Case | 1 s cold | 1 s warm | 3 s cold | 3 s warm |
+|---|---|---|---|---|
+| Klatt, drawn tracks | 0.13–0.22 s | 0.14–0.17 s | 0.37–0.46 s | 0.36–0.48 s |
+| Klatt, constant parameters | 0.07–0.10 s | 0.10–0.15 s | 0.32–0.45 s | 0.26–0.35 s |
+| Three sine-wave tones | 0.007–0.014 s | 0.006–0.015 s | 0.031–0.037 s | 0.021–0.025 s |
+
+Each range spans the two page loads. Synthesis is fast enough: 1 s of
+drawn speech takes under a quarter of a second, 3 s under half a second.
+Loading is the cost. A warm reload still takes about 9 s, and about 4 s of
+that is `import sonore` in both runs. It is probably the import of scipy and
+matplotlib (inferred, not profiled). Both could be trimmed: the page needs
+neither matplotlib nor most of scipy, so a lazy import in sonore would
+help (a sonore question, D6).
 
 What the decision needs from M6 [estimate, from interface practice, no
 literature cited]: about 0.1 s from releasing a stroke to hearing sound
@@ -242,8 +255,8 @@ for editing.
   within a tolerance in Hz (Ramer–Douglas–Peucker), and those replace the
   breakpoints under it. This is the new piece: it makes a smooth transition
   one gesture.
-- Every edit can be undone. Playback starts when a stroke ends, if M6 allows
-  (D2, D3).
+- Every edit can be undone. Playback can start when a stroke ends: M6
+  measures 0.1–0.2 s per second of speech.
 
 Copy synthesis adds a file picker (or drag-and-drop), the spectrogram of the
 recording, a seed F0 track from `so.f0_track`, a seed AV from a sliding RMS,
@@ -306,22 +319,21 @@ sonore are already in notebooks, and a widget keeps the drawing next to the
 analysis. For (a): nothing to install, one link to share, works on a tablet
 with a pen (the most natural way to draw a track), and fits Cho's later idea
 of mobile analysis.
-*Recommended:* (a), conditional on M6: if a warm reload is a few seconds
-and 1 s of speech synthesizes in about a second or less. If Pyodide is far
-slower, (c) for v1 with the same drawing code (anywidget runs JavaScript in
-the notebook), and (a) later.
+*Recommended:* (a). M6 meets the bar set above: 1 s of speech synthesizes
+in 0.13–0.22 s and 3 s in under 0.5 s. The weak point is loading, at
+16 s on a first visit and 9 s on a reload. The page should show
+progress and let the user start drawing before sonore has loaded.
 
 **D3. Where synthesis runs (in the browser).**
 (a) sonore in Pyodide: one copy of every formula, the same numbers as the
 Python library; (b) a JavaScript (or WebAssembly) port of the Klatt
 synthesizer: faster to load and run, but a second copy to keep in step and
 check.
-*Recommended:* (a), as Cho prefers one copy of each formula; M5 shows the
-cost is in the vectorized harmonic sum, which Pyodide's NumPy runs as
-compiled code, so the slowdown may be modest (inferred; M6 decides). If
-M6 shows a stroke-to-sound delay over about 1 s, the first fix is in sonore
-(for example, fewer amplitude-function evaluations in `harmonic_complex`),
-not a port.
+*Recommended:* (a), as Cho prefers one copy of each formula, and M6 shows
+no need for a port. Synthesis under Pyodide is 0.13–0.48 s for 1–3 s of
+speech. If that delay is ever too long while drawing, the first fix belongs
+in sonore (for example, fewer amplitude-function evaluations in
+`harmonic_complex`), not a port.
 
 **D4. Track model.**
 (a) sparse breakpoints per parameter (sonore's `(times, values)`); (b) fixed
@@ -355,7 +367,12 @@ kept across tones (M3), no fade below Nyquist (M2), and a stated drop rule
 (M4). Default amplitudes |S(F_k)| from the Klatt parameters (C2).
 (ii) A sliding RMS level in dB for the AV seed: small, and useful beyond
 TrackDraw, but it could also stay app-side.
-*Recommended:* (i) upstream; (ii) app-side unless Cho wants it in sonore.
+(iii) A faster `import sonore` under Pyodide. M6 measures about 4 s even
+with a warm cache, probably because scipy and matplotlib load eagerly
+(inferred). Deferring those imports until a function needs them would
+shorten every page load.
+*Recommended:* (i) upstream; (ii) app-side unless Cho wants it in sonore;
+(iii) profile the import first, then decide.
 
 **D7. Repository and name.**
 (a) revive `choyun1/TrackDraw`: keeps the 2016 history, the MIT licence and
