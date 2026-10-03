@@ -411,8 +411,7 @@ After the decisions, each step a PR for Cho:
 - Assmann, P., Ballard, W., Bornstein, L., & Paschall, D. (1994).
   Track-Draw: A graphical interface for controlling the parameters of a
   speech synthesizer. *Behavior Research Methods, Instruments, & Computers*,
-  26(4), 431–436. (DOI likely 10.3758/BF03204661; not checked, as Crossref
-  was out of reach from this container.)
+  26(4), 431–436. doi:10.3758/BF03204661.
 - Klatt, D. H. (1980). Software for a cascade/parallel formant synthesizer.
   *JASA* 67(3), 971–995. doi:10.1121/1.383940.
 - Klatt, D. H. (1982). Harsyn: An additive harmonic synthesizer. MIT RLE
