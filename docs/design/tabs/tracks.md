@@ -1,13 +1,17 @@
-# TrackDraw: drawing speech parameters, on sonore
+# The Tracks tab: drawing speech parameters (TrackDraw)
 
-A design for reviving TrackDraw as a separate application built on sonore:
-a page where you draw formant, F0 and amplitude tracks with a mouse, pen or
-finger, and hear the speech they describe. It sets out the original, what
-sonore already provides and what is missing, the checks behind each number,
-a proposed interface and data model, and the decisions for Cho (D1–D10).
+The Klatt tab of the app proposed in `../app.md`: draw formant, F0 and
+amplitude tracks with a mouse, pen or finger, and hear the speech they
+describe, as Track-Draw (Assmann et al., 1994) did. This document sets out
+the original, what sonore already provides and what is missing, the checks
+behind each number, a proposed interface and data model, and the decisions
+for this tab.
 
-Status: proposal, 2026-10-03. Nothing is built. No application code is
-written until Cho has answered the decisions below.
+Status: proposal. Written 2026-10-03 as the design for TrackDraw alone;
+on 2026-10-04 Cho broadened the project to a general drawing front end for
+sonore, so this became one tab of it. Platform, synthesis location,
+repository, generality and pinning (D2, D3, D7, D8, D9 below) now belong
+to the whole app and are decided in `../app.md`. Nothing is built.
 
 This project is AI-assisted: the document and the scripts in `tools/` were
 drafted by Claude (Claude Code) from Cho's handoff brief, for Cho to review.
@@ -309,31 +313,9 @@ editable as numbers, not tracks. The case for the paper's set only: fewer
 panels and the original's scope. The case for more: sonore makes fricatives
 nearly free, and /s/ or /h/ is the first thing users will try to draw.
 
-**D2. Platform for the interface.**
-(a) a static browser page running sonore under Pyodide; (b) a desktop app
-(PySide6, as in 2016 with PyQt5); (c) notebook widgets (anywidget or
-ipywidgets, in Jupyter or Colab).
-The best case for (b): native speed, real files, no download on start, and
-Qt's mature pointer handling; the 2016 code is a start. For (c): users of
-sonore are already in notebooks, and a widget keeps the drawing next to the
-analysis. For (a): nothing to install, one link to share, works on a tablet
-with a pen (the most natural way to draw a track), and fits Cho's later idea
-of mobile analysis.
-*Recommended:* (a). M6 meets the bar set above: 1 s of speech synthesizes
-in 0.13–0.22 s and 3 s in under 0.5 s. The weak point is loading, at
-16 s on a first visit and 9 s on a reload. The page should show
-progress and let the user start drawing before sonore has loaded.
+**D2. Platform for the interface.** Moved to `../app.md` (D3 and D4); the measurements behind it stay above (M5, M6).
 
-**D3. Where synthesis runs (in the browser).**
-(a) sonore in Pyodide: one copy of every formula, the same numbers as the
-Python library; (b) a JavaScript (or WebAssembly) port of the Klatt
-synthesizer: faster to load and run, but a second copy to keep in step and
-check.
-*Recommended:* (a), as Cho prefers one copy of each formula, and M6 shows
-no need for a port. Synthesis under Pyodide is 0.13–0.48 s for 1–3 s of
-speech. If that delay is ever too long while drawing, the first fix belongs
-in sonore (for example, fewer amplitude-function evaluations in
-`harmonic_complex`), not a port.
+**D3. Where synthesis runs (in the browser).** Moved to `../app.md` (D4); the measurements behind it stay above (M5, M6).
 
 **D4. Track model.**
 (a) sparse breakpoints per parameter (sonore's `(times, values)`); (b) fixed
@@ -374,29 +356,11 @@ shorten every page load.
 *Recommended:* (i) upstream; (ii) app-side unless Cho wants it in sonore;
 (iii) profile the import first, then decide.
 
-**D7. Repository and name.**
-(a) revive `choyun1/TrackDraw`: keeps the 2016 history, the MIT licence and
-Daniel R Guest as co-author; (b) a new repository.
-*Recommended:* (a), with the 2016 code moved to `legacy/` (or left in the
-history only) and a README crediting Assmann et al. (1994) for the
-original design. This proposal is a branch of (a), which is easy to move if
-Cho picks (b). Cho decides.
+**D7. Repository and name.** Moved to `../app.md` (D1).
 
-**D8. Generality for later.**
-sonore's roadmap has "free-form modulation patterns: specify a modulation
-spectrum and synthesize it". Drawing on a time-frequency canvas could be
-shared with that.
-*Recommended:* note the parallel and keep the drawing code free of
-Klatt-specific names below the track level, but build nothing for it now
-("add generality when an experiment needs it").
+**D8. Generality for later.** Moved to `../app.md` (D2).
 
-**D9. Pinning sonore, and the link back.**
-*Recommended:* depend on `sonore>=0.4,<0.5`, pin the exact version in the
-web page (micropip installs one version), and record it in every saved file.
-Upgrade by a PR that bumps the pin and re-runs the tests that compare the
-app's samples with Python's. Whether sonore's README "Related projects"
-links to TrackDraw once it exists is a sonore PR and Cho's call; I suggest
-yes, after v1 works.
+**D9. Pinning sonore, and the link back.** Moved to `../app.md` (D5).
 
 **D10. Drawing interaction.** (new; the hard part)
 (a) the paper's point and line modes; (b) 2016's drag of fixed points, with
@@ -410,18 +374,17 @@ with defaults chosen by trying them (an estimate until then).
 
 ## Order of work
 
-After the decisions, each step a PR for Cho:
+Within the app's order (`../app.md`), after the shell exists, each step a
+PR for Cho:
 
-1. Repository set-up (D7): README with credits, licence, `pyproject.toml`
-   pinning sonore (D9), `python -m pytest` running.
-2. The document model and `tracks.py` (D4, D5), with tests that a document
+1. The track model and `tracks.py` (D4, D5), with tests that a document
    synthesizes identically to a direct `so.klatt_synthesize` call.
-3. SYNTH: the page, the formant, F0 and AV panels, the three tools, play,
-   save and open (D2, D3, D10).
-4. Bandwidth strips, noise sources (D1), time stretch and value scaling.
-5. Copy synthesis: load a recording, spectrogram, F0 and AV seeds, play the
+2. SYNTH: the formant, F0 and AV panels, the three tools, play, save and
+   open (D10).
+3. Bandwidth strips, noise sources (D1), time stretch and value scaling.
+4. Copy synthesis: load a recording, spectrogram, F0 and AV seeds, play the
    original.
-6. Sine-wave speech: the sonore PR (D6), then the mode switch.
+5. Sine-wave speech: the sonore PR (D6), then the mode switch.
 
 ## References
 
