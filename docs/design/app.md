@@ -1,8 +1,8 @@
 # A drawing front end for sonore
 
 A design for a web page where you draw on a picture of sound and hear the
-result: formant tracks over a time-frequency grid (TrackDraw), blobs on a
-modulation spectrum, a painted spectrogram, and other views as they come.
+result: formant tracks over a time-frequency grid (TrackDraw), a painted
+spectrogram, blobs on a modulation spectrum, and other views as they come.
 Each tab is one of sonore's ways back to sound, given a point-and-click
 surface. sonore does the synthesis; this project is only the interface.
 
@@ -66,13 +66,16 @@ loads.
 
 ### Candidate tabs
 
+In order of rising abstraction: parameters of a voice, then the spectrogram,
+then the modulation spectrum (a transform of the spectrogram's envelope).
+
 | Tab | You draw | sonore call | In sonore 0.4.0? |
 |---|---|---|---|
 | **Tracks** (TrackDraw) | F1–F5, F0, AV, bandwidths as tracks over time, optionally over a recording's spectrogram | `so.klatt_synthesize`; sine-wave speech by a new function (`tabs/tracks.md`, D6) | Yes |
-| **Modulation blobs** | Gaussian blobs on rate (Hz, signed) × density (cycles/octave): centre, two widths, level; carrier, depth, seed | `ModulationSpectrum.from_blobs(...).to_sound(carrier=...)` | No: on sonore's main branch, unreleased |
-| **Edit a modulation spectrum** | A gain mask painted on a recording's modulation spectrum | `spectrum.with_gain(g).to_sound(carrier=recording, iterations=n)` | No: same |
 | **Painted spectrogram** | Level painted on time × log-frequency | `so.ripple_sound(pattern, ...)` with the painting as `pattern(t, x)` | Yes |
 | **Spectrogram mask** | A mask painted over a recording's spectrogram (erase a band, a moment, a harmonic) | `(stft * mask).to_sound()`, least squares (`GaborFrame`) | Yes |
+| **Modulation blobs** | Gaussian blobs on rate (Hz, signed) × density (cycles/octave): centre, two widths, level; carrier, depth, seed | `ModulationSpectrum.from_blobs(...).to_sound(carrier=...)` | No: on sonore's main branch, unreleased |
+| **Edit a modulation spectrum** | A gain mask painted on a recording's modulation spectrum | `spectrum.with_gain(g).to_sound(carrier=recording, iterations=n)` | No: same |
 
 Further ideas, not proposed for now: an F0 contour drawn over a recording and
 resynthesized with WORLD (`world_synthesize`); a long-term spectrum drawn as
@@ -89,31 +92,33 @@ Pyodide 314.0.7, details in `tabs/tracks.md`, M6): 1 s of Klatt speech in
 0.13–0.22 s and 3 s in 0.36–0.48 s, but 16 s to load on a first visit and
 9 s on a reload, of which about 4 s is `import sonore` each time.
 
-**M2. The other tabs' calls are as fast or faster, natively.**
-[measure] `tools/measure_tab_synthesis.py`, 16 kHz, cold (first call) and
-warm (median of the next three):
+**M2. The other tabs' calls are as fast or faster, natively, up to 10 s.**
+[measure] `tools/measure_tab_synthesis.py` and
+`tools/measure_pyodide_latency.py --native`, 16 kHz, cold (first call)
+and warm (median of the next three), sonore's main branch at 451f99a:
 
-| Case | 1 s cold | 1 s warm | 3 s cold | 3 s warm |
-|---|---|---|---|---|
-| Blobs on tones | 0.175 s | 0.065 s | 0.491 s | 0.185 s |
-| Blobs on noise | 0.255 s | 0.182 s | 0.578 s | 0.360 s |
-| Painted envelope (`ripple_sound`) | 0.024 s | 0.019 s | 0.055 s | 0.054 s |
-| Spectrogram mask (`GaborFrame`) | 0.011 s | 0.015 s | 0.040 s | 0.027 s |
+| Case | 1 s cold | 1 s warm | 3 s cold | 3 s warm | 10 s cold | 10 s warm |
+|---|---|---|---|---|---|---|
+| Klatt, drawn tracks | 0.086 s | 0.075 s | 0.277 s | 0.278 s | 0.936 s | 0.920 s |
+| Painted envelope (`ripple_sound`) | 0.020 s | 0.018 s | 0.058 s | 0.057 s | 0.531 s | 0.375 s |
+| Spectrogram mask (`GaborFrame`) | 0.011 s | 0.010 s | 0.028 s | 0.030 s | 0.100 s | 0.101 s |
+| Blobs on tones | 0.144 s | 0.064 s | 0.456 s | 0.171 s | 1.526 s | 0.684 s |
+| Blobs on noise | 0.269 s | 0.184 s | 0.415 s | 0.393 s | 1.777 s | 1.163 s |
 
-For comparison, Klatt synthesis took 0.08 s and 0.29 s for 1 s and 3 s of
-speech natively (`tabs/tracks.md`, M5), and 0.13–0.22 s and 0.36–0.48 s
-under Pyodide (M1). If the other calls slow down by a similar factor in the
-browser, every tab plays within about half a second of a 3 s drawing
-[estimate: the factor is from one call on different machines, so this is a
-rough guide only]. The Pyodide script can time these calls as well once the
-blob functions are released.
+Every call grows roughly in proportion to the duration. Under Pyodide, 3 s
+of Klatt speech took 0.36–0.48 s (M1) against 0.28 s here, a factor of
+about 1.3–1.7 [estimate: one call, two different machines]. By that
+factor, 10 s would take about 1.2–1.6 s for Klatt and up to about 3 s for
+blobs on noise, cold. That is fine behind a Play button, but too slow to
+play automatically after every stroke (D10). The Pyodide script now also
+times 10 s, so Cho can replace this estimate by re-running it.
 
 ## Proposed design
 
 ### Layout (sketch)
 
 ```
-┌ Tracks │ Blobs │ Painted │ Mask ───────────────────────────── ▶ ■  ⤓ ⟲ ┐
+┌ Tracks │ Painted │ Mask │ Blobs │ Edit ───────────────────── ▶ ■  ⤓ ⟲ ┐
 │                                                              │ tools    │
 │      drawing surface (the tab's view, with its axes)         │ for this │
 │                                                              │ tab      │
@@ -126,6 +131,16 @@ blob functions are released.
 Each tab keeps its own state when you switch away, so you can move between
 them and come back. A loaded recording is shared: it can be the background
 for Tracks, the carrier for Blobs, the source for Edit and Mask.
+
+### Duration
+
+The duration is a setting of the whole page, from a fraction of a second
+up to a limit (D10), shown on the time axis of every tab. Lengthening or
+shortening it stretches what is drawn: track breakpoints and painted
+columns scale with it, as the paper's `dur` did (exactly for breakpoints,
+`tabs/tracks.md`, C3), and a modulation spectrum is redrawn on the new grid
+(`from_blobs` takes the duration). A tab over a recording takes the
+recording's length, up to the same limit.
 
 ### Drawing primitives
 
@@ -214,12 +229,14 @@ function needs them; a sonore PR, after profiling);
 (inferred, not profiled: probably scipy and matplotlib). (c) only if (b) is
 not enough.
 
-**D7. Which tabs in v1.**
-*Recommended:* Tracks first (fully designed in `tabs/tracks.md`), then
-Blobs (Cho named both, and Blobs is the first tab on the Blobs primitive).
-The Painted and Mask tabs come next because they are cheap once the Paint
-primitive exists. Edit a modulation spectrum comes after both, because it
-combines a recording, a view and a painted mask.
+**D7. Which tabs, in which order.**
+*Recommended:* in order of rising abstraction, as Cho asked (2026-10-04):
+Tracks, then the two spectrogram tabs (Painted, Mask), then the two
+modulation tabs (Blobs, Edit). This also suits sonore's releases: Tracks,
+Painted and Mask need only 0.4.0, and by the time the modulation tabs are
+reached, 0.5.0 can be out (D5). Painted and Mask share the Paint
+primitive. Edit is last because it combines a recording, a view and a
+painted mask.
 
 **D8. Sharing.**
 A drawing small enough to fit in a link (`#state=...`) can be sent to a
@@ -233,6 +250,18 @@ Build the three primitives and the tab contract, and nothing more general
 ("add generality when an experiment needs it"). A new tab is a new state, a
 new sonore call and a choice of primitives.
 
+**D10. Longest duration.**
+Cho, 2026-10-04: let the user lengthen the sound, "up to some reasonable
+computational limit, maybe up to like 10 sec?".
+(a) 10 s for every tab;
+(b) a limit per tab, set by its own speed;
+(c) no fixed limit, with a warning above a measured time.
+*Recommended:* (a), 10 s everywhere. It is one rule to explain, and M2
+puts every tab's 10 s synthesis at roughly 1–3 s in the browser
+[estimate]. Below about 3 s, sound plays automatically when a stroke ends.
+Above that, it plays on Play, and a progress note shows while it is made.
+The limit is one constant, so it can change after measuring in the browser.
+
 The Tracks tab's own decisions (scope, track model, file format, sine-wave
 speech upstream, drawing interaction) are in `tabs/tracks.md`.
 
@@ -242,11 +271,12 @@ After the decisions, each step a PR for Cho:
 
 1. Repository and name (D1): README with credits, licence, a package
    pinning sonore (D5), `python -m pytest` running.
-2. The shell: tabs, the worker with Pyodide and sonore, playback, the result
-   picture, save and open, load progress (D2–D4, D6).
+2. The shell: tabs, the duration setting, the worker with Pyodide and
+   sonore, playback, the result picture, save and open, load progress
+   (D2–D4, D6, D10).
 3. The Tracks tab (`tabs/tracks.md`, its order of work).
-4. The Blobs primitive and tab, once sonore 0.5.0 is released (D5).
-5. The Paint primitive, then the Painted and Mask tabs.
+4. The Paint primitive, then the Painted and Mask tabs.
+5. The Blobs primitive and tab, once sonore 0.5.0 is released (D5).
 6. Edit a modulation spectrum.
 
 ## References

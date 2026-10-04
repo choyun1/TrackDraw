@@ -11,7 +11,7 @@ installs sonore from PyPI with micropip, and times:
 - the page load: Pyodide itself, micropip, and ``import sonore`` with its
   dependencies (numpy, scipy, matplotlib, soundfile), once with an empty
   browser cache (cold) and once more in the same browser profile (warm);
-- ``so.klatt_synthesize`` at 16 kHz for 1 s and 3 s of speech, with F0, AV
+- ``so.klatt_synthesize`` at 16 kHz for 1 s, 3 s and 10 s of speech, with F0, AV
   and F1-F3 given as tracks of a few breakpoints (each moving formant runs
   sonore's per-sample resonator loop), and the same with every parameter
   constant (the resonators then run through ``scipy.signal.lfilter``): the
@@ -94,7 +94,7 @@ cases = {
 }
 results = []
 for name, function in cases.items():
-    for duration in (1.0, 3.0):
+    for duration in (1.0, 3.0, 10.0):
         cold = timed(function, duration)
         warm = statistics.median(timed(function, duration) for _ in range(WARM_REPEATS))
         results.append({"case": name, "duration_s": duration, "cold_s": cold, "warm_s": warm})

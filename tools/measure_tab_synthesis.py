@@ -2,7 +2,7 @@
 
 This script runs sonore to measure it; it is not an independent check. It
 times the synthesis behind three of the tabs proposed in
-docs/design/app.md, at 16 kHz, for 1 s and 3 s of sound: the first call
+docs/design/app.md, at 16 kHz, for 1 s, 3 s and 10 s of sound: the first call
 (cold) and the median of the next three (warm).
 
 - Modulation blobs: ``so.ModulationSpectrum.from_blobs`` then
@@ -66,7 +66,7 @@ cases["spectrogram mask (GaborFrame)"] = spectrogram_mask
 print(f"sonore {so.__version__}, numpy {np.__version__}")
 print(f"  {'case':<32s} {'sound':>6s} {'cold':>8s} {'warm':>8s}")
 for name, function in cases.items():
-    for duration in (1.0, 3.0):
+    for duration in (1.0, 3.0, 10.0):
         cold = timed(function, duration)
         warm = statistics.median(timed(function, duration) for _ in range(WARM_REPEATS))
         print(f"  {name:<32s} {duration:5.0f}s {cold:7.3f}s {warm:7.3f}s")
