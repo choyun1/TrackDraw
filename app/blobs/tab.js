@@ -19,7 +19,7 @@
 // (with bands, measured within them: bands.md, K7), above the page's waveform.
 
 import { magma } from "../colormap.js";
-import { fitCanvas, niceStep } from "../plot.js";
+import { drawWaveform, fitCanvas, niceStep } from "../plot.js";
 import {
   BAND_WIDTH_MAX,
   BAND_WIDTH_MIN,
@@ -29,6 +29,7 @@ import {
   clampBandLevel,
   clampBandWidth,
   newBand,
+  strokeOnto,
   tidyHz,
   tidyTime,
   COARSE_BELOW_S,
@@ -51,6 +52,11 @@ const SEAM = 7; // half the gap between the two sides of the rate axis, px
 const FLOOR_DB = -40; // the picture's range below the drawing's peak
 const PICK_PX = 8;
 const RATE_TICKS = [1, 2, 4, 8, 16, 32, 64];
+const BAND_TOOLS = [
+  { id: "point", label: "Point", key: "p", title: "Drag a breakpoint; click a band's line to add one; drag inside a band to move it (P)" },
+  { id: "line", label: "Line", key: "l", title: "Press at one end and release at the other: a straight stretch of the band (L)" },
+  { id: "freehand", label: "Freehand", key: "f", title: "Draw the band's centre; outside every band, a new band (F)" },
+];
 
 export function createBlobsTab(root, { commit }) {
   let state = null;
@@ -64,11 +70,20 @@ export function createBlobsTab(root, { commit }) {
   root.innerHTML = `
     <div class="blobs-body">
       <div class="paint-area">
-        <h3 class="panel-group">Design <span>blobs on the modulation plane, then bands over the result's spectrogram</span></h3>
-        <canvas class="plane"></canvas>
-        <canvas class="stft" title="The bands, drawn over the result's spectrogram (5 ms window) on a log-frequency axis"></canvas>
-        <h3 class="panel-group result-group">Result <span>measured from the sound after Play</span></h3>
-        <canvas class="measured" title="The result's own modulation spectrum, measured from the sound after Play, on the plane's axes"></canvas>
+        <section class="panel-box design-box">
+          <h3 class="panel-group" title="What you draw: blobs on the modulation plane, and bands over the result's spectrogram">Design</h3>
+          <div class="panel-stack">
+            <canvas class="plane"></canvas>
+            <canvas class="stft" title="The bands, drawn over the result's spectrogram (5 ms window) on a log-frequency axis"></canvas>
+          </div>
+        </section>
+        <section class="panel-box result-box">
+          <h3 class="panel-group" title="What came out: measured from the sound after Play">Result</h3>
+          <div class="panel-stack">
+            <canvas class="measured" title="The result's own modulation spectrum, measured from the sound after Play, on the plane's axes"></canvas>
+            <canvas class="wave" title="The result's waveform"></canvas>
+          </div>
+        </section>
       </div>
       <aside class="side">
         <fieldset class="blob-fields"><legend>Blob</legend>
@@ -82,6 +97,17 @@ export function createBlobsTab(root, { commit }) {
             <button type="button" class="delete" title="Remove this blob (Delete)">Delete</button>
           </div>
         </fieldset>
+        <fieldset class="band-fields"><legend>Bands</legend>
+          <p class="hint band-count"></p>
+          <div class="band-tools"></div>
+          <div class="band-edit">
+            <label class="field" title="How wide the band is, in octaves">Width <input type="number" class="band-width" min="${+BAND_WIDTH_MIN.toFixed(2)}" max="${BAND_WIDTH_MAX}" step="0.25"> oct</label>
+            <label class="field" title="The band's level relative to the others">Level <input type="number" class="band-level" min="-40" max="0" step="1"> dB</label>
+            <button type="button" class="delete-band" title="Remove this band (Delete, with no breakpoint selected)">Delete band</button>
+          </div>
+          <button type="button" class="add-band" title="Confine the sound to a band, one octave wide, that you can then reshape on the spectrogram">Add band</button>
+          <p class="hint band-motion" hidden>A band that moves is a sweep of its own, so it adds modulation to what the blobs draw.</p>
+        </fieldset>
         <fieldset><legend>Sound</legend>
           <label class="field" title="What carries the modulation: log-spaced tones (clearest), a harmonic complex on F0 (pitched), or noise (adds modulation of its own)">Carrier
             <select class="carrier">${CARRIERS.map((c) => `<option value="${c}">${c}</option>`).join("")}</select></label>
@@ -91,16 +117,6 @@ export function createBlobsTab(root, { commit }) {
           <label class="field" title="Which random draw of the modulation's timing to hear">Seed <input type="number" class="seed" step="1"></label>
           <button type="button" class="new-draw" title="Hear another draw with the same spectrum">New draw</button>
           <button type="button" class="clear" title="Remove every blob (Undo brings them back)">Clear</button>
-        </fieldset>
-        <fieldset class="band-fields"><legend>Bands</legend>
-          <p class="hint band-count"></p>
-          <div class="band-edit">
-            <label class="field" title="How wide the band is, in octaves">Width <input type="number" class="band-width" min="${+BAND_WIDTH_MIN.toFixed(2)}" max="${BAND_WIDTH_MAX}" step="0.25"> oct</label>
-            <label class="field" title="The band's level relative to the others">Level <input type="number" class="band-level" min="-40" max="0" step="1"> dB</label>
-            <button type="button" class="delete-band" title="Remove this band (Delete, with no breakpoint selected)">Delete band</button>
-          </div>
-          <button type="button" class="add-band" title="Confine the sound to a band, one octave wide, that you can then reshape on the spectrogram">Add band</button>
-          <p class="hint band-motion" hidden>A band that moves is a sweep of its own, so it adds modulation to what the blobs draw.</p>
         </fieldset>
         <p class="hint coarse" hidden></p>
         <p class="hint">Click to add a blob, drag to move it, drag its squares to change its width and height. Space plays.</p>
@@ -114,8 +130,24 @@ export function createBlobsTab(root, { commit }) {
     carrier: $(".carrier"), f0: $(".f0"), f0Field: $(".f0-field"), stft: $("canvas.stft"), depth: $(".depth"), useDepth: $(".use-depth"), seed: $(".seed"),
     newDraw: $(".new-draw"), clear: $(".clear"), coarse: $(".coarse"),
     bandCount: $(".band-count"), bandEdit: $(".band-edit"), bandWidth: $(".band-width"), bandLevel: $(".band-level"),
-    removeBand: $(".delete-band"), addBand: $(".add-band"), bandMotion: $(".band-motion"),
+    removeBand: $(".delete-band"), addBand: $(".add-band"), bandMotion: $(".band-motion"), wave: $("canvas.wave"),
   };
+
+  // The bands' drawing tools, as on the Speech tab: Point moves breakpoints
+  // (and a click on a band's line adds one, a drag inside it moves it all);
+  // Line and Freehand draw a stroke that replaces the band's track over its
+  // span, on the band pressed in, or make a new band when pressed outside.
+  let bandTool = "point";
+  const toolBox = $(".band-tools");
+  for (const { id, label, key, title } of BAND_TOOLS) {
+    const node = document.createElement("label");
+    node.className = "band-tool";
+    node.title = title;
+    node.innerHTML = `<input type="radio" name="band-tool" value="${id}"> ${label} <kbd>${key.toUpperCase()}</kbd>`;
+    node.querySelector("input").checked = id === bandTool;
+    node.querySelector("input").addEventListener("change", () => (bandTool = id));
+    toolBox.appendChild(node);
+  }
 
   const items = () => drag?.items ?? state.items;
   const bands = () => bandDrag?.bands ?? state.bands ?? [];
@@ -838,6 +870,22 @@ export function createBlobsTab(root, { commit }) {
     if (!nearPlot(sg, at)) return;
     event.preventDefault();
     const hit = pickBand(sg, at);
+    if (bandTool !== "point") {
+      // a stroke on the band pressed in, or a new band
+      const list = bands().map((b) => ({ ...b, points: b.points.map((p) => [...p]) }));
+      if (!hit && list.length >= MAX_BANDS) return;
+      const index = hit ? hit.index : list.length;
+      const from = [sg.t(at[0]), sg.f(at[1])];
+      ui.stft.setPointerCapture(event.pointerId);
+      focus = "band";
+      band = { index, point: null };
+      const origin = hit ? list[index].points : null;
+      const next = [...list];
+      next[index] = { ...(origin ? list[index] : { width: 1, level: 0 }), points: strokeOnto(origin, [from]) };
+      bandDrag = { kind: bandTool, index, origin, stroke: [from], bands: next, added: !hit, changed: false, start: at };
+      showSettings();
+      return renderStft();
+    }
     if (!hit) {
       band = null;
       showSettings();
@@ -872,8 +920,17 @@ export function createBlobsTab(root, { commit }) {
     const at = stftLocal(event);
     if (!bandDrag) {
       const hit = nearPlot(sg, at) ? pickBand(sg, at) : null;
-      ui.stft.style.cursor = !hit ? "default" : hit.kind === "point" ? "grab" : hit.kind === "line" ? "copy" : "ns-resize";
+      ui.stft.style.cursor = bandTool !== "point" ? "crosshair" : !hit ? "default" : hit.kind === "point" ? "grab" : hit.kind === "line" ? "copy" : "ns-resize";
       return;
+    }
+    if (bandDrag.kind === "line" || bandDrag.kind === "freehand") {
+      const here = [sg.t(at[0]), sg.f(at[1])];
+      bandDrag.stroke = bandDrag.kind === "line" ? [bandDrag.stroke[0], here] : [...bandDrag.stroke, here];
+      const points = strokeOnto(bandDrag.origin, bandDrag.stroke);
+      bandDrag.bands = bandDrag.bands.map((x, i) => (i === bandDrag.index ? { ...x, points } : x));
+      bandDrag.changed = true;
+      showSettings();
+      return renderStft();
     }
     const { f_lo, f_hi } = state;
     const b = bandDrag.bands[bandDrag.index];
@@ -913,12 +970,21 @@ export function createBlobsTab(root, { commit }) {
   ui.stft.addEventListener("pointerup", finishBand);
   ui.stft.addEventListener("pointercancel", finishBand);
 
+  // The result's waveform, under the measured spectrum, on the bands
+  // panel's time axis (the page's own waveform strip is hidden on this tab).
+  function renderWave() {
+    const duration = sound ? sound.samples.length / sound.fs : state?.duration ?? 1;
+    drawWaveform(ui.wave, sound?.samples, sound?.fs, duration);
+  }
+
   new ResizeObserver(render).observe(canvas);
+  new ResizeObserver(renderWave).observe(ui.wave);
   new ResizeObserver(renderMeasured).observe(measuredCanvas);
   new ResizeObserver(renderStft).observe(ui.stft);
 
   return {
     id: "blobs",
+    ownWaveform: true, // drawn in the Result box above
     setDocument(next) {
       fits = null; // a refusal is shown again if this drawing is refused again
       drag = null;
@@ -937,6 +1003,7 @@ export function createBlobsTab(root, { commit }) {
       }
       renderMeasured();
       renderStft();
+      renderWave();
     },
     setPlayhead(t) {
       playhead = t;
@@ -957,6 +1024,12 @@ export function createBlobsTab(root, { commit }) {
     },
     key(event) {
       if (event.key === "Delete" || event.key === "Backspace") return focus === "band" ? removeBandOrPoint() : removeSelected();
+      const toolKey = !event.ctrlKey && !event.metaKey && BAND_TOOLS.find((t) => t.key === event.key.toLowerCase());
+      if (toolKey) {
+        bandTool = toolKey.id;
+        toolBox.querySelector(`input[value="${bandTool}"]`).checked = true;
+        return true;
+      }
       return false;
     },
   };

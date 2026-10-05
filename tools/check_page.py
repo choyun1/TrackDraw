@@ -398,6 +398,19 @@ def main() -> None:
             page.click("#tab-blobs .delete-band")
             assert bands_now() == []
             expect(status).to_contain_text("Made", timeout=60_000)
+            # Freehand: a stroke outside every band draws a new band along it.
+            page.check("#tab-blobs input[name=band-tool][value=freehand]")
+            gesture([(sx(0.1), sy(300)), (sx(0.3), sy(600)), (sx(0.5), sy(1200))])
+            drawn = bands_now()
+            assert len(drawn) == 1 and len(drawn[0]["points"]) >= 2, drawn
+            assert abs(math.log2(drawn[0]["points"][0][1] / 300)) < 0.15 and abs(math.log2(drawn[0]["points"][-1][1] / 1200)) < 0.15, drawn
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page.locator("main > .result").is_hidden(), "the page's own waveform strip shows on the Modulation tab"
+            print(f"modulation: a freehand stroke drew a new band {drawn[0]['points']}")
+            page.mouse.move(sx(0.3), stft["y"] - 30)
+            page.keyboard.press("p")
+            page.keyboard.press("Control+z")
+            assert bands_now() == []
             print(f"modulation: added a band, bent it up to {end[1]} Hz, added and removed a breakpoint, removed the band")
             page.click("#reset")
             expect(status).to_contain_text("Made", timeout=60_000)

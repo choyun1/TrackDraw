@@ -16,11 +16,15 @@ export const MIN_DURATION = 0.05;
 // is the freehand simplification tolerance in the track's own unit (D10: a
 // default to be tuned by trying it).
 const FORMANT_COLORS = ["#d1495b", "#2e86ab", "#3c9d5d", "#9a6fb0", "#c07a1e"];
+// The same tracks over the magma spectrogram, whose black-purple-red-orange-
+// yellow leaves the cool and pale hues free: cyan, lime, white, sky blue,
+// lavender, each drawn on a dark casing (style.css, .on-spectrogram).
+const FORMANT_BRIGHT = ["#00e5ff", "#a6ff4d", "#ffffff", "#5aa9ff", "#d9b3ff"];
 export const TRACKS = {
   ...Object.fromEntries(
     [1, 2, 3, 4, 5].map((k, i) => [
       `F${k}`,
-      { panel: "formants", min: 0, max: 5000, unit: "Hz", tolerance: 15, color: FORMANT_COLORS[i] },
+      { panel: "formants", min: 0, max: 5000, unit: "Hz", tolerance: 15, color: FORMANT_COLORS[i], bright: FORMANT_BRIGHT[i] },
     ]),
   ),
   // F0 is drawn on 0-300 Hz but never below `floor`: lower, the voicing turns
