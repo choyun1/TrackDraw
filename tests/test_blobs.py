@@ -134,6 +134,102 @@ def test_a_saved_page_on_the_modulation_tab_sounds_as_the_tab_does():
     assert np.array_equal(page.synthesize(document).data, blobs.synthesize(state()).data)
 
 
+# --- bands (docs/design/tabs/bands.md) ---------------------------------------------
+
+
+def band(points, width=1.0, level=0.0):
+    return {"points": [list(p) for p in points], "width": width, "level": level}
+
+
+def band_levels(sound, t0=0.0, t1=None):
+    """Long-term level [dB] per 1/12-octave band between ``t0`` and ``t1``."""
+    bank = so.cosine_filterbank(f_lo=100, f_hi=6400, spacing=1 / 12, scale="octave")
+    env = bank.analyze(sound).envelopes(fs=1000).data.mean(axis=2)
+    env = env[int(t0 * 1000) : None if t1 is None else int(t1 * 1000)]
+    return bank.cfs, 10 * np.log10(np.mean(env**2, axis=0) + 1e-20)
+
+
+def test_no_bands_is_the_sound_as_before():
+    plain = blobs.synthesize(state())
+    assert np.array_equal(blobs.synthesize(state(bands=[])).data, plain.data)
+
+
+@pytest.mark.parametrize("carrier", blobs.CARRIERS)
+def test_a_band_keeps_the_sound_inside_it(carrier):
+    # bands.md, K-M1, as a test: 45-58 dB measured; 40 dB asked.
+    sound = blobs.synthesize(state(carrier=carrier, bands=[band([(0, 1000)])]))
+    cfs, level = band_levels(sound)
+    distance = np.abs(np.log2(cfs / 1000))
+    power = 10 ** (level / 10)
+    assert 10 * np.log10(power[distance <= 0.5].mean() / power[distance >= 1].mean()) > 40
+    assert sound.rms == pytest.approx(1)
+
+
+def test_a_band_follows_its_track():
+    sound = blobs.synthesize(state(duration=2.0, bands=[band([(0, 300), (2, 3000)], width=0.5)]))
+    for t0, t1, hz in ((0.0, 0.3, 300 * 10 ** (0.15)), (1.7, 2.0, 3000 / 10 ** 0.15)):
+        cfs, level = band_levels(sound, t0, t1)
+        assert abs(np.log2(cfs[np.argmax(level)] / hz)) < 0.5
+
+
+def test_a_bands_level_is_heard_and_bands_combine_by_the_largest_gain():
+    sound = blobs.synthesize(state(bands=[band([(0, 400)], width=0.5), band([(0, 3200)], width=0.5, level=-20)]))
+    cfs, level = band_levels(sound)
+    assert level[np.argmin(np.abs(cfs - 400))] - level[np.argmin(np.abs(cfs - 3200))] == pytest.approx(20, abs=3)
+    gain = blobs.band_gain([band([(0, 1000)]), band([(0, 1000)], level=-6)], np.array([1000.0]), np.array([0.0]))
+    assert gain[0, 0] == pytest.approx(1)
+
+
+@pytest.mark.parametrize(
+    "bands, message",
+    [
+        ([band([(0, 1000)])] * 6, "at most 5"),
+        ([band([(0, 1000)], width=0.1)], "width"),
+        ([band([(0, 1000)], level=-50)], "level"),
+        ([band([])], "points"),
+        ([band([(0.5, 1000), (0.5, 2000)])], "times must increase"),
+        ([band([(0, 1000), (2, 2000)])], "times must increase"),
+        ([band([(0, 50)])], "centre"),
+    ],
+)
+def test_bad_bands_are_refused(bands, message):
+    with pytest.raises(ValueError, match=message):
+        blobs.check(state(bands=bands))
+
+
+def contrast(spectrum, drawn):
+    """blobs.md, B-M4: measured power where the drawing is within 6 dB of its
+    peak over where it is 30 dB or more below, 1 <= |rate| <= 32 Hz."""
+    near = ((np.abs(drawn.w_t) <= 32) & (np.abs(drawn.w_t) >= 1))[None, :] & (drawn.w_f <= 4)[:, None]
+    inside = near & (drawn.level >= drawn.level[near].max() - 6)
+    outside = near & (drawn.level <= drawn.level[near].max() - 30)
+    power = 10 ** (spectrum.level / 10)
+    return 10 * np.log10(power[inside].mean() / power[outside].mean())
+
+
+def test_the_measured_plane_is_the_results_own_modulation_spectrum():
+    drawing = state(duration=3.0)
+    sound = blobs.synthesize(drawing)
+    ours, sonores = blobs.measured(sound, drawing), so.ModulationSpectrum.octave(sound, f_lo=100, f_hi=6400)
+    assert np.allclose(ours.level, sonores.level) and np.allclose(ours.w_t, sonores.w_t)
+
+
+def test_within_the_bands_a_moving_band_does_not_hide_the_blobs():
+    # bands.md, K-M4: 10.5 dB over the whole range, 22.5 dB within the band.
+    drawing = state(duration=3.0, bands=[band([(0, 500), (3, 4000)])])
+    sound, drawn = blobs.synthesize(drawing), blobs.target(drawing)
+    whole, within = contrast(blobs.measured(sound, state(duration=3.0)), drawn), contrast(blobs.measured(sound, drawing), drawn)
+    assert whole < 15 and within > 18, (whole, within)
+
+
+def test_the_page_gets_the_measured_plane_on_the_modulation_tab():
+    result = page.handle({"tab": "blobs", "state": state()})
+    picture = result["modulation"]
+    assert len(picture["data"]) == picture["n_densities"] * picture["n_rates"]
+    assert picture["rate_first"] == pytest.approx(-64, abs=picture["rate_step"]) and picture["n_densities"] >= 30
+    assert max(picture["data"]) == 255
+
+
 if __name__ == "__main__":
     FIXTURE.write_text(json.dumps(picture_fixture(), indent=0) + "\n")
     print(f"wrote {FIXTURE.relative_to(ROOT)}")

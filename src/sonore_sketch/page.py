@@ -93,7 +93,8 @@ def handle(request: Mapping[str, Any]) -> dict[str, Any]:
 
     Returns the sampling rate, the samples as little-endian float32 bytes
     (sonore's level: RMS 1), a spectrogram (:func:`spectrogram`), and the
-    seconds synthesis took.
+    seconds synthesis took; on the Modulation tab also the result's measured
+    modulation spectrum (``blobs.measured_picture``).
     """
     tab = request.get("tab")
     if tab not in TABS:
@@ -101,9 +102,12 @@ def handle(request: Mapping[str, Any]) -> dict[str, Any]:
     start = time.perf_counter()
     sound = TABS[tab](request["state"])
     elapsed = time.perf_counter() - start
-    return {
+    result = {
         "fs": float(sound.fs),
         "samples": np.ascontiguousarray(sound.mono().data[:, 0], dtype="<f4").tobytes(),
         "spectrogram": spectrogram(sound),
         "synthesis_s": elapsed,
     }
+    if tab == "blobs":  # the result's measured modulation spectrum, for under the plane (blobs.md, B7)
+        result["modulation"] = blobs.measured_picture(blobs.measured(sound, request["state"]))
+    return result

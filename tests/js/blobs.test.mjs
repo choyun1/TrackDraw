@@ -3,11 +3,13 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
+  bandCentre,
   check,
   clampRate,
   defaultSection,
   depthThatFits,
   grid,
+  newBand,
   power,
   rateToUnit,
   unitToRate,
@@ -75,4 +77,36 @@ test("the page keeps the blobs in their own section, and old pages gain it", () 
   assert.deepEqual(openDocument(older).blobs, defaultSection());
   assert.equal(resetTab(next, "blobs").blobs.seed, 1);
   assert.equal(resetTab(next, "painted").blobs.seed, 2);
+});
+
+// --- bands (docs/design/tabs/bands.md) ---------------------------------------------
+
+test("a band's centre is its points, interpolated in log frequency and held past its ends", () => {
+  const points = [[0.2, 500], [0.6, 2000]];
+  assert.equal(bandCentre(points, 0), 500);
+  assert.ok(Math.abs(bandCentre(points, 0.4) - 1000) < 1e-9);
+  assert.equal(bandCentre(points, 1), 2000);
+});
+
+test("a new band goes where no band is, flat across the page", () => {
+  const first = newBand([], 0.6);
+  assert.deepEqual(first, { points: [[0, 500], [0.6, 500]], width: 1, level: 0 });
+  assert.equal(newBand([first], 0.6).points[0][1], 2000);
+});
+
+test("bands are checked", () => {
+  const ok = { ...defaultSection(), duration: 0.6, bands: [newBand([], 0.6)] };
+  assert.equal(check(ok), ok);
+  assert.throws(() => check({ ...ok, bands: Array(6).fill(ok.bands[0]) }), /at most 5/);
+  assert.throws(() => check({ ...ok, bands: [{ ...ok.bands[0], width: 0.1 }] }), /width/);
+  assert.throws(() => check({ ...ok, bands: [{ ...ok.bands[0], points: [[0.3, 500], [0.3, 600]] }] }), /times must increase/);
+  assert.throws(() => check({ ...ok, bands: [{ ...ok.bands[0], points: [[0, 50]] }] }), /centre/);
+});
+
+test("stretching the page stretches the bands with it", () => {
+  const page = defaultPage();
+  page.blobs = { ...page.blobs, bands: [{ points: [[0, 500], [0.3, 800], [0.6, 500]], width: 1, level: 0 }] };
+  const longer = stretchPage(page, 1.2);
+  assert.deepEqual(longer.blobs.bands[0].points, [[0, 500], [0.6, 800], [1.2, 500]]);
+  assert.deepEqual(longer.blobs.items, page.blobs.items);
 });
