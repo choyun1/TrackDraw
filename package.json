@@ -1,0 +1,9 @@
+{
+  "name": "sonore-sketch",
+  "private": true,
+  "type": "module",
+  "description": "The page's JavaScript has no dependencies and no build step; this file only runs its tests.",
+  "scripts": {
+    "test": "node --test \"tests/js/*.test.mjs\""
+  }
+}

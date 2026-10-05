@@ -1,0 +1,206 @@
+// The Tracks tab's document and the edits drawing makes to it.
+//
+// A document is the file format of docs/design/tabs/tracks.md (D5), kept as
+// is in memory: each parameter is a number or [times, values], which is what
+// sonore_sketch.tracks hands to so.klatt_synthesize. Edits never change a
+// document in place; each returns a new one, so undo is a list of documents.
+//
+// No DOM here, so this file runs under `node --test`.
+
+export const FORMAT = 1;
+export const SONORE_VERSION = "0.4.0";
+export const MAX_DURATION = 10; // seconds (docs/design/app.md, D10)
+export const MIN_DURATION = 0.05;
+
+// The drawable tracks (tracks.md, D1: the paper's voiced set). `tolerance`
+// is the freehand simplification tolerance in the track's own unit (D10: a
+// default to be tuned by trying it).
+const FORMANT_COLORS = ["#d1495b", "#2e86ab", "#3c9d5d", "#9a6fb0", "#c07a1e"];
+export const TRACKS = {
+  ...Object.fromEntries(
+    [1, 2, 3, 4, 5].map((k, i) => [
+      `F${k}`,
+      { panel: "formants", min: 0, max: 5000, unit: "Hz", tolerance: 15, color: FORMANT_COLORS[i] },
+    ]),
+  ),
+  F0: { panel: "F0", min: 0, max: 300, unit: "Hz", tolerance: 1.5, color: "#444" },
+  AV: { panel: "AV", min: 0, max: 80, unit: "dB", tolerance: 1, color: "#444" },
+  ...Object.fromEntries(
+    [1, 2, 3, 4, 5].map((k, i) => [
+      `B${k}`,
+      { panel: "bandwidths", min: 0, max: 600, unit: "Hz", tolerance: 5, color: FORMANT_COLORS[i] },
+    ]),
+  ),
+};
+
+// sonore's KLATT_DEFAULTS for the drawable tracks.
+export const DEFAULTS = {
+  F0: 100, AV: 60, F1: 500, F2: 1500, F3: 2500, F4: 3500, F5: 4500,
+  B1: 60, B2: 90, B3: 150, B4: 200, B5: 250,
+};
+
+// A first drawing to hear at once: a short /aɪ/-like glide with a falling F0.
+export function defaultDocument() {
+  return {
+    trackdraw: FORMAT,
+    sonore: SONORE_VERSION,
+    duration: 0.6,
+    fs: 16000,
+    mode: "klatt",
+    params: {
+      F0: [[0, 0.6], [125, 95]],
+      AV: [[0, 0.03, 0.55, 0.6], [0, 60, 60, 0]],
+      F1: [[0, 0.15, 0.45, 0.6], [700, 700, 400, 380]],
+      F2: [[0, 0.15, 0.45, 0.6], [1100, 1100, 2000, 2100]],
+      F3: [[0, 0.6], [2500, 2700]],
+      F4: 3500,
+      F5: 4500,
+      B1: 60, B2: 90, B3: 150, B4: 200, B5: 250,
+    },
+  };
+}
+
+const round = (x, digits) => Number(x.toFixed(digits));
+
+// A track's breakpoints as [[t, v], ...]; a number is a flat line.
+export function points(doc, name) {
+  const value = doc.params[name] ?? DEFAULTS[name];
+  if (typeof value === "number") return [[0, value], [doc.duration, value]];
+  const [times, values] = value;
+  return times.map((t, i) => [t, values[i]]);
+}
+
+// A new document with `name` set to the breakpoints `pts` (sorted by time).
+export function withPoints(doc, name, pts) {
+  const sorted = [...pts].sort((a, b) => a[0] - b[0]);
+  const times = sorted.map(([t]) => round(t, 4));
+  const values = sorted.map(([, v]) => round(v, 2));
+  return { ...doc, params: { ...doc.params, [name]: [times, values] } };
+}
+
+export function clampValue(name, v) {
+  const { min, max } = TRACKS[name];
+  return Math.min(max, Math.max(min, v));
+}
+
+// The track's value at time t: linear between breakpoints, held beyond the
+// ends, as sonore does.
+export function valueAt(pts, t) {
+  if (t <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) {
+    const [t1, v1] = pts[i];
+    if (t <= t1) {
+      const [t0, v0] = pts[i - 1];
+      return t1 === t0 ? v1 : v0 + ((v1 - v0) * (t - t0)) / (t1 - t0);
+    }
+  }
+  return pts[pts.length - 1][1];
+}
+
+// The index of the breakpoint nearest t, if within `tolerance` seconds.
+export function nearestPoint(pts, t, tolerance) {
+  let best = -1;
+  let distance = tolerance;
+  pts.forEach(([pt], i) => {
+    const d = Math.abs(pt - t);
+    if (d <= distance) {
+      best = i;
+      distance = d;
+    }
+  });
+  return best;
+}
+
+// Add a breakpoint, keeping times sorted; returns the points and its index.
+export function insertPoint(pts, t, v) {
+  let index = pts.findIndex(([pt]) => pt > t);
+  if (index < 0) index = pts.length;
+  return { pts: [...pts.slice(0, index), [t, v], ...pts.slice(index)], index };
+}
+
+// Move breakpoint i, kept between its neighbours in time.
+export function movePoint(pts, i, t, v) {
+  const lo = i > 0 ? pts[i - 1][0] : 0;
+  const hi = i < pts.length - 1 ? pts[i + 1][0] : Infinity;
+  const moved = pts.slice();
+  moved[i] = [Math.min(hi, Math.max(lo, t)), v];
+  return moved;
+}
+
+export function removePoint(pts, i) {
+  return pts.length > 1 ? pts.filter((_, j) => j !== i) : pts;
+}
+
+// Replace the breakpoints under a span (line and freehand): those strictly
+// inside the new points' time range go, and the new points come in.
+export function replaceSpan(pts, span) {
+  const t0 = span[0][0];
+  const t1 = span[span.length - 1][0];
+  const kept = pts.filter(([t]) => t < t0 || t > t1);
+  return [...kept, ...span].sort((a, b) => a[0] - b[0]);
+}
+
+// Ramer-Douglas-Peucker on a stroke [[t, v], ...], keeping every point
+// whose value is more than `tolerance` (in the track's unit) from the chord
+// between the kept points on either side.
+export function simplify(stroke, tolerance) {
+  const sorted = [...stroke].sort((a, b) => a[0] - b[0]);
+  if (sorted.length <= 2) return sorted;
+  const keep = new Array(sorted.length).fill(false);
+  keep[0] = keep[sorted.length - 1] = true;
+  const stack = [[0, sorted.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    const [ta, va] = sorted[a];
+    const [tb, vb] = sorted[b];
+    let worst = -1;
+    let deviation = tolerance;
+    for (let i = a + 1; i < b; i++) {
+      const [t, v] = sorted[i];
+      const chord = tb === ta ? va : va + ((vb - va) * (t - ta)) / (tb - ta);
+      const d = Math.abs(v - chord);
+      if (d > deviation) {
+        worst = i;
+        deviation = d;
+      }
+    }
+    if (worst >= 0) {
+      keep[worst] = true;
+      stack.push([a, worst], [worst, b]);
+    }
+  }
+  return sorted.filter((_, i) => keep[i]);
+}
+
+export function clampDuration(duration) {
+  return Math.min(MAX_DURATION, Math.max(MIN_DURATION, duration));
+}
+
+// Change the duration, stretching every track with it: breakpoint times
+// scale exactly (tracks.md, C3), so nothing is resampled or splined.
+export function stretch(doc, duration) {
+  const factor = duration / doc.duration;
+  const params = Object.fromEntries(
+    Object.entries(doc.params).map(([name, value]) =>
+      typeof value === "number" ? [name, value] : [name, [value[0].map((t) => round(t * factor, 4)), value[1]]],
+    ),
+  );
+  return { ...doc, duration, params };
+}
+
+// Raise an Error saying what is wrong with a document read from a file or a
+// link; the Python side checks the same (sonore_sketch.tracks.check).
+export function check(doc) {
+  if (!doc || doc.trackdraw !== FORMAT) throw new Error(`not a TrackDraw document of format ${FORMAT}`);
+  if (!(doc.duration > 0 && doc.duration <= MAX_DURATION)) throw new Error(`duration must be in (0, ${MAX_DURATION}] s`);
+  if (!(doc.fs > 0)) throw new Error("fs must be a positive sampling rate");
+  if ((doc.mode ?? "klatt") !== "klatt") throw new Error(`mode ${doc.mode} is not supported yet`);
+  for (const [name, value] of Object.entries(doc.params ?? {})) {
+    if (typeof value === "number") continue;
+    const ok =
+      Array.isArray(value) && value.length === 2 && Array.isArray(value[0]) && Array.isArray(value[1]) &&
+      value[0].length === value[1].length && value[0].length > 0;
+    if (!ok) throw new Error(`${name} must be a number or [times, values]`);
+  }
+  return doc;
+}

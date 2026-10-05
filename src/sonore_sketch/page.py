@@ -1,0 +1,68 @@
+"""What the page asks of Python, and what it gets back.
+
+The page's worker (``app/worker.js``, under Pyodide) and the local server
+(``tools/serve.py``, in this Python) both call :func:`handle`, so the two
+engines give the same result. A request names a tab and holds its state; the
+result is the sound's samples and a picture of it, as bytes the page can wrap
+in typed arrays without copying element by element.
+"""
+
+from __future__ import annotations
+
+import time
+from collections.abc import Mapping
+from typing import Any
+
+import numpy as np
+import sonore as so
+
+from . import tracks
+
+TABS = {"tracks": tracks.synthesize}
+
+# The result's spectrogram: wideband, 5 ms Hann, as on the Seeing speech page
+# (docs/design/tabs/tracks.md, "What sonore provides").
+WINDOW_S = 0.005
+N_FFT = 512
+MAX_FRAMES = 1200
+FLOOR_DB = -70.0
+
+
+def spectrogram(sound: so.Sound) -> dict[str, Any]:
+    """A wideband spectrogram of ``sound`` as 8-bit levels, 0 at ``FLOOR_DB``
+    below the loudest cell and 255 at it, frequency rows from 0 Hz up."""
+    hop = max(0.001, sound.duration / MAX_FRAMES)
+    stft = so.GaborFrame(WINDOW_S, hop, n_fft=N_FFT).analyze(sound.mono())
+    magnitude = np.abs(stft.data[0])
+    level = 20 * np.log10(np.maximum(magnitude, 1e-12) / max(magnitude.max(), 1e-12))
+    scaled = np.round(255 * (1 - np.clip(level, FLOOR_DB, 0) / FLOOR_DB))
+    return {
+        "data": np.ascontiguousarray(scaled, dtype=np.uint8).tobytes(),
+        "n_freqs": int(magnitude.shape[0]),
+        "n_frames": int(magnitude.shape[1]),
+        "f_max": float(stft.f[-1]),
+        "t_start": float(stft.t[0]),
+        "t_step": float(stft.t[1] - stft.t[0]) if stft.t.size > 1 else hop,
+        "floor_db": FLOOR_DB,
+    }
+
+
+def handle(request: Mapping[str, Any]) -> dict[str, Any]:
+    """Synthesize ``request["state"]`` with the tab ``request["tab"]``.
+
+    Returns the sampling rate, the samples as little-endian float32 bytes
+    (sonore's level: RMS 1), a spectrogram (:func:`spectrogram`), and the
+    seconds synthesis took.
+    """
+    tab = request.get("tab")
+    if tab not in TABS:
+        raise ValueError(f"unknown tab {tab!r}; known: {sorted(TABS)}")
+    start = time.perf_counter()
+    sound = TABS[tab](request["state"])
+    elapsed = time.perf_counter() - start
+    return {
+        "fs": float(sound.fs),
+        "samples": np.ascontiguousarray(sound.mono().data[:, 0], dtype="<f4").tobytes(),
+        "spectrogram": spectrogram(sound),
+        "synthesis_s": elapsed,
+    }

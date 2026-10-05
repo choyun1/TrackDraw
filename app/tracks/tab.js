@@ -1,0 +1,359 @@
+// The Tracks tab: draw F1-F5, F0, AV and B1-B5 over time and hear the
+// Klatt speech they describe (docs/design/tabs/tracks.md).
+//
+// One panel per kind of track, all on the same time axis. The selected track
+// is the one that is edited (D10); clicking another track's line or its
+// button selects it. Tools: Point (add or drag a breakpoint; double-click
+// removes one), Line (press at one end, release at the other) and Freehand
+// (a stroke, simplified to the fewest breakpoints within a tolerance).
+
+import { drawSpectrogram } from "../plot.js";
+import {
+  TRACKS,
+  clampValue,
+  insertPoint,
+  movePoint,
+  nearestPoint,
+  points,
+  removePoint,
+  replaceSpan,
+  simplify,
+  valueAt,
+  withPoints,
+} from "./model.js";
+
+const SVG = "http://www.w3.org/2000/svg";
+const MARGIN = { left: 52, right: 10, top: 8, bottom: 8 };
+const GRAB_PX = 9; // a press this close in time to a breakpoint grabs it
+const SELECT_PX = 7; // a press this close to another track's line selects it
+
+const PANELS = [
+  { id: "formants", label: "Formants", tracks: ["F1", "F2", "F3", "F4", "F5"], ticks: [0, 1000, 2000, 3000, 4000, 5000], format: (v) => `${v / 1000}k` },
+  { id: "F0", label: "F0 (Hz)", tracks: ["F0"], ticks: [0, 100, 200, 300] },
+  { id: "AV", label: "AV (dB)", tracks: ["AV"], ticks: [0, 20, 40, 60, 80] },
+  { id: "bandwidths", label: "Bandwidth (Hz)", tracks: [], ticks: [0, 200, 400, 600] },
+];
+
+const TOOLS = [
+  { id: "point", label: "Point", key: "p", title: "Add or drag a breakpoint; double-click one to remove it (P)" },
+  { id: "line", label: "Line", key: "l", title: "Press at one end, release at the other (L)" },
+  { id: "freehand", label: "Freehand", key: "f", title: "Draw a stroke; it becomes the fewest breakpoints that follow it (F)" },
+];
+
+function element(name, attributes = {}, parent = null) {
+  const node = document.createElementNS(SVG, name);
+  for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+  parent?.appendChild(node);
+  return node;
+}
+
+export function createTracksTab(root, { commit }) {
+  let doc = null;
+  let selected = "F2";
+  let tool = "point";
+  let picture = null;
+  let playhead = null;
+  let gesture = null;
+
+  root.innerHTML = `
+    <div class="tracks-body">
+      <div class="panels"></div>
+      <aside class="side">
+        <fieldset class="tool-group"><legend>Tool</legend></fieldset>
+        <fieldset class="track-group"><legend>Track</legend></fieldset>
+        <label class="check"><input type="checkbox" class="show-bandwidths"> Bandwidths</label>
+        <p class="hint">Space plays. 1–5 select F1–F5. Ctrl+Z undoes.</p>
+      </aside>
+    </div>`;
+  const panelsNode = root.querySelector(".panels");
+  const toolGroup = root.querySelector(".tool-group");
+  const trackGroup = root.querySelector(".track-group");
+  const showBandwidths = root.querySelector(".show-bandwidths");
+
+  for (const { id, label, key, title } of TOOLS) {
+    const node = document.createElement("label");
+    node.className = "choice";
+    node.title = title;
+    node.innerHTML = `<input type="radio" name="tracks-tool" value="${id}"> ${label} <kbd>${key.toUpperCase()}</kbd>`;
+    node.querySelector("input").checked = id === tool;
+    node.querySelector("input").addEventListener("change", () => (tool = id));
+    toolGroup.appendChild(node);
+  }
+  const trackButtons = {};
+  for (const name of ["F1", "F2", "F3", "F4", "F5", "F0", "AV"]) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = name;
+    button.style.setProperty("--track", TRACKS[name].color);
+    button.addEventListener("click", () => select(name));
+    trackGroup.appendChild(button);
+    trackButtons[name] = button;
+  }
+
+  const panels = PANELS.map((spec) => {
+    const node = document.createElement("div");
+    node.className = `panel panel-${spec.id}`;
+    node.innerHTML = `<canvas class="background"></canvas>`;
+    const svg = element("svg", { class: "surface" }, node);
+    panelsNode.appendChild(node);
+    const panel = { ...spec, node, svg, canvas: node.querySelector("canvas") };
+    attachPointer(panel);
+    return panel;
+  });
+  const axis = element("svg", { class: "time-axis" });
+  panelsNode.appendChild(axis);
+
+  // Bandwidths show one at a time: that of the selected formant, else the last.
+  let bandwidth = "B2";
+  function trackList(panel) {
+    return panel.id === "bandwidths" ? [bandwidth] : panel.tracks;
+  }
+
+  showBandwidths.addEventListener("change", () => {
+    panels.find((p) => p.id === "bandwidths").node.hidden = !showBandwidths.checked;
+    render();
+  });
+  panels.find((p) => p.id === "bandwidths").node.hidden = true;
+
+  function select(name) {
+    selected = name;
+    if (/^F[1-5]$/.test(name)) bandwidth = `B${name[1]}`;
+    if (/^B[1-5]$/.test(name)) bandwidth = name;
+    render();
+  }
+
+  // Panel geometry, in the SVG's own pixels.
+  function geometry(panel) {
+    const width = panel.svg.clientWidth || 600;
+    const height = panel.svg.clientHeight || 100;
+    const { min, max } = TRACKS[trackList(panel)[0]];
+    const x0 = MARGIN.left;
+    const x1 = width - MARGIN.right;
+    const y0 = MARGIN.top;
+    const y1 = height - MARGIN.bottom;
+    return {
+      width, height, x0, x1, y0, y1, min, max,
+      x: (t) => x0 + (t / doc.duration) * (x1 - x0),
+      y: (v) => y1 - ((v - min) / (max - min)) * (y1 - y0),
+      t: (x) => Math.min(doc.duration, Math.max(0, ((x - x0) / (x1 - x0)) * doc.duration)),
+      v: (y) => min + ((y1 - y) / (y1 - y0)) * (max - min),
+    };
+  }
+
+  function renderPanel(panel) {
+    if (panel.node.hidden || !doc) return;
+    const g = geometry(panel);
+    const svg = panel.svg;
+    svg.setAttribute("viewBox", `0 0 ${g.width} ${g.height}`);
+    svg.replaceChildren();
+    const grid = element("g", { class: "grid" }, svg);
+    for (const tick of panel.ticks) {
+      element("line", { x1: g.x0, x2: g.x1, y1: g.y(tick), y2: g.y(tick) }, grid);
+      const label = element("text", { x: g.x0 - 6, y: g.y(tick), class: "tick" }, grid);
+      label.textContent = panel.format ? panel.format(tick) : tick;
+    }
+    const step = niceStep(doc.duration);
+    for (let t = 0; t <= doc.duration + 1e-9; t += step) {
+      element("line", { x1: g.x(t), x2: g.x(t), y1: g.y0, y2: g.y1, class: "time" }, grid);
+    }
+    const title = element("text", { x: g.x0 + 6, y: g.y0 + 3, class: "panel-title" }, svg);
+    title.textContent = panel.id === "bandwidths" ? `${bandwidth} (Hz)` : panel.label;
+
+    const names = trackList(panel);
+    // The selected track last, so it is drawn on top.
+    for (const name of [...names.filter((n) => n !== selected), ...names.filter((n) => n === selected)]) {
+      const pts = points(doc, name);
+      const isSelected = name === selected;
+      const ends = [[0, pts[0][1]], ...pts, [doc.duration, pts[pts.length - 1][1]]];
+      const group = element("g", { class: `track${isSelected ? " selected" : ""}`, style: `--track: ${TRACKS[name].color}` }, svg);
+      element("polyline", { points: ends.map(([t, v]) => `${g.x(t)},${g.y(v)}`).join(" ") }, group);
+      if (names.length > 1) {
+        const label = element("text", { x: g.x1 - 4, y: g.y(pts[pts.length - 1][1]) - 5, class: "track-label" }, group);
+        label.textContent = name;
+      }
+      if (isSelected) {
+        for (const [t, v] of pts) element("circle", { cx: g.x(t), cy: g.y(v), r: 4 }, group);
+      }
+    }
+    if (gesture?.panel === panel && gesture.preview) {
+      element("polyline", { class: "preview", points: gesture.preview.map(([t, v]) => `${g.x(t)},${g.y(v)}`).join(" ") }, svg);
+    }
+    if (playhead !== null) {
+      element("line", { class: "playhead", x1: g.x(playhead), x2: g.x(playhead), y1: g.y0, y2: g.y1 }, svg);
+    }
+  }
+
+  function renderBackground() {
+    const panel = panels[0];
+    if (!doc) return;
+    const g = geometry(panel);
+    const canvas = panel.canvas;
+    // The canvas covers the plotting area only.
+    Object.assign(canvas.style, { left: `${g.x0}px`, top: `${g.y0}px`, width: `${g.x1 - g.x0}px`, height: `${g.y1 - g.y0}px` });
+    drawSpectrogram(canvas, picture, doc.duration, g.max, 0.55);
+  }
+
+  function renderAxis() {
+    if (!doc) return;
+    const width = axis.clientWidth || 600;
+    const x0 = MARGIN.left;
+    const x1 = width - MARGIN.right;
+    axis.setAttribute("viewBox", `0 0 ${width} 18`);
+    axis.replaceChildren();
+    const step = niceStep(doc.duration);
+    for (let t = 0; t <= doc.duration + 1e-9; t += step) {
+      const label = element("text", { x: x0 + (t / doc.duration) * (x1 - x0), y: 12 }, axis);
+      label.textContent = Number(t.toFixed(2));
+    }
+    const unit = element("text", { x: x0 - 16, y: 12, class: "unit" }, axis);
+    unit.textContent = "s";
+  }
+
+  function render() {
+    for (const [name, button] of Object.entries(trackButtons)) button.classList.toggle("active", name === selected);
+    panels.forEach(renderPanel);
+    renderAxis();
+  }
+
+  // --- drawing ---------------------------------------------------------------
+
+  function attachPointer(panel) {
+    const svg = panel.svg;
+    const local = (event) => {
+      const box = svg.getBoundingClientRect();
+      return [event.clientX - box.left, event.clientY - box.top];
+    };
+
+    svg.addEventListener("pointerdown", (event) => {
+      if (!doc || event.button > 0) return;
+      const names = trackList(panel);
+      const g = geometry(panel);
+      const [px, py] = local(event);
+      const t = g.t(px);
+      const distance = (name) => Math.abs(g.y(valueAt(points(doc, name), t)) - py);
+      if (!names.includes(selected)) {
+        // Pressing in another panel selects its track; in a strip of one
+        // track, drawing starts at once.
+        const nearest = names.reduce((a, b) => (distance(a) <= distance(b) ? a : b));
+        select(nearest);
+        if (names.length > 1) return;
+      } else if (names.length > 1 && distance(selected) > SELECT_PX) {
+        const other = names.find((n) => n !== selected && distance(n) <= SELECT_PX);
+        if (other) return select(other);
+      }
+      event.preventDefault();
+      svg.setPointerCapture(event.pointerId);
+      const name = selected;
+      const v = clampValue(name, g.v(py));
+      const pts = points(doc, name);
+      const start = doc;
+      if (tool === "point") {
+        let index = nearestPoint(pts, t, (GRAB_PX / (g.x1 - g.x0)) * doc.duration);
+        let current = pts;
+        if (index < 0) ({ pts: current, index } = insertPoint(pts, t, v));
+        gesture = { panel, name, start, kind: "point", index, base: current };
+        doc = withPoints(doc, name, current);
+      } else if (tool === "line") {
+        gesture = { panel, name, start, kind: "line", from: [t, v], preview: [[t, v], [t, v]] };
+      } else {
+        gesture = { panel, name, start, kind: "freehand", stroke: [[t, v]], preview: [[t, v]] };
+      }
+      renderPanel(panel);
+    });
+
+    svg.addEventListener("pointermove", (event) => {
+      if (!gesture || gesture.panel !== panel) return;
+      const g = geometry(panel);
+      const moves = event.getCoalescedEvents?.() ?? [event];
+      for (const move of moves.length ? moves : [event]) {
+        const [px, py] = local(move);
+        const t = g.t(px);
+        const v = clampValue(gesture.name, g.v(py));
+        if (gesture.kind === "point") {
+          doc = withPoints(doc, gesture.name, movePoint(gesture.base, gesture.index, t, v));
+        } else if (gesture.kind === "line") {
+          gesture.preview = [gesture.from, [t, v]];
+        } else {
+          gesture.stroke.push([t, v]);
+          gesture.preview = gesture.stroke;
+        }
+      }
+      renderPanel(panel);
+    });
+
+    const finish = (event) => {
+      if (!gesture || gesture.panel !== panel) return;
+      const { name, start, kind } = gesture;
+      const pts = points(doc, name);
+      if (kind === "line") {
+        const [a, b] = gesture.preview;
+        const span = Math.abs(geometry(panel).x(b[0]) - geometry(panel).x(a[0])) < 3 && Math.abs(a[1] - b[1]) < 1e-9 ? [a] : [a, b].sort((p, q) => p[0] - q[0]);
+        doc = withPoints(doc, name, span.length === 1 ? insertPoint(pts, ...span[0]).pts : replaceSpan(pts, span));
+      } else if (kind === "freehand") {
+        const simplified = simplify(gesture.stroke, TRACKS[name].tolerance);
+        doc = withPoints(doc, name, simplified.length === 1 ? insertPoint(pts, ...simplified[0]).pts : replaceSpan(pts, simplified));
+      }
+      gesture = null;
+      if (event.type === "pointercancel") doc = start;
+      renderPanel(panel);
+      if (JSON.stringify(doc.params[name]) !== JSON.stringify(start.params[name])) commit(doc);
+      else doc = start;
+    };
+    svg.addEventListener("pointerup", finish);
+    svg.addEventListener("pointercancel", finish);
+
+    svg.addEventListener("dblclick", (event) => {
+      if (!doc || tool !== "point" || !trackList(panel).includes(selected)) return;
+      const g = geometry(panel);
+      const [px] = local(event);
+      const pts = points(doc, selected);
+      const index = nearestPoint(pts, g.t(px), (GRAB_PX / (g.x1 - g.x0)) * doc.duration);
+      if (index >= 0 && pts.length > 1) commit((doc = withPoints(doc, selected, removePoint(pts, index))));
+      render();
+    });
+  }
+
+  new ResizeObserver(() => {
+    render();
+    renderBackground();
+  }).observe(panelsNode);
+
+  return {
+    id: "tracks",
+    get document() {
+      return doc;
+    },
+    setDocument(next) {
+      gesture = null;
+      doc = next;
+      render();
+      renderBackground();
+    },
+    setResult(result) {
+      picture = result?.spectrogram ?? null;
+      renderBackground();
+    },
+    setPlayhead(t) {
+      playhead = t;
+      render();
+    },
+    key(event) {
+      const toolKey = TOOLS.find((t) => t.key === event.key.toLowerCase());
+      if (toolKey) {
+        tool = toolKey.id;
+        toolGroup.querySelector(`input[value="${tool}"]`).checked = true;
+        return true;
+      }
+      if (/^[1-5]$/.test(event.key)) {
+        select(`F${event.key}`);
+        return true;
+      }
+      return false;
+    },
+  };
+}
+
+function niceStep(duration) {
+  for (const step of [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2]) if (duration / step <= 12) return step;
+  return 5;
+}
