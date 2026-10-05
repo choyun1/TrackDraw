@@ -10,6 +10,7 @@ import { Log } from "./log.js";
 import { drawSpectrogram, drawWaveform } from "./plot.js";
 import { encodeState, stateFromHash } from "./share.js";
 import { defaultPage, openDocument, resetTab, stretchPage, tabState, withTabState } from "./document.js";
+import { createBlobsTab } from "./blobs/tab.js";
 import { createPaintedTab } from "./painted/tab.js";
 import { clampDuration } from "./tracks/model.js";
 import { createTracksTab } from "./tracks/tab.js";
@@ -91,6 +92,7 @@ const commitFrom = (id) => (state) => change(withTabState(history.present, id, s
 const tabs = {
   tracks: createTracksTab($("tab-tracks"), { commit: commitFrom("tracks") }),
   painted: createPaintedTab($("tab-painted"), { commit: commitFrom("painted"), log }),
+  blobs: createBlobsTab($("tab-blobs"), { commit: commitFrom("blobs") }),
 };
 // The tab shown is not an edit (undo does not switch tabs); it is saved with
 // the document, so a link opens on the tab it was made on.
@@ -149,6 +151,7 @@ function afterChange() {
 
 async function synthesize({ play }) {
   const doc = history.present;
+  const asked = tab;
   const state = tabState(doc, tab.id);
   const key = `${tab.id} ${JSON.stringify(state)}`;
   if (result?.key === key) {
@@ -169,9 +172,13 @@ async function synthesize({ play }) {
   } catch (error) {
     status(`Synthesis failed: ${error.message} (see Log; Reset starts again)`, true);
     log.error(`synthesis failed: ${error.message}`, error.detail ?? "");
+    if (tab === asked && history.present === doc) tab.failed?.(error.message);
     return null;
   }
   if (!sound) return null; // a newer drawing replaced this request
+  // The drawing changed while this was made, to one that asks for no sound
+  // (nothing drawn) or to another tab: this sound is no longer what is shown.
+  if (tab !== asked || history.present !== doc) return null;
   result = { key, doc, sound };
   showResult();
   status(`Made ${doc.duration} s in ${sound.synthesisSeconds.toFixed(2)} s.`);
