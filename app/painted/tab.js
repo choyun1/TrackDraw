@@ -7,7 +7,7 @@
 // toward the brush's level by its weight when the stroke ends.
 
 import { magma } from "../colormap.js";
-import { fitCanvas } from "../plot.js";
+import { fitCanvas, niceStep } from "../plot.js";
 import {
   CARRIERS,
   applyStroke,
@@ -341,10 +341,4 @@ export function createPaintedTab(root, { commit, log }) {
       return true;
     },
   };
-}
-
-// A time step whose labels are at least 44 px apart.
-function niceStep(duration, width) {
-  for (const step of [0.01, 0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2]) if ((width * step) / duration >= 44) return step;
-  return 5;
 }

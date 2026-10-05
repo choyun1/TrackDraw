@@ -79,3 +79,9 @@ export function drawWaveform(canvas, samples, fs, duration) {
     context.fillRect(x, top, 1, Math.max(1, bottom - top));
   }
 }
+
+// A time step whose labels are at least 44 px apart.
+export function niceStep(duration, width) {
+  for (const step of [0.01, 0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2]) if ((width * step) / duration >= 44) return step;
+  return 5;
+}

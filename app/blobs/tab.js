@@ -7,9 +7,13 @@
 // centre and, for the selected blob, its two width handles go on top. An
 // edit is one gesture: adding, moving or resizing a blob is committed when
 // the pointer comes up.
+//
+// Under the plane, the result's spectrogram (the shell's 5 ms STFT) on a
+// log-frequency axis over the carrier's bands, so a blob's density shows as
+// the slope of its stripes in octaves.
 
 import { magma } from "../colormap.js";
-import { fitCanvas } from "../plot.js";
+import { fitCanvas, niceStep } from "../plot.js";
 import {
   CARRIERS,
   COARSE_BELOW_S,
@@ -41,7 +45,10 @@ export function createBlobsTab(root, { commit }) {
 
   root.innerHTML = `
     <div class="blobs-body">
-      <div class="paint-area"><canvas class="plane"></canvas></div>
+      <div class="paint-area">
+        <canvas class="plane"></canvas>
+        <canvas class="stft" title="The result's spectrogram (5 ms window) on a log-frequency axis"></canvas>
+      </div>
       <aside class="side">
         <fieldset class="blob-fields"><legend>Blob</legend>
           <p class="hint blob-count"></p>
@@ -55,8 +62,9 @@ export function createBlobsTab(root, { commit }) {
           </div>
         </fieldset>
         <fieldset><legend>Sound</legend>
-          <label class="field" title="What carries the modulation: log-spaced tones (clearest) or noise (adds modulation of its own)">Carrier
+          <label class="field" title="What carries the modulation: log-spaced tones (clearest), a harmonic complex on F0 (pitched), or noise (adds modulation of its own)">Carrier
             <select class="carrier">${CARRIERS.map((c) => `<option value="${c}">${c}</option>`).join("")}</select></label>
+          <label class="field f0-field" title="The harmonic complex's fundamental">F0 <input type="number" class="f0" min="20" max="1000" step="1"> Hz</label>
           <label class="field" title="How deep the modulation is: the envelopes' rms about their mean, relative to it">Depth <input type="number" class="depth" min="0.01" max="1" step="0.01"></label>
           <button type="button" class="use-depth" hidden></button>
           <label class="field" title="Which random draw of the modulation's timing to hear">Seed <input type="number" class="seed" step="1"></label>
@@ -72,7 +80,7 @@ export function createBlobsTab(root, { commit }) {
   const ui = {
     count: $(".blob-count"), edit: $(".blob-edit"), rate: $(".rate"), density: $(".density"),
     rateWidth: $(".rate-width"), densityWidth: $(".density-width"), level: $(".level"), remove: $(".delete"),
-    carrier: $(".carrier"), depth: $(".depth"), useDepth: $(".use-depth"), seed: $(".seed"),
+    carrier: $(".carrier"), f0: $(".f0"), f0Field: $(".f0-field"), stft: $("canvas.stft"), depth: $(".depth"), useDepth: $(".use-depth"), seed: $(".seed"),
     newDraw: $(".new-draw"), clear: $(".clear"), coarse: $(".coarse"),
   };
 
@@ -101,6 +109,8 @@ export function createBlobsTab(root, { commit }) {
       ui.level.value = blob.level;
     }
     ui.carrier.value = state.carrier;
+    ui.f0.value = state.f0 ?? 100;
+    ui.f0Field.hidden = state.carrier !== "harmonic";
     ui.depth.value = state.rms_depth;
     ui.seed.value = state.seed;
     ui.useDepth.hidden = fits === null;
@@ -129,6 +139,11 @@ export function createBlobsTab(root, { commit }) {
   ui.remove.addEventListener("click", removeSelected);
 
   ui.carrier.addEventListener("change", () => commit({ ...state, carrier: ui.carrier.value }));
+  ui.f0.addEventListener("change", () => {
+    const f0 = Math.round(Number(ui.f0.value));
+    if (f0 >= 20 && f0 <= Math.min(1000, state.f_hi) && f0 !== state.f0) commit({ ...state, f0 });
+    else showSettings();
+  });
   ui.depth.addEventListener("change", () => {
     const depth = tidy(Number(ui.depth.value));
     if (depth > 0 && depth <= 1 && depth !== state.rms_depth) commit({ ...state, rms_depth: depth });
@@ -427,7 +442,116 @@ export function createBlobsTab(root, { commit }) {
   canvas.addEventListener("pointerup", finish);
   canvas.addEventListener("pointercancel", finish);
 
+  // --- the result's spectrogram ------------------------------------------------------
+
+  const STFT_MARGIN = { left: 52, right: 10, top: 6, bottom: 20 };
+  const FREQUENCY_TICKS = [100, 200, 500, 1000, 2000, 5000];
+  let sound = null;
+  let playhead = null;
+  const stftImage = document.createElement("canvas");
+  let stftDrawn = { sound: null, key: "" };
+
+  // The spectrogram as an image, one pixel per CSS pixel; kept until the
+  // sound or the size changes, so the playhead can move over it cheaply.
+  function paintStft(w, h, span, duration) {
+    const { f_lo } = state;
+    stftImage.width = w;
+    stftImage.height = h;
+    const pixels = stftImage.getContext("2d").createImageData(w, h);
+    const floor = magma(0);
+    for (let i = 0; i < pixels.data.length; i += 4) {
+      pixels.data.set(floor, i);
+      pixels.data[i + 3] = 255;
+    }
+    const picture = sound?.spectrogram;
+    if (picture) {
+      const { data, nFreqs, nFrames, fMax, tStart, tStep } = picture;
+      const bins = Int32Array.from({ length: h }, (_, py) => Math.round(((f_lo * 2 ** ((1 - (py + 0.5) / h) * span)) / fMax) * (nFreqs - 1)));
+      for (let px = 0; px < w; px++) {
+        const frame = Math.round((((px + 0.5) / w) * duration - tStart) / tStep);
+        if (frame < 0 || frame >= nFrames) continue;
+        for (let py = 0; py < h; py++) {
+          const bin = bins[py];
+          if (bin < 0 || bin >= nFreqs) continue;
+          pixels.data.set(magma(data[bin * nFrames + frame] / 255), 4 * (py * w + px));
+        }
+      }
+    }
+    stftImage.getContext("2d").putImageData(pixels, 0, 0);
+  }
+
+  function renderStft() {
+    const context = fitCanvas(ui.stft);
+    const ratio = ui.stft.width / (ui.stft.clientWidth || 1);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const width = ui.stft.clientWidth || 600;
+    const height = ui.stft.clientHeight || 200;
+    const x0 = STFT_MARGIN.left;
+    const x1 = width - STFT_MARGIN.right;
+    const y0 = STFT_MARGIN.top;
+    const y1 = height - STFT_MARGIN.bottom;
+    context.clearRect(0, 0, width, height);
+    if (!state) return;
+    const { f_lo, f_hi } = state;
+    const duration = sound ? sound.samples.length / sound.fs : state.duration; // the sound's own, while a new one is made
+    const span = Math.log2(f_hi / f_lo);
+    const y = (f) => y1 - (Math.log2(f / f_lo) / span) * (y1 - y0);
+    const style = getComputedStyle(ui.stft);
+    const muted = style.getPropertyValue("--muted").trim() || "#6b7280";
+    const line = style.getPropertyValue("--line").trim() || "#d5d9e0";
+    const w = Math.max(1, Math.round(x1 - x0));
+    const h = Math.max(1, Math.round(y1 - y0));
+    const key = [w, h, f_lo, f_hi, duration].join(" ");
+    if (stftDrawn.sound !== sound || stftDrawn.key !== key) {
+      paintStft(w, h, span, duration);
+      stftDrawn = { sound, key };
+    }
+    context.imageSmoothingEnabled = true;
+    context.drawImage(stftImage, x0, y0, x1 - x0, y1 - y0);
+
+    context.lineWidth = 1;
+    context.font = "11px system-ui, sans-serif";
+    context.strokeStyle = line;
+    context.strokeRect(x0 + 0.5, y0 + 0.5, x1 - x0 - 1, y1 - y0 - 1);
+    context.fillStyle = muted;
+    context.textAlign = "right";
+    context.textBaseline = "middle";
+    for (const f of FREQUENCY_TICKS.filter((f) => f >= f_lo && f <= f_hi)) {
+      const yy = Math.round(y(f)) + 0.5;
+      context.strokeStyle = "rgba(255, 255, 255, 0.15)";
+      context.beginPath();
+      context.moveTo(x0, yy);
+      context.lineTo(x1, yy);
+      context.stroke();
+      context.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, x0 - 6, Math.min(Math.max(yy, y0 + 5), y1 - 5));
+    }
+    context.save();
+    context.translate(12, (y0 + y1) / 2);
+    context.rotate(-Math.PI / 2);
+    context.textAlign = "center";
+    context.fillText("Hz", 0, 0);
+    context.restore();
+    context.textAlign = "center";
+    context.textBaseline = "top";
+    const step = niceStep(duration, x1 - x0);
+    for (let k = 0; k * step <= duration + 1e-9; k++) {
+      const x = x0 + ((k * step) / duration) * (x1 - x0);
+      if (x < x1 - 24) context.fillText(`${+(k * step).toFixed(2)}`, x, y1 + 4);
+    }
+    context.textAlign = "right";
+    context.fillText("s", x1, y1 + 4);
+    if (playhead !== null) {
+      const x = Math.round(x0 + (playhead / duration) * (x1 - x0)) + 0.5;
+      context.strokeStyle = style.getPropertyValue("--accent").trim() || "#2e86ab";
+      context.beginPath();
+      context.moveTo(x, y0);
+      context.lineTo(x, y1);
+      context.stroke();
+    }
+  }
+
   new ResizeObserver(render).observe(canvas);
+  new ResizeObserver(renderStft).observe(ui.stft);
 
   return {
     id: "blobs",
@@ -438,13 +562,18 @@ export function createBlobsTab(root, { commit }) {
       showSettings();
       render();
     },
-    setResult(sound) {
+    setResult(next) {
+      sound = next ?? null;
       if (sound) {
         fits = null;
         showSettings();
       }
+      renderStft();
     },
-    setPlayhead() {},
+    setPlayhead(t) {
+      playhead = t;
+      renderStft();
+    },
     // sonore refused the drawing; if it named a depth that fits, offer a
     // little less: it prints the depth rounded, and the depth that fits can
     // move by a few thousandths with the depth asked for (seen in

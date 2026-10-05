@@ -332,6 +332,21 @@ def main() -> None:
             page.keyboard.press("Control+z")
             assert len(blobs_now()) == 3
             expect(status).to_contain_text("Made", timeout=60_000)
+            page.select_option("#tab-blobs .carrier", "harmonic")
+            expect(page.locator("#tab-blobs .f0-field")).to_be_visible()
+            page.locator("#tab-blobs .f0").fill("150")
+            page.locator("#tab-blobs .f0").press("Enter")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            section = page_document_in(page)["blobs"]
+            assert section["carrier"] == "harmonic" and section["f0"] == 150, section
+            colours = page.evaluate(
+                """() => { const c = document.querySelector('canvas.stft');
+                    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+                    const seen = new Set(); for (let i = 0; i < d.length; i += 4) seen.add(d[i] * 65536 + d[i + 1] * 256 + d[i + 2]);
+                    return seen.size; }"""
+            )
+            assert colours > 50, f"the spectrogram under the plane looks empty ({colours} colours)"
+            print(f"modulation: the harmonic carrier on 150 Hz plays, and the spectrogram under the plane is drawn ({colours} colours)")
             page.click("#reset")
             expect(status).to_contain_text("Made", timeout=60_000)
             assert page_document_in(page)["blobs"] == example, "Reset did not restore the example blobs"

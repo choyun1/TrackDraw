@@ -217,6 +217,17 @@ blob, snapping to a grid.
 the Filter recording tab, which brings recordings in. B-M4 shows the
 difference is worth hearing.
 
+*Added (2026-10-05, Cho):* a harmonic carrier, a harmonic complex on F0
+(default 100 Hz) whose fine structure in each band carries the drawn
+envelopes, with the modulation phase drawn from the seed (`to_sound` with a
+recording would take the phase from the steady complex itself). At 3 s, with
+rate 0 left out (a harmonic complex has static spectral ripple of its own
+there), the drawn blobs stand 21–24 dB above the rest on harmonics at
+100–200 Hz, against 26 dB on tones and 15 dB on noise [measure: the B-M4
+comparison, one-off]. Iterations are not offered on it. Under the plane, the
+result's spectrogram (the shell's 5 ms STFT) is shown on a log-frequency
+axis over 100–6400 Hz.
+
 **B4. Iterations.**
 (a) not offered;
 (b) a field from 0 (default) to 10.
