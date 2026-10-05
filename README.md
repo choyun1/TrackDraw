@@ -28,6 +28,10 @@ each change is heard as soon as you finish drawing it.
 - The duration (up to 10 s) stretches everything drawn.
 - **Save** writes the drawing as JSON, **Open** reads it back, **Link**
   copies an address that opens it, and **WAV** saves the sound.
+- **Reset** starts again from the default drawing; Undo brings yours back.
+- **Log** shows what the page did and any errors, with Python's traceback.
+  **Copy** puts the log, the versions and the current drawing on the
+  clipboard, for a bug report.
 
 A saved drawing gives the same sound in Python:
 

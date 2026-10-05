@@ -1,38 +1,69 @@
 // The page shell: tabs, duration, synthesis engine, playback, the result,
-// undo, save, open and links (docs/design/app.md, "One tab, one route back
+// undo, reset, save, open, links and the log (docs/design/app.md, "One tab, one route back
 // to sound"). Tabs plug in through a small contract: a document to edit, a
 // `commit` callback when an edit ends, and a picture of the last result.
 
 import { Player, wavBlob } from "./audio.js";
 import { LatestOnly, createEngine } from "./engine.js";
 import { History } from "./history.js";
+import { Log } from "./log.js";
 import { drawSpectrogram, drawWaveform } from "./plot.js";
 import { encodeState, stateFromHash } from "./share.js";
-import { check, clampDuration, defaultDocument, stretch } from "./tracks/model.js";
+import { check, clampDuration, defaultDocument, stretch, tidyDocument } from "./tracks/model.js";
 import { createTracksTab } from "./tracks/tab.js";
 
 const AUTOPLAY_MAX_S = 3; // longer sounds play on Play only (app.md, D10)
 
 const $ = (id) => document.getElementById(id);
 const ui = {
-  play: $("play"), duration: $("duration"), autoplay: $("autoplay"), undo: $("undo"), redo: $("redo"),
+  play: $("play"), duration: $("duration"), autoplay: $("autoplay"), reset: $("reset"), undo: $("undo"), redo: $("redo"),
   open: $("open"), save: $("save"), link: $("link"), wav: $("wav"), file: $("file"),
   status: $("status"), versions: $("versions"), waveform: $("waveform"), spectrogram: $("spectrogram"),
+  log: $("log"), logToggle: $("log-toggle"), logLines: $("log-lines"), logCopy: $("log-copy"), logClear: $("log-clear"),
 };
 
+// --- the log ---------------------------------------------------------------------
+
+const log = new Log();
+log.onchange = () => {
+  ui.logLines.replaceChildren(
+    ...log.entries.map(({ time, level, text, detail }) => {
+      const line = document.createElement("div");
+      line.className = level;
+      line.textContent = `${time} ${text}${detail ? `\n${detail.replace(/^/gm, "    ")}` : ""}`;
+      return line;
+    }),
+  );
+  ui.logLines.scrollTop = ui.logLines.scrollHeight;
+  ui.logToggle.textContent = log.errors ? `Log (${log.errors})` : "Log";
+  ui.logToggle.classList.toggle("has-errors", log.errors > 0);
+};
+window.addEventListener("error", (event) => log.error(`page error: ${event.message}`, event.error?.stack ?? ""));
+window.addEventListener("unhandledrejection", (event) =>
+  log.error(`page error: ${event.reason?.message ?? event.reason}`, event.reason?.stack ?? ""),
+);
+
 const engineKind = new URLSearchParams(location.search).get("engine") ?? "pyodide";
+log.info(`page opened, engine: ${engineKind}`, navigator.userAgent);
 let ready = false;
 const engine = new LatestOnly(
   createEngine(engineKind, {
-    onProgress: (text) => status(text),
+    onProgress: (text) => {
+      status(text);
+      log.info(text);
+    },
     onReady: (versions) => {
       ready = true;
+      log.info(`ready: ${versions}`);
       ui.versions.textContent = versions;
       ui.play.disabled = false;
       status("Ready. Draw on a track, then press Play.");
       synthesize({ play: false });
     },
-    onFailed: (message) => status(`Could not start the synthesizer: ${message}`, true),
+    onFailed: (message) => {
+      status(`Could not start the synthesizer: ${message} (see Log)`, true);
+      log.error(`could not start the synthesizer: ${message}`);
+    },
   }),
 );
 
@@ -49,9 +80,9 @@ function status(text, error = false) {
 let initial = defaultDocument();
 try {
   const linked = stateFromHash(location.hash);
-  if (linked) initial = check(linked);
+  if (linked) initial = tidyDocument(check(linked));
 } catch (error) {
-  console.warn("ignoring the link's drawing:", error);
+  log.error(`ignored the drawing in the link: ${error.message}`);
 }
 const history = new History(initial);
 const tab = createTracksTab($("tab-tracks"), { commit: (doc) => change(doc) });
@@ -91,13 +122,15 @@ async function synthesize({ play }) {
   try {
     sound = await engine.synthesize({ tab: tab.id, state: doc });
   } catch (error) {
-    status(`Synthesis failed: ${error.message}`, true);
+    status(`Synthesis failed: ${error.message} (see Log; Reset starts again)`, true);
+    log.error(`synthesis failed: ${error.message}`, error.detail ?? "");
     return null;
   }
   if (!sound) return null; // a newer drawing replaced this request
   result = { doc, sound };
   showResult();
   status(`Made ${doc.duration} s in ${sound.synthesisSeconds.toFixed(2)} s.`);
+  log.info(`made ${doc.duration} s in ${sound.synthesisSeconds.toFixed(2)} s`);
   if (play && history.present === doc) start(sound);
   return sound;
 }
@@ -156,6 +189,12 @@ function redo() {
   }
 }
 ui.undo.addEventListener("click", undo);
+// Reset is an edit like any other, so Undo brings the drawing back.
+ui.reset.addEventListener("click", () => {
+  change(defaultDocument());
+  log.info("reset to the default drawing");
+  if (!ready) status("Reset to the default drawing.");
+});
 ui.redo.addEventListener("click", redo);
 
 function download(blob, name) {
@@ -178,10 +217,12 @@ ui.file.addEventListener("change", async () => {
   ui.file.value = "";
   if (!file) return;
   try {
-    change(check(JSON.parse(await file.text())));
+    change(tidyDocument(check(JSON.parse(await file.text()))));
     status(`Opened ${file.name}.`);
+    log.info(`opened ${file.name}`);
   } catch (error) {
     status(`Could not open ${file.name}: ${error.message}`, true);
+    log.error(`could not open ${file.name}: ${error.message}`);
   }
 });
 ui.link.addEventListener("click", async () => {
@@ -190,6 +231,32 @@ ui.link.addEventListener("click", async () => {
     status("Link copied: it opens this drawing.");
   } catch {
     status("The address bar holds the link to this drawing.");
+  }
+});
+
+ui.logToggle.addEventListener("click", () => {
+  ui.log.hidden = !ui.log.hidden;
+  ui.logToggle.setAttribute("aria-expanded", String(!ui.log.hidden));
+  if (!ui.log.hidden) ui.logLines.scrollTop = ui.logLines.scrollHeight;
+});
+ui.logClear.addEventListener("click", () => log.clear());
+ui.logCopy.addEventListener("click", async () => {
+  const report = [
+    `sonore sketch log, ${new Date().toISOString()}`,
+    `versions: ${ui.versions.textContent || "(not loaded)"}`,
+    `engine: ${engineKind}`,
+    `browser: ${navigator.userAgent}`,
+    "",
+    log.text(),
+    "",
+    "current drawing:",
+    JSON.stringify(history.present),
+  ].join("\n");
+  try {
+    await navigator.clipboard.writeText(report);
+    status("Log copied, with the versions and the current drawing.");
+  } catch {
+    status("Could not copy; select the log text instead.", true);
   }
 });
 

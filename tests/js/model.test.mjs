@@ -14,6 +14,7 @@ import {
   replaceSpan,
   simplify,
   stretch,
+  tidyDocument,
   valueAt,
   withPoints,
 } from "../../app/tracks/model.js";
@@ -45,8 +46,10 @@ test("point edits: grab within tolerance, insert in order, move between neighbou
   const { pts: added, index } = insertPoint(pts, 0.3, 9);
   assert.equal(index, 2);
   assert.deepEqual(added.map(([t]) => t), [0, 0.2, 0.3, 0.4]);
-  assert.deepEqual(movePoint(pts, 1, 0.9, 5)[1], [0.4, 5]);
-  assert.deepEqual(movePoint(pts, 1, -1, 5)[1], [0, 5]);
+  // Kept 0.1 ms inside its neighbours: sonore needs times to increase.
+  const [right] = movePoint(pts, 1, 0.9, 5)[1];
+  const [left] = movePoint(pts, 1, -1, 5)[1];
+  assert.ok(Math.abs(right - 0.3999) < 1e-12 && Math.abs(left - 0.0001) < 1e-12);
 });
 
 test("a line replaces the breakpoints under it, as the paper's line-draw", () => {
@@ -107,4 +110,33 @@ test("history undoes and redoes, and a new edit drops the redo branch", () => {
   history.push("d");
   assert.equal(history.redo(), false);
   assert.equal(history.present, "d");
+});
+
+// sonore refuses a track whose times do not strictly increase ("F0's times
+// must increase"), so no edit may leave two breakpoints at one time.
+const increasing = (times) => times.every((t, i) => i === 0 || t > times[i - 1]);
+
+test("a point dragged onto its neighbour stays just beside it", () => {
+  const doc = defaultDocument();
+  const pts = points(doc, "F0");
+  const next = withPoints(doc, "F0", movePoint(pts, 1, -1, 110));
+  assert.ok(increasing(next.params.F0[0]));
+  assert.equal(next.params.F0[0].length, 2);
+});
+
+test("a line with no width in time keeps one breakpoint there, the newest", () => {
+  const doc = defaultDocument();
+  const next = withPoints(doc, "F0", replaceSpan(points(doc, "F0"), [[0.3, 100], [0.30001, 140]]));
+  assert.deepEqual(next.params.F0, [[0, 0.3, 0.6], [125, 140, 95]]);
+});
+
+test("shrinking the duration never merges times into a repeat", () => {
+  const doc = withPoints(defaultDocument(), "F1", [[0, 500], [0.0002, 600], [0.0004, 700], [0.6, 500]]);
+  const short = stretch(doc, 0.05);
+  for (const value of Object.values(short.params)) if (typeof value !== "number") assert.ok(increasing(value[0]));
+});
+
+test("a document from a file or link with repeated times is tidied", () => {
+  const doc = { ...defaultDocument(), params: { F0: [[0, 0.3, 0.3, 0.6], [125, 100, 140, 95]] } };
+  assert.deepEqual(tidyDocument(doc).params.F0, [[0, 0.3, 0.6], [125, 140, 95]]);
 });

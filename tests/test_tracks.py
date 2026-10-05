@@ -63,7 +63,8 @@ def test_noise_sources_are_seeded():
         ({"mode": "sine"}, "mode"),
         ({"params": {"F9": 100}}, "unknown"),
         ({"params": {"F1": [[0, 1], [300]]}}, "same"),
-        ({"params": {"F1": [[0.5, 0.1], [300, 400]]}}, "decrease"),
+        ({"params": {"F1": [[0.5, 0.1], [300, 400]]}}, "increase"),
+        ({"params": {"F0": [[0, 0.3, 0.3, 0.6], [125, 100, 140, 95]]}}, "share a time"),
         ({"params": {"F1": "high"}}, "number"),
     ],
 )

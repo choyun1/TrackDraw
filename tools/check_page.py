@@ -162,6 +162,41 @@ def main() -> None:
             )
             assert all(drawn), f"result pictures are empty: {drawn}"
             print(f"result pictures drawn ({drawn[0]} and {drawn[1]} pixels)")
+
+            # A link from before breakpoint times were kept increasing (two F0
+            # points at 0.3 s) is tidied on opening, and synthesizes.
+            def open_link(state):
+                encoded = base64.urlsafe_b64encode(json.dumps(state).encode()).decode().rstrip("=")
+                page.goto(f"http://127.0.0.1:{port}/?engine={args.engine}{extra}#state={encoded}")
+                page.reload()
+
+            repeated = {**doc, "params": {**doc["params"], "F0": [[0, 0.3, 0.3, 0.6], [125, 100, 140, 95]]}}
+            open_link(repeated)
+            expect(status).to_contain_text("Made", timeout=180_000)
+            assert document_in(page)["params"]["F0"] == [[0, 0.3, 0.6], [125, 140, 95]], document_in(page)["params"]["F0"]
+            print("repeated breakpoint times in a link: tidied and synthesized")
+
+            # A drawing sonore refuses (F1 above Nyquist at fs = 1000 Hz) puts
+            # the error and its traceback in the log, and Reset recovers.
+            before_failure = len(errors)
+            open_link({**doc, "fs": 1000})
+            expect(status).to_contain_text("Synthesis failed", timeout=180_000)
+            expect(page.locator("#log-toggle")).to_have_text("Log (1)")
+            page.click("#log-toggle")
+            expect(page.locator("#log-lines .error")).to_contain_text("synthesis failed")
+            assert "Traceback" in page.locator("#log-lines .error").inner_text(), "no traceback in the log"
+            print("error: shown in the log with its traceback")
+            page.click("#reset")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert document_in(page) == doc, "Reset did not restore the default drawing"
+            page.keyboard.press("Control+z")
+            assert document_in(page)["fs"] == 1000, "Undo did not bring the drawing back after Reset"
+            print("reset: back to the default drawing, and undo brings the old one back")
+            # The local server answers the refused drawing (twice: opened, then
+            # undone back to) with HTTP 400, which the browser reports in its
+            # console; those are expected.
+            page.wait_for_timeout(500)
+            errors[before_failure:] = [e for e in errors[before_failure:] if "400 (Bad Request)" not in e]
             if args.screenshot:
                 page.screenshot(path=args.screenshot)
             browser.close()

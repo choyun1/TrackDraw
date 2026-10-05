@@ -55,8 +55,8 @@ def check(document: Mapping[str, Any]) -> None:
             raise ValueError(f"{name}: times and values must be two lists of the same, non-zero length")
         if not (np.all(np.isfinite(times)) and np.all(np.isfinite(values))):
             raise ValueError(f"{name}: times and values must be finite")
-        if np.any(np.diff(times) < 0):
-            raise ValueError(f"{name}: times must not decrease")
+        if np.any(np.diff(times) <= 0):
+            raise ValueError(f"{name}: times must increase (two breakpoints share a time, or are out of order)")
 
 
 def klatt_params(document: Mapping[str, Any]) -> dict[str, Any]:

@@ -32,7 +32,7 @@ class PyodideEngine {
       const { resolve, reject } = this.waiting.get(data.id);
       this.waiting.delete(data.id);
       if (data.type === "result") resolve(data.result);
-      else reject(new Error(data.message));
+      else reject(Object.assign(new Error(data.message), { detail: data.detail }));
     };
     this.worker.onerror = (event) => onFailed(event.message ?? "the synthesis worker failed");
   }
@@ -62,7 +62,7 @@ class LocalEngine {
       body: JSON.stringify(request),
     });
     const body = await response.json();
-    if (!response.ok) throw new Error(body.error);
+    if (!response.ok) throw Object.assign(new Error(body.error), { detail: body.detail });
     return {
       fs: body.fs,
       samples: new Float32Array(bytesFromBase64(body.samples).buffer),
