@@ -13,11 +13,15 @@
   <header class="bar">
     <h1>sonore sketch</h1>
     <nav class="tabs" role="tablist">
-      <button role="tab" class="active" aria-selected="true" data-tab="tracks" title="Formant, F0 and amplitude tracks, synthesized by Klatt's synthesizer (TrackDraw; Assmann et al., 1994)">Tracks</button>
-      <button role="tab" aria-selected="false" data-tab="painted" title="Level painted on time × log-frequency, heard through sonore's ripple_sound">Painted</button>
-      <button role="tab" disabled title="Not built yet: a mask painted over a recording's spectrogram">Mask</button>
-      <button role="tab" disabled title="Not built yet: needs sonore 0.5 (ModulationSpectrum.from_blobs)">Blobs</button>
-      <button role="tab" disabled title="Not built yet: needs sonore 0.5 (ModulationSpectrum.with_gain)">Edit</button>
+      <button role="tab" class="active" aria-selected="true" data-tab="tracks"
+        data-caption="Draw formant, pitch and loudness tracks over time, and hear the speech Klatt's synthesizer makes from them (after TrackDraw; Assmann et al., 1994)."
+        title="Formant, F0 and amplitude tracks, synthesized by Klatt's synthesizer">Speech</button>
+      <button role="tab" aria-selected="false" data-tab="painted"
+        data-caption="Paint loudness over time and frequency, and hear a sound whose spectrogram is your painting."
+        title="Level painted on time × log-frequency, heard through sonore's ripple_sound">Spectrogram</button>
+      <button role="tab" disabled title="Not built yet: erase parts of a recording's spectrogram and hear what is left">Filter recording</button>
+      <button role="tab" disabled title="Not built yet: place blobs of temporal and spectral modulation and hear them">Modulation</button>
+      <button role="tab" disabled title="Not built yet: repaint a recording's modulation spectrum">Edit modulation</button>
     </nav>
     <div class="controls">
       <button type="button" id="play" class="primary" title="Play or stop (Space)" disabled>▶ Play</button>
@@ -37,6 +41,7 @@
     </div>
   </header>
   <main>
+    <p class="tab-caption" id="tab-caption"></p>
     <section class="tab-body" id="tab-tracks"></section>
     <section class="tab-body" id="tab-painted" hidden></section>
     <section class="result">

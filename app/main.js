@@ -104,6 +104,7 @@ function showTab() {
     button.setAttribute("aria-selected", String(active));
   }
   for (const id of Object.keys(tabs)) $(`tab-${id}`).hidden = id !== tab.id;
+  $("tab-caption").textContent = tabButtons.find((b) => b.dataset.tab === tab.id)?.dataset.caption ?? "";
 }
 
 function switchTab(id) {

@@ -4,10 +4,10 @@ Draw on a picture of sound and hear the result. Each tab is one of
 [sonore](https://pypi.org/project/sonore/)'s routes back to sound, given a
 point-and-click surface; sonore does the synthesis, in your browser.
 
-**Tracks** is the first tab: draw formant (F1–F5), F0, voicing amplitude
+**Speech** is the first tab: draw formant (F1–F5), F0, voicing amplitude
 (AV) and bandwidth tracks over time, and hear the speech Klatt's (1980)
 synthesizer makes from them. It follows Track-Draw (Assmann, Ballard,
-Bornstein & Paschall, 1994). **Painted** lets you paint level on time ×
+Bornstein & Paschall, 1994). **Spectrogram** lets you paint level on time ×
 log-frequency and hear a sound whose spectrotemporal envelope is the
 painting (sonore's `ripple_sound`). Spectrogram masks and
 modulation-spectrum blobs are planned (`docs/design/app.md`).
@@ -29,7 +29,7 @@ each change is heard as soon as you finish drawing it.
   kept as the fewest breakpoints within a small tolerance.
 - The selected track is the one you draw on. Select it with its button,
   by clicking its line, or with the keys 1–5 for F1–F5.
-- In **Painted**, drag to paint at the brush's level (0 dB is the loudest),
+- In **Spectrogram**, drag to paint at the brush's level (0 dB is the loudest),
   and right-drag or **Erase** to paint silence. **Clear** erases everything.
   The carrier is what the painting shapes: tones, harmonics of an F0, or
   noise.
@@ -71,7 +71,7 @@ measurements in `tools/`.
 ## Credits
 
 sonore sketch grew out of TrackDraw (2016), by Adrian Y. Cho and Daniel R
-Guest, whose history this repository keeps. The Tracks tab is after:
+Guest, whose history this repository keeps. The Speech tab is after:
 
 Assmann, P., Ballard, W., Bornstein, L., & Paschall, D. (1994). Track-Draw:
 A graphical interface for controlling the parameters of a speech
