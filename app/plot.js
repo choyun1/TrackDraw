@@ -15,21 +15,16 @@ export function fitCanvas(canvas) {
 }
 
 // Draw `picture` (8-bit levels, rows from 0 Hz up) over time [0, duration]
-// and frequency [0, fTop]: in magma, as sonore plots it, or, as a background
-// under drawing (`background`), in translucent ink, dark where loud.
-export function drawSpectrogram(canvas, picture, duration, fTop, { background = false } = {}) {
+// and frequency [0, fTop], in magma, as sonore plots it.
+export function drawSpectrogram(canvas, picture, duration, fTop) {
   const context = fitCanvas(canvas);
   const { width, height } = canvas;
   context.clearRect(0, 0, width, height);
   if (!picture) return;
   const { data, nFreqs, nFrames, fMax, tStart, tStep } = picture;
   const image = context.createImageData(width, height);
-  if (!background) {
-    const [r0, g0, b0] = magma(0);
-    for (let i = 0; i < image.data.length; i += 4) image.data.set([r0, g0, b0, 255], i);
-  }
-  const dark = getComputedStyle(canvas).getPropertyValue("--ink-rgb").trim() || "20, 24, 31";
-  const [r, g, b] = dark.split(",").map(Number);
+  const [r0, g0, b0] = magma(0);
+  for (let i = 0; i < image.data.length; i += 4) image.data.set([r0, g0, b0, 255], i);
   for (let x = 0; x < width; x++) {
     const t = ((x + 0.5) / width) * duration;
     const frame = Math.round((t - tStart) / tStep);
@@ -40,15 +35,8 @@ export function drawSpectrogram(canvas, picture, duration, fTop, { background = 
       if (row < 0 || row >= nFreqs) continue;
       const level = data[row * nFrames + frame] / 255;
       const i = 4 * (y * width + x);
-      if (background) {
-        image.data[i] = r;
-        image.data[i + 1] = g;
-        image.data[i + 2] = b;
-        image.data[i + 3] = Math.round(255 * 0.55 * level ** 1.5);
-      } else {
-        image.data.set(magma(level), i);
-        image.data[i + 3] = 255;
-      }
+      image.data.set(magma(level), i);
+      image.data[i + 3] = 255;
     }
   }
   context.putImageData(image, 0, 0);

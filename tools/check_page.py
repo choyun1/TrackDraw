@@ -20,6 +20,7 @@ import argparse
 import base64
 import json
 import math
+import re
 import socket
 import subprocess
 import sys
@@ -173,15 +174,20 @@ def main() -> None:
             expect(page.locator("#play")).to_have_text("▶ Play", timeout=10_000)
             print("play: played and ended")
 
+            # The waveform is the only result picture; the spectrogram is drawn
+            # in magma under the formants, which then sit on a pale halo.
+            expect(page.locator("#spectrogram")).to_have_count(0)
+            expect(page.locator(".panel-formants")).to_have_class(re.compile(r"\bon-spectrogram\b"))
             drawn = page.evaluate(
-                """() => ['waveform', 'spectrogram'].map((id) => {
-                    const c = document.getElementById(id);
+                """() => ['#waveform', '.panel-formants canvas.background'].map((selector) => {
+                    const c = document.querySelector(selector);
                     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-                    let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
-                    return n; })"""
+                    const colours = new Set(); let n = 0;
+                    for (let i = 0; i < d.length; i += 4) if (d[i + 3]) { n++; colours.add(d[i] << 16 | d[i + 1] << 8 | d[i + 2]); }
+                    return [n, colours.size]; })"""
             )
-            assert all(drawn), f"result pictures are empty: {drawn}"
-            print(f"result pictures drawn ({drawn[0]} and {drawn[1]} pixels)")
+            assert drawn[0][0] and drawn[1][1] > 50, f"result pictures are empty or not in colour: {drawn}"
+            print(f"waveform drawn ({drawn[0][0]} pixels); spectrogram under the formants in {drawn[1][1]} colours")
 
             # A link from before breakpoint times were kept increasing (two F0
             # points at 0.3 s) is tidied on opening, and synthesizes.
@@ -225,7 +231,6 @@ def main() -> None:
             expect(page.locator("#tab-painted")).to_be_visible()
             expect(status).to_contain_text("Made", timeout=60_000)
             assert page_document_in(page)["tab"] == "painted"
-            expect(page.locator("#spectrogram-row")).to_be_hidden()  # the painting is the spectrogram
             example = page_document_in(page)["painted"]["levels"]
             canvas = page.locator("canvas.paint").bounding_box()
             px = lambda fraction: canvas["x"] + 52 + fraction * (canvas["width"] - 62)  # noqa: E731
@@ -258,7 +263,6 @@ def main() -> None:
             page.click(".tabs [data-tab=tracks]")
             expect(status).to_contain_text("Made", timeout=60_000)
             assert document_in(page) == doc, "the Tracks drawing changed while painting"
-            expect(page.locator("#spectrogram-row")).to_be_visible()  # back on Speech
             print("painted: Clear, Undo, the noise carrier and switching tabs work")
 
             # The Modulation tab: the example plays; clicking adds a blob,
@@ -270,7 +274,6 @@ def main() -> None:
             assert page_document_in(page)["tab"] == "blobs"
             example = page_document_in(page)["blobs"]
             expect(page.locator("#tab-blobs .coarse")).to_be_visible()  # 0.6 s is under 2 s
-            expect(page.locator("#spectrogram-row")).to_be_hidden()  # the tab shows its own, under the plane
             plane = page.locator("canvas.plane").bounding_box()
             left, right = plane["x"] + 52, plane["x"] + plane["width"] - 10
             top, bottom = plane["y"] + 8, plane["y"] + plane["height"] - 36

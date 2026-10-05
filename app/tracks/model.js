@@ -23,7 +23,9 @@ export const TRACKS = {
       { panel: "formants", min: 0, max: 5000, unit: "Hz", tolerance: 15, color: FORMANT_COLORS[i] },
     ]),
   ),
-  F0: { panel: "F0", min: 0, max: 300, unit: "Hz", tolerance: 1.5, color: "#444" },
+  // F0 is drawn on 0-300 Hz but never below `floor`: lower, the voicing turns
+  // into separate clicks and the rest of the sound goes odd (Cho, 2026-10-05).
+  F0: { panel: "F0", min: 0, max: 300, floor: 20, unit: "Hz", tolerance: 1.5, color: "#444" },
   AV: { panel: "AV", min: 0, max: 80, unit: "dB", tolerance: 1, color: "#444" },
   ...Object.fromEntries(
     [1, 2, 3, 4, 5].map((k, i) => [
@@ -101,8 +103,9 @@ export function withPoints(doc, name, pts) {
 export function tidyDocument(doc) {
   const params = Object.fromEntries(
     Object.entries(doc.params ?? {}).map(([name, value]) => {
-      if (typeof value === "number") return [name, value];
-      const tidy = tidyPoints(value[0].map((t, i) => [t, value[1][i]]));
+      const floor = TRACKS[name]?.floor ?? -Infinity;
+      if (typeof value === "number") return [name, Math.max(floor, value)];
+      const tidy = tidyPoints(value[0].map((t, i) => [t, Math.max(floor, value[1][i])]));
       return [name, [tidy.map(([t]) => t), tidy.map(([, v]) => v)]];
     }),
   );
@@ -110,8 +113,8 @@ export function tidyDocument(doc) {
 }
 
 export function clampValue(name, v) {
-  const { min, max } = TRACKS[name];
-  return Math.min(max, Math.max(min, v));
+  const { min, max, floor = min } = TRACKS[name];
+  return Math.min(max, Math.max(floor, v));
 }
 
 // The track's value at time t: linear between breakpoints, held beyond the

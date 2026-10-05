@@ -23,6 +23,7 @@ import sonore as so
 FORMAT = 1
 MAX_DURATION = 10.0  # seconds, the whole app's limit (docs/design/app.md, D10)
 MODES = ("klatt",)  # sine-wave speech comes later (tracks.md, D6)
+F0_FLOOR = 20.0  # Hz: lower, the voicing turns into clicks (Cho, 2026-10-05); the page draws no lower
 
 
 def check(document: Mapping[str, Any]) -> None:
@@ -60,7 +61,8 @@ def check(document: Mapping[str, Any]) -> None:
 
 
 def klatt_params(document: Mapping[str, Any]) -> dict[str, Any]:
-    """The ``params`` mapping to give ``so.klatt_synthesize`` for ``document``."""
+    """The ``params`` mapping to give ``so.klatt_synthesize`` for ``document``,
+    with F0 raised to ``F0_FLOOR`` wherever it is below it."""
     check(document)
     params: dict[str, Any] = {}
     for name, value in document.get("params", {}).items():
@@ -69,6 +71,9 @@ def klatt_params(document: Mapping[str, Any]) -> dict[str, Any]:
         else:
             times, values = value
             params[name] = (np.asarray(times, dtype=float), np.asarray(values, dtype=float))
+    if "F0" in params:
+        f0 = params["F0"]
+        params["F0"] = max(f0, F0_FLOOR) if isinstance(f0, float) else (f0[0], np.maximum(f0[1], F0_FLOOR))
     return params
 
 
