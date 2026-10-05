@@ -1,3 +1,6 @@
+import re
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -31,3 +34,11 @@ def test_a_saved_page_sounds_as_its_tab_does():
 def test_other_documents_are_refused(document, message):
     with pytest.raises(ValueError, match=message):
         page.tab_state(document)
+
+
+def test_the_browser_worker_loads_every_module_of_the_package():
+    # app/worker.js copies the package into Pyodide file by file; a module
+    # missing from its list works locally but fails in the browser.
+    root = Path(__file__).resolve().parents[1]
+    listed = re.search(r"PYTHON_FILES = \[([^\]]*)\]", (root / "app" / "worker.js").read_text()).group(1)
+    assert sorted(re.findall(r'"([^"]+)"', listed)) == sorted(p.name for p in (root / "src" / "sonore_sketch").glob("*.py"))
