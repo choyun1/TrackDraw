@@ -14,7 +14,10 @@ function bytesFromBase64(text) {
 
 class PyodideEngine {
   constructor({ onProgress, onReady, onFailed }) {
-    this.worker = new Worker(new URL("./worker.js", import.meta.url));
+    const url = new URL("./worker.js", import.meta.url);
+    const pyodide = new URLSearchParams(location.search).get("pyodide");
+    if (pyodide) url.searchParams.set("pyodide", pyodide);
+    this.worker = new Worker(url, { type: "module" });
     this.waiting = new Map();
     this.nextId = 0;
     this.worker.onmessage = ({ data }) => {

@@ -43,6 +43,7 @@ def document_in(page) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--engine", choices=["local", "pyodide"], default="local")
+    parser.add_argument("--pyodide-url", help="Pyodide's full/ folder, instead of jsDelivr (with --engine pyodide)")
     parser.add_argument("--chromium", help="path to a Chromium to use instead of Playwright's own")
     parser.add_argument("--screenshot", help="save a screenshot of the page here at the end")
     parser.add_argument("--headed", action="store_true", help="show the browser")
@@ -61,7 +62,8 @@ def main() -> None:
             page.on("pageerror", lambda e: errors.append(str(e)))
             for attempt in range(50):
                 try:
-                    page.goto(f"http://127.0.0.1:{port}/?engine={args.engine}")
+                    extra = f"&pyodide={args.pyodide_url}" if args.pyodide_url else ""
+                    page.goto(f"http://127.0.0.1:{port}/?engine={args.engine}{extra}")
                     break
                 except Exception:
                     time.sleep(0.1)

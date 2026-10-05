@@ -1,5 +1,7 @@
 // The synthesis worker: Pyodide, sonore and sonore_sketch, off the page's
-// thread so drawing never waits (docs/design/app.md, Architecture).
+// thread so drawing never waits (docs/design/app.md, Architecture). A module
+// worker, which loads Pyodide's ES module (pyodide.mjs) from its CDN, or from
+// the folder named by ?pyodide=<URL> on the page.
 //
 // Messages in:  {id, request: {tab, state}}
 // Messages out: {type: "progress", text} while loading,
@@ -32,12 +34,28 @@ function toBytes(proxy) {
   }
 }
 
+// Why a URL could not be loaded, as far as fetch can tell.
+async function reachable(url) {
+  try {
+    const response = await fetch(url, { method: "HEAD" });
+    return response.ok ? "it is reachable, so the failure is in the script" : `HTTP ${response.status}`;
+  } catch (error) {
+    return `network error: ${error.message}`;
+  }
+}
+
 async function load() {
   let start = performance.now();
   const seconds = () => ((performance.now() - start) / 1000).toFixed(1);
   progress("Loading Python (Pyodide)…");
-  const indexURL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
-  importScripts(`${indexURL}pyodide.js`);
+  const indexURL =
+    new URL(self.location).searchParams.get("pyodide") ?? `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+  let loadPyodide;
+  try {
+    ({ loadPyodide } = await import(`${indexURL}pyodide.mjs`));
+  } catch (error) {
+    throw new Error(`could not load ${indexURL}pyodide.mjs (${await reachable(`${indexURL}pyodide.mjs`)}): ${error.message}`);
+  }
   const pyodide = await loadPyodide({ indexURL });
   progress(`Installing sonore ${SONORE_VERSION} and NumPy/SciPy… (${seconds()} s)`);
   await pyodide.loadPackage("micropip");
