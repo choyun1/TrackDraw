@@ -192,7 +192,8 @@ export function createTracksTab(root, { commit }) {
     const canvas = panel.canvas;
     // The canvas covers the plotting area only.
     Object.assign(canvas.style, { left: `${g.x0}px`, top: `${g.y0}px`, width: `${g.x1 - g.x0}px`, height: `${g.y1 - g.y0}px` });
-    drawSpectrogram(canvas, picture, doc.duration, g.max, { background: true });
+    drawSpectrogram(canvas, picture, doc.duration, g.max);
+    panel.node.classList.toggle("on-spectrogram", Boolean(picture));
   }
 
   function renderAxis() {

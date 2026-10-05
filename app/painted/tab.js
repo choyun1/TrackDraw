@@ -311,7 +311,6 @@ export function createPaintedTab(root, { commit, log }) {
 
   return {
     id: "painted",
-    ownSpectrogram: true, // the painting is the spectrogram, so the shell's strip is hidden
     setDocument(next) {
       stroke = null;
       state = next;

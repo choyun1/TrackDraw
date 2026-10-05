@@ -7,7 +7,7 @@ import { Player, wavBlob } from "./audio.js";
 import { LatestOnly, createEngine } from "./engine.js";
 import { History } from "./history.js";
 import { Log } from "./log.js";
-import { drawSpectrogram, drawWaveform } from "./plot.js";
+import { drawWaveform } from "./plot.js";
 import { encodeState, stateFromHash } from "./share.js";
 import { defaultPage, openDocument, resetTab, stretchPage, tabState, withTabState } from "./document.js";
 import { createBlobsTab } from "./blobs/tab.js";
@@ -21,7 +21,7 @@ const $ = (id) => document.getElementById(id);
 const ui = {
   play: $("play"), duration: $("duration"), autoplay: $("autoplay"), reset: $("reset"), undo: $("undo"), redo: $("redo"),
   open: $("open"), save: $("save"), link: $("link"), wav: $("wav"), file: $("file"),
-  status: $("status"), versions: $("versions"), waveform: $("waveform"), spectrogram: $("spectrogram"),
+  status: $("status"), versions: $("versions"), waveform: $("waveform"),
   log: $("log"), logToggle: $("log-toggle"), logLines: $("log-lines"), logCopy: $("log-copy"), logClear: $("log-clear"),
 };
 
@@ -107,8 +107,6 @@ function showTab() {
   }
   for (const id of Object.keys(tabs)) $(`tab-${id}`).hidden = id !== tab.id;
   $("tab-caption").textContent = tabButtons.find((b) => b.dataset.tab === tab.id)?.dataset.caption ?? "";
-  // A tab that shows the result's spectrogram itself does without the strip.
-  $("spectrogram-row").hidden = Boolean(tab.ownSpectrogram);
 }
 
 function switchTab(id) {
@@ -195,7 +193,6 @@ function showResult() {
   const duration = result?.doc.duration ?? history.present.duration;
   tab.setResult(sound);
   drawWaveform(ui.waveform, sound?.samples, sound?.fs, duration);
-  drawSpectrogram(ui.spectrogram, sound?.spectrogram, duration, sound?.fs / 2 || 8000);
   ui.wav.disabled = !sound;
 }
 

@@ -6,6 +6,7 @@ import { decodeState, encodeState, stateFromHash } from "../../app/share.js";
 import {
   check,
   clampDuration,
+  clampValue,
   defaultDocument,
   insertPoint,
   movePoint,
@@ -139,4 +140,13 @@ test("shrinking the duration never merges times into a repeat", () => {
 test("a document from a file or link with repeated times is tidied", () => {
   const doc = { ...defaultDocument(), params: { F0: [[0, 0.3, 0.3, 0.6], [125, 100, 140, 95]] } };
   assert.deepEqual(tidyDocument(doc).params.F0, [[0, 0.3, 0.6], [125, 140, 95]]);
+});
+
+test("F0 is never drawn or read below 20 Hz; other tracks still reach 0", () => {
+  assert.equal(clampValue("F0", 5), 20);
+  assert.equal(clampValue("F0", 120), 120);
+  assert.equal(clampValue("F1", -5), 0);
+  const doc = { ...defaultDocument(), params: { F0: [[0, 0.3, 0.6], [125, 8, 95]], AV: 0 } };
+  assert.deepEqual(tidyDocument(doc).params, { F0: [[0, 0.3, 0.6], [125, 20, 95]], AV: 0 });
+  assert.equal(tidyDocument({ ...doc, params: { F0: 10 } }).params.F0, 20);
 });
