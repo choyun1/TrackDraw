@@ -80,7 +80,11 @@ canvas.paint, canvas.plane {
 .side .field input[type=range] { flex: 1; min-width: 60px; }
 .side .field input[type=number] { width: 4.5em; }
 .side .clear { margin-top: 4px; }
-.side .blob-edit[hidden], .side .use-depth[hidden], .side .coarse[hidden] { display: none; }
+canvas.stft {
+  display: block; width: 100%; height: 180px; margin-top: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+}
+.side .f0-field[hidden], .side .blob-edit[hidden], .side .use-depth[hidden], .side .coarse[hidden] { display: none; }
 .side .blob-count { margin-bottom: 4px; }
 .side .use-depth { border-color: var(--accent); }
 .panels { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }

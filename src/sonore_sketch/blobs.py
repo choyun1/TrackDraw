@@ -5,14 +5,17 @@ signed] by density [cycles/octave] (docs/design/tabs/blobs.md)::
 
     {"blobs": 1, "sonore": "0.5.0", "duration": 3.0, "fs": 16000,
      "f_lo": 100, "f_hi": 6400, "bands_per_octave": 12,
-     "carrier": "tones", "iterations": 0, "rms_depth": 0.2, "seed": 1,
+     "carrier": "tones", "f0": 100, "iterations": 0, "rms_depth": 0.2, "seed": 1,
      "items": [{"rate": 4, "density": 0, "rate_width": 0.5,
                 "density_width": 0.25, "level": 0}, ...]}
 
 Each item is a ``so.ModulationBlob``; the sound is
 ``so.ModulationSpectrum.from_blobs(...).to_sound(...)``, RMS 1. The seed
 draws the modulation phase (and the noise carrier), so a drawing always
-gives the same samples.
+gives the same samples. The harmonic carrier is a harmonic complex on
+``f0`` whose band-by-band fine structure carries the drawn envelopes, as
+``to_sound`` does for a recording but with the modulation phase drawn from
+the seed.
 """
 
 from __future__ import annotations
@@ -25,7 +28,7 @@ import sonore as so
 
 FORMAT = 1
 MAX_DURATION = 10.0  # seconds, the whole app's limit (docs/design/app.md, D10)
-CARRIERS = ("tones", "noise")  # blobs.md, B3
+CARRIERS = ("tones", "harmonic", "noise")  # blobs.md, B3, and Cho's harmonic complex
 MAX_BLOBS = 8  # B2
 MAX_ITERATIONS = 10  # B4
 ITEM_KEYS = ("rate", "density", "rate_width", "density_width", "level")
@@ -51,6 +54,9 @@ def check(state: Mapping[str, Any]) -> None:
         raise ValueError("'bands_per_octave' must be a whole number of at least 1")
     if state.get("carrier", "tones") not in CARRIERS:
         raise ValueError(f"'carrier' must be one of {CARRIERS}, not {state.get('carrier')!r}")
+    f0 = state.get("f0", 100)
+    if state.get("carrier") == "harmonic" and not (_number(f0) and 20 <= f0 <= f_hi):
+        raise ValueError(f"'f0' must be a frequency from 20 Hz up to f_hi for the harmonic carrier, not {f0!r}")
     iterations = state.get("iterations", 0)
     if not (isinstance(iterations, int) and 0 <= iterations <= MAX_ITERATIONS):
         raise ValueError(f"'iterations' must be a whole number from 0 to {MAX_ITERATIONS}, not {iterations!r}")
@@ -91,12 +97,30 @@ def synthesize(state: Mapping[str, Any]) -> so.Sound:
     check(state)
     if not state["items"]:
         raise ValueError("no blobs yet: add a blob to hear something")
+    if state.get("carrier") == "harmonic":
+        return _on_harmonics(state)
     return target(state).to_sound(
         carrier=state.get("carrier", "tones"),
         fs=float(state["fs"]),
         rng=int(state.get("seed", 1)),
         iterations=int(state.get("iterations", 0)),
     )
+
+
+def _on_harmonics(state: Mapping[str, Any]) -> so.Sound:
+    """The drawing's envelopes, drawn with the seed, on the fine structure of
+    a harmonic complex in each band: ``to_sound``'s route for a recording
+    carrier, which would otherwise take the modulation phase from the
+    (unmodulated) complex itself."""
+    if state.get("iterations", 0):
+        raise ValueError("iterations work on the tones and noise carriers only")
+    fs, duration = float(state["fs"]), float(state["duration"])
+    envelopes = target(state).to_envelopes(rng=int(state.get("seed", 1)))
+    complex_tone = so.harmonic_complex(duration, fs, float(state.get("f0", 100)))
+    fine = envelopes.filterbank.analyze(complex_tone).tfs()
+    sound = (envelopes * fine).to_sound()
+    sound = so.Sound(sound.data[: complex_tone.data.shape[0]], fs)
+    return sound.normalize()
 
 
 # The drawing the tab starts from (B9): a syllable-rate flutter, and ripples

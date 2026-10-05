@@ -10,13 +10,13 @@
 // No DOM here, so this file runs under `node --test`.
 
 export const FORMAT = 1;
-export const CARRIERS = ["tones", "noise"];
+export const CARRIERS = ["tones", "harmonic", "noise"];
 export const MAX_BLOBS = 8;
 export const ENV_FS = 1000; // sonore's envelope rate for from_blobs
 
 export const DEFAULTS = {
   f_lo: 100, f_hi: 6400, bands_per_octave: 12,
-  carrier: "tones", iterations: 0, rms_depth: 0.2, seed: 1,
+  carrier: "tones", f0: 100, iterations: 0, rms_depth: 0.2, seed: 1,
 };
 // A new blob's widths and level (B2).
 export const NEW_BLOB = { rate_width: 0.5, density_width: 0.25, level: 0 };
@@ -120,10 +120,11 @@ const ITEM_KEYS = ["rate", "density", "rate_width", "density_width", "level"];
 // Raise an Error saying what is wrong with a section from a file or a link;
 // sonore_sketch.blobs.check does the same in Python (with the page's fs).
 export function check(state) {
-  const { f_lo, f_hi, bands_per_octave, carrier, iterations, rms_depth, seed, items } = state;
+  const { f_lo, f_hi, bands_per_octave, carrier, f0 = 100, iterations, rms_depth, seed, items } = state;
   if (!(f_lo > 0 && f_hi > f_lo)) throw new Error("the modulation tab's frequency range must have 0 < f_lo < f_hi");
   if (!(Number.isInteger(bands_per_octave) && bands_per_octave >= 1)) throw new Error("bands_per_octave must be a whole number of at least 1");
   if (!CARRIERS.includes(carrier)) throw new Error(`the modulation carrier must be one of ${CARRIERS.join(", ")}`);
+  if (carrier === "harmonic" && !(f0 >= 20 && f0 <= f_hi)) throw new Error("f0 must be from 20 Hz up to f_hi for the harmonic carrier");
   if (!(Number.isInteger(iterations) && iterations >= 0 && iterations <= 10)) throw new Error("iterations must be a whole number from 0 to 10");
   if (!(rms_depth > 0 && rms_depth <= 1)) throw new Error("rms_depth must be in (0, 1]");
   if (!Number.isInteger(seed)) throw new Error("seed must be a whole number");

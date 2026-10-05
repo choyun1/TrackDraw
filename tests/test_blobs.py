@@ -57,14 +57,31 @@ def test_the_page_starts_from_the_same_example():
     assert items == blobs.EXAMPLE_ITEMS
 
 
-def test_a_blob_is_heard_where_it_is_drawn():
+@pytest.mark.parametrize("carrier", ["tones", "harmonic"])
+def test_a_blob_is_heard_where_it_is_drawn(carrier):
     # blobs.md, B-M2, as a test: at 3 s, the result's measured modulation
     # peaks within the blob's width of where it was drawn.
-    sound = blobs.synthesize(state(duration=3.0, items=[{"rate": 8, "density": 1, "rate_width": 0.3, "density_width": 0.25, "level": 0}]))
+    sound = blobs.synthesize(state(duration=3.0, carrier=carrier, items=[{"rate": 8, "density": 1, "rate_width": 0.3, "density_width": 0.25, "level": 0}]))
     measured = so.ModulationSpectrum.octave(sound, f_lo=100, f_hi=6400)
-    near = (np.abs(measured.w_t) <= 40)[None, :] & (measured.w_f <= 4)[:, None]
+    # Rate 0 is left out: no blob can be there, and a harmonic complex's own
+    # static spectral ripple (its harmonics) is.
+    rates = (np.abs(measured.w_t) <= 40) & (np.abs(measured.w_t) >= 1)
+    near = rates[None, :] & (measured.w_f <= 4)[:, None]
     j, i = np.unravel_index(np.argmax(np.where(near, measured.level, -np.inf)), measured.level.shape)
     assert 8 * 2**-0.6 <= measured.w_t[i] <= 8 * 2**0.6 and abs(measured.w_f[j] - 1) <= 0.5
+
+
+def test_the_harmonic_carrier_is_a_harmonic_complex_on_f0():
+    data = blobs.synthesize(state(carrier="harmonic", f0=125)).mono().data[:, 0]
+    spectrum = np.abs(np.fft.rfft(data * np.hanning(len(data)))) ** 2
+    f = np.fft.rfftfreq(len(data), 1 / 16000)
+    on = np.isin(np.round(f), 125 * np.arange(1, 52))  # 1 Hz bins: the harmonics' own
+    assert spectrum[on].sum() / spectrum.sum() > 0.5  # mostly at harmonics, though the envelopes widen each
+
+
+def test_iterations_are_refused_on_the_harmonic_carrier():
+    with pytest.raises(ValueError, match="iterations"):
+        blobs.synthesize(state(carrier="harmonic", iterations=2))
 
 
 @pytest.mark.parametrize("carrier", blobs.CARRIERS)
@@ -91,7 +108,9 @@ def test_no_blobs_says_so():
     [
         ({"blobs": 2}, "format 1"),
         ({"f_hi": 8000}, "fs/2"),
-        ({"carrier": "harmonic"}, "carrier"),
+        ({"carrier": "pink"}, "carrier"),
+        ({"carrier": "harmonic", "f0": 5}, "f0"),
+        ({"carrier": "harmonic", "iterations": 2, "items": []}, None),
         ({"iterations": 11}, "iterations"),
         ({"rms_depth": 0}, "rms_depth"),
         ({"items": [{"rate": 0, "density": 0, "rate_width": 0.5, "density_width": 0.25, "level": 0}]}, "nonzero rate"),
@@ -100,6 +119,8 @@ def test_no_blobs_says_so():
     ],
 )
 def test_bad_states_are_refused(changes, message):
+    if message is None:  # allowed by check
+        return blobs.check(state(**changes))
     with pytest.raises(ValueError, match=message):
         blobs.check(state(**changes))
 

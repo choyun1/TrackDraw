@@ -57,7 +57,8 @@ test("sonore's refusal of a depth names the depth that fits", () => {
 test("sections from files and links are checked", () => {
   const state = tabState(defaultPage(), "blobs");
   assert.equal(check(state), state);
-  assert.throws(() => check({ ...state, carrier: "harmonic" }), /carrier/);
+  assert.throws(() => check({ ...state, carrier: "pink" }), /carrier/);
+  assert.throws(() => check({ ...state, carrier: "harmonic", f0: 5 }), /f0/);
   assert.throws(() => check({ ...state, items: [{ ...state.items[0], rate: 0 }] }), /nonzero rate/);
   assert.throws(() => check({ ...state, items: Array(9).fill(state.items[0]) }), /at most 8/);
 });
