@@ -7,8 +7,9 @@ envelope is the painting. The brush, grid and canvas it is built on are the
 Edit tabs will reuse; this document designs both, and leaves what is
 particular to Mask and Edit to their own documents.
 
-Status: proposed, for Cho to decide (2026-10-05). No code until the
-decisions below are answered.
+Status: decided (2026-10-05). Cho accepted every recommendation except
+P3's frequency range, which goes down to 100 Hz; the numbers below are
+measured at that range.
 
 This project is AI-assisted: the document and `tools/measure_paint_grid.py`
 were drafted by Claude (Claude Code), for Cho to review.
@@ -52,39 +53,39 @@ carrier="tones", ...)` already does the synthesis [read:
 ## Measurements
 
 **P-M1. Speed is fine behind Play, and fast enough to play after each stroke
-up to a few seconds.** [measure] A 60 × 256 grid with a dozen soft strokes,
-16 kHz, 200–6400 Hz, first call (cold) and median of the next three (warm):
+up to a few seconds.** [measure] A 72 × 256 grid with a dozen soft strokes,
+16 kHz, 100–6400 Hz, first call (cold) and median of the next three (warm):
 
 | Carrier | 1 s cold | 1 s warm | 3 s cold | 3 s warm | 10 s cold | 10 s warm |
 |---|---|---|---|---|---|---|
-| tones | 0.152 s | 0.059 s | 0.411 s | 0.178 s | 1.476 s | 0.828 s |
-| harmonic | 0.029 s | 0.028 s | 0.096 s | 0.103 s | 0.559 s | 0.495 s |
-| noise | 0.093 s | 0.082 s | 0.950 s | 0.390 s | 3.147 s | 2.195 s |
+| tones | 0.114 s | 0.069 s | 0.415 s | 0.210 s | 2.184 s | 1.003 s |
+| harmonic | 0.038 s | 0.030 s | 0.152 s | 0.111 s | 0.966 s | 0.624 s |
+| noise | 0.103 s | 0.094 s | 0.796 s | 0.423 s | 3.974 s | 2.481 s |
 
 By the factor of 1.3–1.7 between native and Pyodide (`../app.md`, M2)
-[estimate], 10 s on noise would take 3–5 s in the browser, cold. D10's rule
+[estimate], 10 s on noise would take about 5–7 s in the browser, cold. D10's rule
 already covers this: below about 3 s of sound, play when a stroke ends;
 above it, play on Play with a progress note. Cho's local Pyodide run can
 replace the estimate.
 
 **P-M2. What you paint is what you get, in level.** [measure] A flat field at
-0 dB with a hole one octave wide and 0.4 s long; the hole's level in the
-result, against the same band outside it:
+0 dB with a hole one octave wide (400–800 Hz) and 0.4 s long; the hole's
+level in the result, against the same band outside it:
 
 | Carrier | painted −20 dB | painted −40 dB | painted silence |
 |---|---|---|---|
-| tones | −20.0 dB | −40.0 dB | −113.6 dB |
-| harmonic | −20.0 dB | −40.0 dB | −138.6 dB |
-| noise | −21.6 dB | −41.6 dB | −115.9 dB |
+| tones | −20.0 dB | −40.0 dB | −101.2 dB |
+| harmonic | −20.0 dB | −40.0 dB | −126.7 dB |
+| noise | −20.4 dB | −40.4 dB | −101.2 dB |
 
 So a painted level can be shown and believed in dB, and "silence" really is
-silent, with every carrier. The noise carrier comes out 1.6 dB deeper than
+silent, with every carrier. The noise carrier comes out 0.4 dB deeper than
 painted [measure; cause not investigated].
 
 **P-M3. A painting fits in a link, but not a short one.** [measure] The grid
 quantized to whole dB (one byte per cell, 60 levels), deflated and
-base64url-encoded: 52 characters blank, 4494 for a dozen soft strokes, and
-15 334 for the worst case (random cells). Browsers take links far longer
+base64url-encoded: 56 characters blank, 4758 for a dozen soft strokes, and
+18 434 for the worst case (random cells). Browsers take links far longer
 than that [estimate: Chrome's limit is 2 MB], but some chat apps cut long
 links, so a big painting is better saved as a file (`../app.md`, D8).
 
@@ -99,10 +100,10 @@ links, so a big painting is better saved as a file (`../app.md`, D8).
 │ 1600 ┤░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░│  soft  ─○──    │
 │      │░░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░│  level −12 dB  │
 │  400 ┤░░░░░░░░░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░│  ◉ paint ○ erase│
-│  200 ┤                                            │ Sound          │
+│  100 ┤                                            │ Sound          │
 │      0 s                                    1.0 s │  carrier tones ▾│
 ├───────────────────────────────────────────────────┤  f0 (harmonic) │
-│ result: waveform and spectrogram (the shell's)    │  200–6400 Hz   │
+│ result: waveform and spectrogram (the shell's)    │  100–6400 Hz   │
 └───────────────────────────────────────────────────┴────────────────┘
 ```
 
@@ -130,7 +131,7 @@ links, so a big painting is better saved as a file (`../app.md`, D8).
   falloff's weight, once per pointer sample along the stroke, spaced by a
   fraction of the radius so a fast stroke is not dotted. Erase is the same
   brush at the floor.
-- **Canvas.** A `<canvas>` (not SVG: 15 000 cells), drawn as an image of
+- **Canvas.** A `<canvas>` (not SVG: 18 432 cells), drawn as an image of
   the grid scaled to the plot, with SVG axes over it as in Tracks.
 - The Mask and Edit tabs reuse all of this with a different meaning for a
   cell (a gain in dB on a recording's spectrogram or modulation spectrum)
@@ -147,7 +148,7 @@ state with its duration and sampling rate; after this change:
   "duration": 1.0, "fs": 16000, "tab": "painted",
   "tracks":  { "params": { ... } },
   "painted": {
-    "f_lo": 200, "f_hi": 6400, "rows_per_octave": 12, "columns": 256,
+    "f_lo": 100, "f_hi": 6400, "rows_per_octave": 12, "columns": 256,
     "floor_db": -60, "carrier": "tones", "f0": 100, "seed": 1,
     "levels": "<base64 of deflated bytes, one per cell: 0 = 0 dB ... 60 = floor>"
   }
@@ -181,8 +182,10 @@ code changes, and undo is a list of grids. (b) would make links shorter
 per stroke]) but ties every saved painting to the brush's exact
 arithmetic.
 
+*Decided (2026-10-05):* (a).
+
 **P2. Grid size.**
-(a) a fixed 60 rows (12 per octave over 5 octaves) by 256 columns,
+(a) a fixed 12 rows per octave (72 over 100–6400 Hz) by 256 columns,
 stretched with the duration;
 (b) columns per second (say 100), so a longer sound has more columns;
 (c) a size the user picks.
@@ -194,17 +197,27 @@ detail up to 6 cycles/octave, within the tone carrier's limit of 10
 [read: `ripple_sound`, "Spectral modulation up to half this
 (cycles/octave)"].
 
+*Decided (2026-10-05):* (a).
+
 **P3. Frequency range and floor.**
 *Recommended:* 200–6400 Hz (exactly 5 octaves, below Nyquist at 16 kHz)
 and a 60 dB range with the floor meaning silence, both as tab settings
 with these defaults. P-M2 shows painted levels come out as painted across
 that range. Changing the range resamples the grid rather than clearing it.
+200 Hz was chosen because the harmonic carrier is coarse below it (with F0
+at 100 Hz, harmonics 2 and 3 are 0.58 octave apart) [read].
+*Decided (2026-10-05):* 100–6400 Hz (exactly 6 octaves, 72 rows), so
+painting reaches lower; the 60 dB range as recommended. On the harmonic
+carrier, fine detail painted at the bottom cannot come out: with F0 at
+100 Hz the harmonics there are 1 and 0.58 octave apart [read].
 
 **P4. Carriers offered.**
 *Recommended:* tones (default), harmonic (with an F0 field) and noise.
 Low-noise and a recording as carrier wait for the Mask tab, which brings
 recordings in. Each carrier makes the same painting sound different in an
 instructive way (`../app.md`, "Why").
+
+*Decided (2026-10-05):* as recommended.
 
 **P5. The brush.**
 *Recommended:* size, softness, a level, and paint/erase, as in the sketch,
@@ -213,20 +226,26 @@ getting louder). Not proposed for v1: shapes (rectangles, lines), a
 smudge tool, copying a region, painting with the level under the pointer
 rising with pressure. Each is easy to add once the grid exists.
 
+*Decided (2026-10-05):* as recommended.
+
 **P6. Links.**
 *Recommended:* deflate only the grid, as in the data model above (the
 browser's `CompressionStream("deflate")` writes the zlib format Python's
 `zlib.decompress` reads), and leave the rest of the link as it is now.
-P-M3: about 4.5 kB for a typical painting; the same grid as JSON numbers
-would be about 60 kB of link [estimate: 15 360 numbers of 2–3 digits and a
+P-M3: about 4.8 kB for a typical painting; the same grid as JSON numbers
+would be about 70 kB of link [estimate: 18 432 numbers of 2–3 digits and a
 comma, then base64]. A painting too big for a comfortable link is saved
 as a file.
+
+*Decided (2026-10-05):* as recommended.
 
 **P7. Starting painting.**
 (a) blank, with "paint something to hear it";
 (b) a simple example (a glide and a noise band) so Play works at once.
 *Recommended:* (b), as Tracks starts from a vowel, with Reset returning to
 it and a "Clear" button for a blank canvas.
+
+*Decided (2026-10-05):* (b).
 
 ## Order of work
 

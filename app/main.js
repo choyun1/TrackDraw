@@ -9,7 +9,8 @@ import { History } from "./history.js";
 import { Log } from "./log.js";
 import { drawSpectrogram, drawWaveform } from "./plot.js";
 import { encodeState, stateFromHash } from "./share.js";
-import { check, clampDuration, defaultDocument, stretch, tidyDocument } from "./tracks/model.js";
+import { defaultPage, openDocument, stretchPage, tabState, withTabState } from "./document.js";
+import { clampDuration } from "./tracks/model.js";
 import { createTracksTab } from "./tracks/tab.js";
 
 const AUTOPLAY_MAX_S = 3; // longer sounds play on Play only (app.md, D10)
@@ -77,19 +78,21 @@ function status(text, error = false) {
 
 // --- the document and its history ----------------------------------------------
 
-let initial = defaultDocument();
+let initial = defaultPage();
 try {
   const linked = stateFromHash(location.hash);
-  if (linked) initial = tidyDocument(check(linked));
+  if (linked) initial = openDocument(linked);
 } catch (error) {
   log.error(`ignored the drawing in the link: ${error.message}`);
 }
 const history = new History(initial);
-const tab = createTracksTab($("tab-tracks"), { commit: (doc) => change(doc) });
+const tab = createTracksTab($("tab-tracks"), {
+  commit: (state) => change(withTabState(history.present, tab.id, state)),
+});
 
 function show() {
   const doc = history.present;
-  tab.setDocument(doc);
+  tab.setDocument(tabState(doc, tab.id));
   ui.duration.value = doc.duration;
   ui.undo.disabled = !history.past.length;
   ui.redo.disabled = !history.future.length;
@@ -120,7 +123,7 @@ async function synthesize({ play }) {
   status(doc.duration > 1 ? `Synthesizing ${doc.duration} s…` : "Synthesizing…");
   let sound;
   try {
-    sound = await engine.synthesize({ tab: tab.id, state: doc });
+    sound = await engine.synthesize({ tab: tab.id, state: tabState(doc, tab.id) });
   } catch (error) {
     status(`Synthesis failed: ${error.message} (see Log; Reset starts again)`, true);
     log.error(`synthesis failed: ${error.message}`, error.detail ?? "");
@@ -173,7 +176,7 @@ ui.play.addEventListener("click", togglePlay);
 ui.duration.addEventListener("change", () => {
   const duration = clampDuration(Number(ui.duration.value) || history.present.duration);
   if (duration === history.present.duration) return (ui.duration.value = duration);
-  change(stretch(history.present, duration));
+  change(stretchPage(history.present, duration));
 });
 
 function undo() {
@@ -191,7 +194,7 @@ function redo() {
 ui.undo.addEventListener("click", undo);
 // Reset is an edit like any other, so Undo brings the drawing back.
 ui.reset.addEventListener("click", () => {
-  change(defaultDocument());
+  change(defaultPage());
   log.info("reset to the default drawing");
   if (!ready) status("Reset to the default drawing.");
 });
@@ -206,10 +209,10 @@ function download(blob, name) {
 
 ui.save.addEventListener("click", () => {
   const text = JSON.stringify(history.present, null, 1);
-  download(new Blob([text], { type: "application/json" }), "tracks.json");
+  download(new Blob([text], { type: "application/json" }), "sketch.json");
 });
 ui.wav.addEventListener("click", () => {
-  if (result) download(wavBlob(result.sound.samples, result.sound.fs), "tracks.wav");
+  if (result) download(wavBlob(result.sound.samples, result.sound.fs), "sketch.wav");
 });
 ui.open.addEventListener("click", () => ui.file.click());
 ui.file.addEventListener("change", async () => {
@@ -217,7 +220,7 @@ ui.file.addEventListener("change", async () => {
   ui.file.value = "";
   if (!file) return;
   try {
-    change(tidyDocument(check(JSON.parse(await file.text()))));
+    change(openDocument(JSON.parse(await file.text())));
     status(`Opened ${file.name}.`);
     log.info(`opened ${file.name}`);
   } catch (error) {
