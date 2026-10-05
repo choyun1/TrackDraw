@@ -6,10 +6,11 @@ spectrogram, blobs on a modulation spectrum, and other views as they come.
 Each tab is one of sonore's ways back to sound, given a point-and-click
 surface. sonore does the synthesis; this project is only the interface.
 
-Status: proposal, 2026-10-04. It replaces the TrackDraw-only proposal of
-2026-10-03, which is now the Tracks tab (`tabs/tracks.md`). Nothing is
-built, and no application code is written until Cho has answered the
-decisions below.
+Status: accepted. Proposed 2026-10-04, replacing the TrackDraw-only
+proposal of 2026-10-03, which is now the Tracks tab (`tabs/tracks.md`).
+Cho merged it on 2026-10-05 (TrackDraw PR #3), which accepts the
+recommendations below, and the name is settled (D1). Building has started:
+the shell and the Tracks tab's first steps (see "Order of work").
 
 This project is AI-assisted: the documents and the scripts in `tools/` were
 drafted by Claude (Claude Code) for Cho to review.
@@ -186,7 +187,9 @@ old URL), or start a new repository and keep TrackDraw as it is.
 *Recommended:* (b), with the repository renamed. The app is sonore's views
 made drawable, so the name should point there, and renaming keeps the
 history. The Tracks tab keeps the TrackDraw name and credits Assmann et
-al. Cho decides. None of the four names (`sonore-sketch`, `soundsketch`,
+al. *Decided (2026-10-05):* (b), as a new repository,
+`choyun1/sonore-sketch`, which carries TrackDraw's history and licence;
+`choyun1/TrackDraw` stays as it was. None of the four names (`sonore-sketch`, `soundsketch`,
 `trackdraw`, `drawn-sound`) was taken on PyPI on 2026-10-04; GitHub was not
 searched.
 

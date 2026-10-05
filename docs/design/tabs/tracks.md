@@ -7,11 +7,12 @@ the original, what sonore already provides and what is missing, the checks
 behind each number, a proposed interface and data model, and the decisions
 for this tab.
 
-Status: proposal. Written 2026-10-03 as the design for TrackDraw alone;
+Status: accepted with `../app.md` on 2026-10-05; steps 1 and 2 of the
+order of work below are built. Written 2026-10-03 as the design for TrackDraw alone;
 on 2026-10-04 Cho broadened the project to a general drawing front end for
 sonore, so this became one tab of it. Platform, synthesis location,
 repository, generality and pinning (D2, D3, D7, D8, D9 below) now belong
-to the whole app and are decided in `../app.md`. Nothing is built.
+to the whole app and are decided in `../app.md`.
 
 This project is AI-assisted: the document and the scripts in `tools/` were
 drafted by Claude (Claude Code) from Cho's handoff brief, for Cho to review.
@@ -80,7 +81,8 @@ S(f) = G(f) V(f) R(f); G a resonator at 0 Hz, 100 Hz wide; R lip radiation,
 
 ## Cho's 2016 attempt
 
-`choyun1/TrackDraw` (this repository; Adrian Y. Cho and Daniel R Guest, MIT
+`choyun1/TrackDraw` (the history of this repository, removed from its tree
+on 2026-10-05; Adrian Y. Cho and Daniel R Guest, MIT
 licence, last commit July 2016) has about 1,000 lines of Python: PyQt5 and
 matplotlib in a model/view/controller split, its own Klatt resonators, a
 temporary sine-wave synthesizer (`controller/synth/sine.py`), and 40 fixed
