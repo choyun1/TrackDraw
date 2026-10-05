@@ -70,12 +70,43 @@ export function points(doc, name) {
   return times.map((t, i) => [t, values[i]]);
 }
 
-// A new document with `name` set to the breakpoints `pts` (sorted by time).
+// Times are stored to 0.1 ms, and sonore needs them strictly increasing.
+const TIME_DIGITS = 4;
+const TIME_STEP = 10 ** -TIME_DIGITS;
+
+// Breakpoints as sonore takes them: sorted by time, rounded, and with one
+// value per time. Where several land on the same time (a line drawn with no
+// width in time, a point dragged onto its neighbour, a stretch that shrinks
+// two times into one), the last of them wins, so the newest edit is kept.
+export function tidyPoints(pts) {
+  const sorted = pts
+    .map(([t, v], order) => [round(t, TIME_DIGITS), round(v, 2), order])
+    .sort((a, b) => a[0] - b[0] || a[2] - b[2]);
+  const tidy = [];
+  for (const [t, v] of sorted) {
+    if (tidy.length && tidy[tidy.length - 1][0] === t) tidy[tidy.length - 1] = [t, v];
+    else tidy.push([t, v]);
+  }
+  return tidy;
+}
+
+// A new document with `name` set to the breakpoints `pts`.
 export function withPoints(doc, name, pts) {
-  const sorted = [...pts].sort((a, b) => a[0] - b[0]);
-  const times = sorted.map(([t]) => round(t, 4));
-  const values = sorted.map(([, v]) => round(v, 2));
-  return { ...doc, params: { ...doc.params, [name]: [times, values] } };
+  const tidy = tidyPoints(pts);
+  return { ...doc, params: { ...doc.params, [name]: [tidy.map(([t]) => t), tidy.map(([, v]) => v)] } };
+}
+
+// Every track of `doc` tidied (tidyPoints), for documents from a file or a
+// link, which may come from an older page.
+export function tidyDocument(doc) {
+  const params = Object.fromEntries(
+    Object.entries(doc.params ?? {}).map(([name, value]) => {
+      if (typeof value === "number") return [name, value];
+      const tidy = tidyPoints(value[0].map((t, i) => [t, value[1][i]]));
+      return [name, [tidy.map(([t]) => t), tidy.map(([, v]) => v)]];
+    }),
+  );
+  return { ...doc, params };
 }
 
 export function clampValue(name, v) {
@@ -118,10 +149,10 @@ export function insertPoint(pts, t, v) {
   return { pts: [...pts.slice(0, index), [t, v], ...pts.slice(index)], index };
 }
 
-// Move breakpoint i, kept between its neighbours in time.
+// Move breakpoint i, kept strictly between its neighbours in time.
 export function movePoint(pts, i, t, v) {
-  const lo = i > 0 ? pts[i - 1][0] : 0;
-  const hi = i < pts.length - 1 ? pts[i + 1][0] : Infinity;
+  const lo = i > 0 ? pts[i - 1][0] + TIME_STEP : 0;
+  const hi = i < pts.length - 1 ? pts[i + 1][0] - TIME_STEP : Infinity;
   const moved = pts.slice();
   moved[i] = [Math.min(hi, Math.max(lo, t)), v];
   return moved;
@@ -182,10 +213,10 @@ export function stretch(doc, duration) {
   const factor = duration / doc.duration;
   const params = Object.fromEntries(
     Object.entries(doc.params).map(([name, value]) =>
-      typeof value === "number" ? [name, value] : [name, [value[0].map((t) => round(t * factor, 4)), value[1]]],
+      typeof value === "number" ? [name, value] : [name, [value[0].map((t) => t * factor), value[1]]],
     ),
   );
-  return { ...doc, duration, params };
+  return tidyDocument({ ...doc, duration, params });
 }
 
 // Raise an Error saying what is wrong with a document read from a file or a

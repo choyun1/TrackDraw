@@ -6,7 +6,7 @@
 // Messages in:  {id, request: {tab, state}}
 // Messages out: {type: "progress", text} while loading,
 //               {type: "ready", versions},
-//               {id, type: "result", result} or {id, type: "error", message}.
+//               {id, type: "result", result} or {id, type: "error", message, detail}.
 
 const PYODIDE_VERSION = "314.0.7"; // what Cho measured on 2026-10-03 (tracks.md, M6)
 const SONORE_VERSION = "0.5.0"; // keep in step with pyproject.toml (app.md, D5)
@@ -111,8 +111,10 @@ onmessage = async ({ data: { id, request } }) => {
     const result = convert(handle(JSON.stringify(request)));
     postMessage({ id, type: "result", result }, [result.samples.buffer, result.spectrogram.data.buffer]);
   } catch (error) {
-    // A PythonError's message ends with the Python exception's own line.
-    const lines = String(error?.message ?? error).trim().split("\n");
-    postMessage({ id, type: "error", message: lines[lines.length - 1] });
+    // A PythonError's message is the traceback, ending with the exception's
+    // own line: that line is the message, the whole traceback the detail.
+    const full = String(error?.message ?? error).trim();
+    const lines = full.split("\n");
+    postMessage({ id, type: "error", message: lines[lines.length - 1], detail: full });
   }
 };

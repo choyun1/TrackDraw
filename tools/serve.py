@@ -17,6 +17,7 @@ import argparse
 import base64
 import json
 import sys
+import traceback
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -56,7 +57,8 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             result = handle(request)
         except (ValueError, KeyError, TypeError) as error:
-            return self.send_json(400, {"error": f"{type(error).__name__}: {error}"})
+            detail = "".join(traceback.format_exception(error)).strip()
+            return self.send_json(400, {"error": f"{type(error).__name__}: {error}", "detail": detail})
         result["samples"] = base64.b64encode(result["samples"]).decode()
         result["spectrogram"]["data"] = base64.b64encode(result["spectrogram"]["data"]).decode()
         return self.send_json(200, result)
