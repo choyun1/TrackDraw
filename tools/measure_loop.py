@@ -116,31 +116,32 @@ def rejection(sound, centre, width):
     return 10 * np.log10(power[octaves <= width / 2 - 1 / 12].mean() / power[octaves >= width / 2 + 0.5].mean())
 
 
-print(f"sonore {so.__version__}, numpy {np.__version__}, fs {FS} Hz, 3 s, the tab's starting drawing")
-for carrier in ("tones", "noise"):
-    print(f"\n1. B-M4 contrast within the bands, {carrier}; columns are iterations {ITERATIONS}")
-    for name, bands in CASES.items():
-        s = state(bands, carrier)
-        for method in ("after",) if not bands else ("after", "naive", "within"):
-            cells = " ".join(f"{contrast(run(method, s, n), s):5.1f}" for n in ITERATIONS)
-            print(f"  {name:<28s} {method:<6s} {cells} dB")
-
-print("\n2. rejection, 1 oct at 1 kHz, tones, 10 iterations")
-s = state(CASES["1 oct at 1 kHz"])
-for method in ("after", "naive", "within"):
-    print(f"  {method:<6s} {rejection(run(method, s, 10), 1000, 1):5.1f} dB")
-
 def timed(function):
     start = time.perf_counter()
     function()
     return time.perf_counter() - start
 
 
-print("\n3. time per iteration (5 iterations less none, over 5), warm median of 3, tones, 1 oct gliding")
-for duration in (3.0, 10.0):
-    s = {**state([{"points": [[0, 500], [duration, 4000]], "width": 1, "level": 0}]), "duration": duration}
+if __name__ == "__main__":
+    print(f"sonore {so.__version__}, numpy {np.__version__}, fs {FS} Hz, 3 s, the tab's starting drawing")
+    for carrier in ("tones", "noise"):
+        print(f"\n1. B-M4 contrast within the bands, {carrier}; columns are iterations {ITERATIONS}")
+        for name, bands in CASES.items():
+            s = state(bands, carrier)
+            for method in ("after",) if not bands else ("after", "naive", "within"):
+                cells = " ".join(f"{contrast(run(method, s, n), s):5.1f}" for n in ITERATIONS)
+                print(f"  {name:<28s} {method:<6s} {cells} dB")
+
+    print("\n2. rejection, 1 oct at 1 kHz, tones, 10 iterations")
+    s = state(CASES["1 oct at 1 kHz"])
     for method in ("after", "naive", "within"):
-        run(method, s, 5)
-        five = statistics.median(timed(lambda: run(method, s, 5)) for _ in range(3))
-        none = statistics.median(timed(lambda: run(method, s, 0)) for _ in range(3))
-        print(f"  {duration:4.1f} s {method:<6s} {(five - none) / 5:5.2f} s per iteration")
+        print(f"  {method:<6s} {rejection(run(method, s, 10), 1000, 1):5.1f} dB")
+
+    print("\n3. time per iteration (5 iterations less none, over 5), warm median of 3, tones, 1 oct gliding")
+    for duration in (3.0, 10.0):
+        s = {**state([{"points": [[0, 500], [duration, 4000]], "width": 1, "level": 0}]), "duration": duration}
+        for method in ("after", "naive", "within"):
+            run(method, s, 5)
+            five = statistics.median(timed(lambda: run(method, s, 5)) for _ in range(3))
+            none = statistics.median(timed(lambda: run(method, s, 0)) for _ in range(3))
+            print(f"  {duration:4.1f} s {method:<6s} {(five - none) / 5:5.2f} s per iteration")
