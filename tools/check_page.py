@@ -268,6 +268,7 @@ def main() -> None:
             assert page_document_in(page)["tab"] == "blobs"
             example = page_document_in(page)["blobs"]
             expect(page.locator("#tab-blobs .coarse")).to_be_visible()  # 0.6 s is under 2 s
+            expect(page.locator("#spectrogram-row")).to_be_hidden()  # the tab shows its own, under the plane
             plane = page.locator("canvas.plane").bounding_box()
             left, right = plane["x"] + 52, plane["x"] + plane["width"] - 10
             top, bottom = plane["y"] + 8, plane["y"] + plane["height"] - 36

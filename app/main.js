@@ -107,6 +107,8 @@ function showTab() {
   }
   for (const id of Object.keys(tabs)) $(`tab-${id}`).hidden = id !== tab.id;
   $("tab-caption").textContent = tabButtons.find((b) => b.dataset.tab === tab.id)?.dataset.caption ?? "";
+  // A tab that shows the result's spectrogram itself does without the strip.
+  $("spectrogram-row").hidden = Boolean(tab.ownSpectrogram);
 }
 
 function switchTab(id) {

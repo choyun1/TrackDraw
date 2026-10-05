@@ -138,6 +138,7 @@ canvas.stft {
   margin-right: 162px;
 }
 .result-row { display: flex; align-items: center; gap: 0; }
+.result-row[hidden] { display: none; }
 .result-label { width: 52px; color: var(--muted); font-size: 11px; }
 .result canvas {
   flex: 1;

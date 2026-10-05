@@ -555,6 +555,7 @@ export function createBlobsTab(root, { commit }) {
 
   return {
     id: "blobs",
+    ownSpectrogram: true, // under the plane, so the shell's strip is hidden
     setDocument(next) {
       fits = null; // a refusal is shown again if this drawing is refused again
       drag = null;
