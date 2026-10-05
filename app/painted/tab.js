@@ -1,0 +1,354 @@
+// The Painted tab: paint level on time x log-frequency and hear a sound
+// whose spectrotemporal envelope is the painting (docs/design/tabs/painted.md).
+//
+// The grid is drawn on a canvas as an image, one pixel per cell, scaled to
+// the plot with smoothing (close to the bilinear reading Python does). A
+// stroke collects each cell's largest brush weight, and every cell moves
+// toward the brush's level by its weight when the stroke ends.
+
+import { fitCanvas } from "../plot.js";
+import {
+  CARRIERS,
+  applyStroke,
+  blank,
+  dab,
+  dabsAlong,
+  decodeLevels,
+  encodeLevels,
+  isSilent,
+  octaves,
+  resampleRows,
+  rows,
+} from "./model.js";
+
+const MARGIN = { left: 52, right: 10, top: 8, bottom: 22 };
+const CACHE = 400; // decoded paintings kept, so undo and redo are instant
+const FREQUENCY_TICKS = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+
+export function createPaintedTab(root, { commit, log }) {
+  let state = null;
+  let bytes = null; // the painting shown: state's levels, decoded
+  let stroke = null; // {weights, last, target, preview} while painting
+  let pointer = null; // [x, y] of the brush outline, or null
+  let playhead = null;
+  let mode = "paint";
+  const cache = new Map();
+
+  root.innerHTML = `
+    <div class="painted-body">
+      <div class="paint-area"><canvas class="paint"></canvas></div>
+      <aside class="side">
+        <fieldset><legend>Brush</legend>
+          <label class="choice" title="Paint at the level below (B)"><input type="radio" name="paint-mode" value="paint" checked> Paint <kbd>B</kbd></label>
+          <label class="choice" title="Paint silence; right-drag erases too (E)"><input type="radio" name="paint-mode" value="erase"> Erase <kbd>E</kbd></label>
+          <label class="field" title="The brush's diameter on screen">Size <input type="range" class="size" min="4" max="80" value="18"></label>
+          <label class="field" title="How much of the brush's radius fades out at its edge">Softness <input type="range" class="softness" min="0" max="1" step="0.05" value="0.6"></label>
+          <label class="field" title="The level the brush paints, in dB below the loudest (0 dB)">Level <input type="number" class="level" min="-59" max="0" step="1" value="0"> dB</label>
+          <button type="button" class="clear" title="Erase the whole painting (Undo brings it back)">Clear</button>
+        </fieldset>
+        <fieldset><legend>Sound</legend>
+          <label class="field" title="What the painting shapes: log-spaced tones, harmonics of F0, or noise">Carrier
+            <select class="carrier">${CARRIERS.map((c) => `<option value="${c}">${c}</option>`).join("")}</select></label>
+          <label class="field f0-field" title="The harmonic carrier's fundamental">F0 <input type="number" class="f0" min="20" max="1000" step="1"> Hz</label>
+          <label class="field" title="The painted frequency range; changing it keeps what is painted inside the new range">Range
+            <input type="number" class="f-lo" min="20" step="1"> – <input type="number" class="f-hi" step="1"> Hz</label>
+        </fieldset>
+        <p class="hint">Drag to paint; right-drag erases. Space plays. Ctrl+Z undoes.</p>
+      </aside>
+    </div>`;
+  const $ = (selector) => root.querySelector(selector);
+  const canvas = $("canvas.paint");
+  const ui = {
+    size: $(".size"), softness: $(".softness"), level: $(".level"), clear: $(".clear"),
+    carrier: $(".carrier"), f0: $(".f0"), f0Field: $(".f0-field"), fLo: $(".f-lo"), fHi: $(".f-hi"),
+  };
+  for (const input of root.querySelectorAll('input[name="paint-mode"]')) {
+    input.addEventListener("change", () => (mode = input.value));
+  }
+  function setMode(next) {
+    mode = next;
+    root.querySelector(`input[name="paint-mode"][value="${next}"]`).checked = true;
+  }
+
+  // --- the painting and its state ------------------------------------------------
+
+  function remember(levels, decoded) {
+    cache.delete(levels);
+    cache.set(levels, decoded);
+    if (cache.size > CACHE) cache.delete(cache.keys().next().value);
+  }
+
+  // Commit `next` bytes (and any other changes) as a new state.
+  async function commitBytes(next, changes = {}) {
+    const levels = await encodeLevels(next);
+    remember(levels, next);
+    commit({ ...state, ...changes, levels });
+  }
+
+  async function load(next) {
+    const size = rows(next) * next.columns;
+    let decoded = cache.get(next.levels);
+    if (!decoded) {
+      try {
+        decoded = await decodeLevels(next.levels, size);
+      } catch (error) {
+        log?.error(`could not read the painting: ${error.message}`);
+        decoded = blank(next);
+      }
+      remember(next.levels, decoded);
+    }
+    if (state === next) {
+      bytes = decoded;
+      render();
+    }
+  }
+
+  function showSettings() {
+    ui.carrier.value = state.carrier;
+    ui.f0.value = state.f0;
+    ui.f0Field.hidden = state.carrier !== "harmonic";
+    ui.fLo.value = state.f_lo;
+    ui.fHi.value = state.f_hi;
+    ui.fHi.max = Math.floor(state.fs / 2) - 1;
+  }
+
+  ui.carrier.addEventListener("change", () => commit({ ...state, carrier: ui.carrier.value }));
+  ui.f0.addEventListener("change", () => {
+    const f0 = Number(ui.f0.value);
+    if (f0 >= 20 && f0 <= state.f_hi) commit({ ...state, f0 });
+    else ui.f0.value = state.f0;
+  });
+  function changeRange() {
+    const f_lo = Number(ui.fLo.value);
+    const f_hi = Number(ui.fHi.value);
+    const ok = f_lo >= 20 && f_hi < state.fs / 2 && Math.log2(f_hi / f_lo) * state.rows_per_octave >= 2;
+    if (!ok || !bytes || (f_lo === state.f_lo && f_hi === state.f_hi)) return showSettings();
+    const next = { ...state, f_lo, f_hi };
+    commitBytes(resampleRows(bytes, state, next), { f_lo, f_hi });
+  }
+  ui.fLo.addEventListener("change", changeRange);
+  ui.fHi.addEventListener("change", changeRange);
+  ui.clear.addEventListener("click", () => {
+    if (bytes && !isSilent(bytes, state)) commitBytes(blank(state));
+  });
+
+  // --- drawing ---------------------------------------------------------------------
+
+  function geometry() {
+    const width = canvas.clientWidth || 600;
+    const height = canvas.clientHeight || 300;
+    const x0 = MARGIN.left;
+    const x1 = width - MARGIN.right;
+    const y0 = MARGIN.top;
+    const y1 = height - MARGIN.bottom;
+    const span = octaves(state);
+    return {
+      width, height, x0, x1, y0, y1,
+      x: (t) => x0 + (t / state.duration) * (x1 - x0),
+      y: (f) => y1 - (Math.log2(f / state.f_lo) / span) * (y1 - y0),
+      // a pointer position in cells: [row from the bottom, column]
+      cell: (px, py) => [((y1 - py) / (y1 - y0)) * rows(state), ((px - x0) / (x1 - x0)) * state.columns],
+    };
+  }
+
+  const image = document.createElement("canvas");
+
+  function render() {
+    if (!state) return;
+    const context = fitCanvas(canvas);
+    const ratio = canvas.width / (canvas.clientWidth || 1);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const g = geometry();
+    const style = getComputedStyle(canvas);
+    const ink = style.getPropertyValue("--ink-rgb").trim() || "20, 24, 31";
+    const muted = style.getPropertyValue("--muted").trim() || "#6b7280";
+    const line = style.getPropertyValue("--line").trim() || "#d5d9e0";
+    context.clearRect(0, 0, g.width, g.height);
+
+    const shown = stroke?.preview ?? bytes;
+    if (shown) {
+      const nRows = rows(state);
+      const { columns } = state;
+      image.width = columns;
+      image.height = nRows;
+      const pixels = image.getContext("2d").createImageData(columns, nRows);
+      const [r, gr, b] = ink.split(",").map(Number);
+      const floor = -state.floor_db;
+      for (let row = 0; row < nRows; row++) {
+        for (let c = 0; c < columns; c++) {
+          const level = 1 - Math.min(shown[row * columns + c], floor) / floor;
+          const i = 4 * ((nRows - 1 - row) * columns + c);
+          pixels.data[i] = r;
+          pixels.data[i + 1] = gr;
+          pixels.data[i + 2] = b;
+          pixels.data[i + 3] = Math.round(255 * level ** 1.5);
+        }
+      }
+      image.getContext("2d").putImageData(pixels, 0, 0);
+      context.imageSmoothingEnabled = true;
+      context.drawImage(image, g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0);
+    }
+
+    // axes
+    context.strokeStyle = line;
+    context.fillStyle = muted;
+    context.lineWidth = 1;
+    context.font = "11px system-ui, sans-serif";
+    context.strokeRect(g.x0 + 0.5, g.y0 + 0.5, g.x1 - g.x0 - 1, g.y1 - g.y0 - 1);
+    context.textAlign = "right";
+    context.textBaseline = "middle";
+    for (const f of FREQUENCY_TICKS.filter((f) => f >= state.f_lo && f <= state.f_hi)) {
+      const y = Math.round(g.y(f)) + 0.5;
+      context.globalAlpha = 0.5;
+      context.beginPath();
+      context.moveTo(g.x0, y);
+      context.lineTo(g.x1, y);
+      context.stroke();
+      context.globalAlpha = 1;
+      context.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, g.x0 - 6, y);
+    }
+    context.save();
+    context.translate(12, (g.y0 + g.y1) / 2);
+    context.rotate(-Math.PI / 2);
+    context.textAlign = "center";
+    context.fillText("Hz", 0, 0);
+    context.restore();
+    context.textAlign = "center";
+    context.textBaseline = "top";
+    const step = niceStep(state.duration, g.x1 - g.x0);
+    for (let k = 0; k * step <= state.duration + 1e-9; k++) {
+      const x = g.x(k * step);
+      if (x < g.x1 - 24) context.fillText(`${+(k * step).toFixed(2)}`, x, g.y1 + 5); // room for "s"
+    }
+    context.textAlign = "right";
+    context.fillText("s", g.x1, g.y1 + 5);
+
+    if (playhead !== null) {
+      context.strokeStyle = style.getPropertyValue("--accent").trim() || "#d1495b";
+      context.beginPath();
+      context.moveTo(Math.round(g.x(playhead)) + 0.5, g.y0);
+      context.lineTo(Math.round(g.x(playhead)) + 0.5, g.y1);
+      context.stroke();
+    }
+    if (pointer) {
+      context.strokeStyle = muted;
+      context.setLineDash([3, 3]);
+      context.beginPath();
+      context.arc(pointer[0], pointer[1], Number(ui.size.value) / 2, 0, 2 * Math.PI);
+      context.stroke();
+      context.setLineDash([]);
+    }
+  }
+
+  // --- painting --------------------------------------------------------------------
+
+  function local(event) {
+    const box = canvas.getBoundingClientRect();
+    return [event.clientX - box.left, event.clientY - box.top];
+  }
+
+  function brush(g) {
+    const radius = Number(ui.size.value) / 2;
+    return {
+      rRow: Math.max(0.5, (radius / (g.y1 - g.y0)) * rows(state)),
+      rColumn: Math.max(0.5, (radius / (g.x1 - g.x0)) * state.columns),
+      softness: Number(ui.softness.value),
+    };
+  }
+
+  function dabAt(at) {
+    const { rRow, rColumn, softness } = brush(geometry());
+    dab(stroke.weights, rows(state), state.columns, at[0], at[1], rRow, rColumn, softness);
+  }
+
+  canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+  canvas.addEventListener("pointerdown", (event) => {
+    if (!state || !bytes || event.button > 2 || event.button === 1) return;
+    event.preventDefault();
+    canvas.setPointerCapture(event.pointerId);
+    const erase = mode === "erase" || event.button === 2;
+    const level = Math.min(0, Math.max(state.floor_db + 1, Number(ui.level.value) || 0));
+    const at = geometry().cell(...local(event));
+    stroke = {
+      weights: new Float32Array(bytes.length),
+      last: at,
+      target: erase ? -state.floor_db : -level,
+      preview: null,
+    };
+    dabAt(at);
+    stroke.preview = applyStroke(bytes, stroke.weights, stroke.target);
+    render();
+  });
+
+  canvas.addEventListener("pointermove", (event) => {
+    pointer = local(event);
+    if (stroke) {
+      const { rRow, rColumn } = brush(geometry());
+      const moves = event.getCoalescedEvents?.() ?? [event];
+      for (const move of moves.length ? moves : [event]) {
+        const at = geometry().cell(...local(move));
+        for (const centre of dabsAlong(stroke.last, at, rRow, rColumn)) dabAt(centre);
+        stroke.last = at;
+      }
+      stroke.preview = applyStroke(bytes, stroke.weights, stroke.target);
+    }
+    render();
+  });
+  canvas.addEventListener("pointerleave", () => {
+    pointer = null;
+    if (!stroke) render();
+  });
+
+  function finish(event) {
+    if (!stroke) return;
+    const next = stroke.preview;
+    stroke = null;
+    if (event.type === "pointercancel" || next.every((b, i) => b === bytes[i])) return render();
+    bytes = next;
+    render();
+    commitBytes(next);
+  }
+  canvas.addEventListener("pointerup", finish);
+  canvas.addEventListener("pointercancel", finish);
+
+  new ResizeObserver(render).observe(canvas);
+
+  return {
+    id: "painted",
+    setDocument(next) {
+      stroke = null;
+      state = next;
+      showSettings();
+      const decoded = cache.get(next.levels);
+      if (decoded) {
+        bytes = decoded;
+        render();
+      } else {
+        load(next);
+      }
+    },
+    setResult() {},
+    setPlayhead(t) {
+      playhead = t;
+      render();
+    },
+    // Why there is nothing to synthesize yet, if so.
+    blocked() {
+      if (bytes && isSilent(bytes, state)) return "Nothing painted yet: paint something to hear it.";
+      return null;
+    },
+    key(event) {
+      const key = event.key.toLowerCase();
+      if (key === "b") setMode("paint");
+      else if (key === "e") setMode("erase");
+      else return false;
+      return true;
+    },
+  };
+}
+
+// A time step whose labels are at least 44 px apart.
+function niceStep(duration, width) {
+  for (const step of [0.01, 0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2]) if ((width * step) / duration >= 44) return step;
+  return 5;
+}

@@ -14,7 +14,7 @@
     <h1>sonore sketch</h1>
     <nav class="tabs" role="tablist">
       <button role="tab" class="active" aria-selected="true" data-tab="tracks" title="Formant, F0 and amplitude tracks, synthesized by Klatt's synthesizer (TrackDraw; Assmann et al., 1994)">Tracks</button>
-      <button role="tab" disabled title="Not built yet: a spectrogram painted on time × log-frequency">Painted</button>
+      <button role="tab" aria-selected="false" data-tab="painted" title="Level painted on time × log-frequency, heard through sonore's ripple_sound">Painted</button>
       <button role="tab" disabled title="Not built yet: a mask painted over a recording's spectrogram">Mask</button>
       <button role="tab" disabled title="Not built yet: needs sonore 0.5 (ModulationSpectrum.from_blobs)">Blobs</button>
       <button role="tab" disabled title="Not built yet: needs sonore 0.5 (ModulationSpectrum.with_gain)">Edit</button>
@@ -25,7 +25,7 @@
         <input type="number" id="duration" min="0.05" max="10" step="0.05" value="0.6"> s
       </label>
       <label class="check" title="Hear each change as soon as it is drawn (sounds up to 3 s)"><input type="checkbox" id="autoplay" checked> Auto-play</label>
-      <button type="button" id="reset" title="Start again from the default drawing (Undo brings yours back)">Reset</button>
+      <button type="button" id="reset" title="Start this tab again from its default drawing, at the default duration (Undo brings yours back)">Reset</button>
       <button type="button" id="undo" title="Undo (Ctrl+Z)">↶</button>
       <button type="button" id="redo" title="Redo (Ctrl+Shift+Z)">↷</button>
       <button type="button" id="open" title="Open a saved drawing (.json)">Open</button>
@@ -38,6 +38,7 @@
   </header>
   <main>
     <section class="tab-body" id="tab-tracks"></section>
+    <section class="tab-body" id="tab-painted" hidden></section>
     <section class="result">
       <div class="result-row">
         <span class="result-label">Result</span>

@@ -7,7 +7,9 @@ point-and-click surface; sonore does the synthesis, in your browser.
 **Tracks** is the first tab: draw formant (F1–F5), F0, voicing amplitude
 (AV) and bandwidth tracks over time, and hear the speech Klatt's (1980)
 synthesizer makes from them. It follows Track-Draw (Assmann, Ballard,
-Bornstein & Paschall, 1994). Painted spectrograms, spectrogram masks and
+Bornstein & Paschall, 1994). **Painted** lets you paint level on time ×
+log-frequency and hear a sound whose spectrotemporal envelope is the
+painting (sonore's `ripple_sound`). Spectrogram masks and
 modulation-spectrum blobs are planned (`docs/design/app.md`).
 
 ## Using it
@@ -27,10 +29,15 @@ each change is heard as soon as you finish drawing it.
   kept as the fewest breakpoints within a small tolerance.
 - The selected track is the one you draw on. Select it with its button,
   by clicking its line, or with the keys 1–5 for F1–F5.
+- In **Painted**, drag to paint at the brush's level (0 dB is the loudest),
+  and right-drag or **Erase** to paint silence. **Clear** erases everything.
+  The carrier is what the painting shapes: tones, harmonics of an F0, or
+  noise.
 - The duration (up to 10 s) stretches everything drawn.
 - **Save** writes the drawing as JSON, **Open** reads it back, **Link**
   copies an address that opens it, and **WAV** saves the sound.
-- **Reset** starts again from the default drawing; Undo brings yours back.
+- **Reset** starts the tab you are on again from its default drawing, at
+  the default duration; Undo brings yours back.
 - **Log** shows what the page did and any errors, with Python's traceback.
   **Copy** puts the log, the versions and the current drawing on the
   clipboard, for a bug report.

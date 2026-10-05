@@ -5,7 +5,8 @@
 //
 //   {"app": "sonore-sketch", "version": 2, "sonore": "0.5.0",
 //    "duration": 0.6, "fs": 16000, "tab": "tracks",
-//    "tracks": {"mode": "klatt", "params": {...}}}
+//    "tracks": {"mode": "klatt", "params": {...}},
+//    "painted": {"f_lo": 100, "f_hi": 6400, ..., "levels": "..."}}
 //
 // A tab works on its own state, the shape its Python function takes
 // (sonore_sketch.page.tab_state does the same in Python). A version-1
@@ -14,15 +15,19 @@
 //
 // No DOM here, so this file runs under `node --test`.
 
+import * as painted from "./painted/model.js";
 import * as tracks from "./tracks/model.js";
 
 export const APP = "sonore-sketch";
 export const VERSION = 2;
-export const TABS = ["tracks"];
+export const TABS = ["tracks", "painted"];
 
 export function defaultPage() {
   const { sonore, duration, fs, mode, params } = tracks.defaultDocument();
-  return { app: APP, version: VERSION, sonore, duration, fs, tab: "tracks", tracks: { mode, params } };
+  return {
+    app: APP, version: VERSION, sonore, duration, fs, tab: "tracks",
+    tracks: { mode, params }, painted: painted.defaultSection(),
+  };
 }
 
 // A document from a file or a link, as version 2; throws an Error saying what
@@ -30,12 +35,16 @@ export function defaultPage() {
 export function upgrade(doc) {
   if (doc?.trackdraw === tracks.FORMAT) {
     const { sonore, duration, fs, mode = "klatt", params = {} } = doc;
-    return { app: APP, version: VERSION, sonore, duration, fs, tab: "tracks", tracks: { mode, params } };
+    return {
+      app: APP, version: VERSION, sonore, duration, fs, tab: "tracks",
+      tracks: { mode, params }, painted: painted.defaultSection(),
+    };
   }
   if (doc?.app !== APP || doc.version !== VERSION) {
     throw new Error(`not a sonore sketch document of version ${VERSION}, or a TrackDraw document of format ${tracks.FORMAT}`);
   }
-  return doc;
+  // A tab added since the document was saved starts from its default.
+  return { ...doc, painted: doc.painted ?? painted.defaultSection() };
 }
 
 // The state a tab draws on and its Python function takes.
@@ -43,6 +52,10 @@ export function tabState(page, tab) {
   if (tab === "tracks") {
     const { sonore, duration, fs } = page;
     return { trackdraw: tracks.FORMAT, sonore, duration, fs, ...page.tracks };
+  }
+  if (tab === "painted") {
+    const { sonore, duration, fs } = page;
+    return { painted: painted.FORMAT, sonore, duration, fs, ...page.painted };
   }
   throw new Error(`unknown tab ${tab}`);
 }
@@ -53,6 +66,10 @@ export function withTabState(page, tab, state) {
     const { mode, params } = state;
     return { ...page, tracks: { mode, params } };
   }
+  if (tab === "painted") {
+    const { painted: _format, sonore: _sonore, duration: _duration, fs: _fs, ...section } = state;
+    return { ...page, painted: section };
+  }
   throw new Error(`unknown tab ${tab}`);
 }
 
@@ -60,11 +77,21 @@ export function withTabState(page, tab, state) {
 export function openDocument(doc) {
   const page = upgrade(doc);
   const state = tracks.tidyDocument(tracks.check(tabState(page, "tracks")));
+  painted.check(tabState(page, "painted"));
   return withTabState({ ...page, tab: TABS.includes(page.tab) ? page.tab : "tracks" }, "tracks", state);
 }
 
-// Change the duration, stretching what every tab has drawn.
+// Change the duration, stretching what every tab has drawn (a painting's
+// columns are fractions of the duration, so it stretches by itself).
 export function stretchPage(page, duration) {
   const state = tracks.stretch(tabState(page, "tracks"), duration);
   return withTabState({ ...page, duration }, "tracks", state);
+}
+
+// Reset: the duration, sampling rate and `tab`'s drawing go back to their
+// defaults; the other tabs keep their drawings, stretched to the duration.
+export function resetTab(page, tab) {
+  const fresh = defaultPage();
+  const stretched = stretchPage(page, fresh.duration);
+  return withTabState({ ...stretched, fs: fresh.fs, sonore: fresh.sonore }, tab, tabState(fresh, tab));
 }
