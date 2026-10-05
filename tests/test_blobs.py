@@ -191,6 +191,35 @@ def test_a_bands_level_is_heard_and_bands_combine_by_the_largest_gain():
     assert gain[0, 0] == pytest.approx(1)
 
 
+def drawn_contrast(sound, drawing):
+    """B-M4 of blobs.md on the measured plane within the bands."""
+    drawn = blobs.target(drawing)
+    near = ((np.abs(drawn.w_t) <= 32) & (np.abs(drawn.w_t) >= 1))[None, :] & (drawn.w_f <= 4)[:, None]
+    inside = near & (drawn.level >= drawn.level[near].max() - 6)
+    outside = near & (drawn.level <= drawn.level[near].max() - 30)
+    power = 10 ** (blobs.measured(sound, drawing).level / 10)
+    return 10 * np.log10(power[inside].mean() / power[outside].mean())
+
+
+def test_with_bands_iterations_pull_the_sound_toward_the_blobs_and_the_bands_still_hold():
+    # tools/measure_loop.py, "within": a gliding band, tones, 3 s, gains 4.4 dB at 10
+    # iterations; the band still rejects 74 dB (static). Asked here: 2 dB at 5, and 40 dB.
+    drawing = state(duration=3.0, bands=[band([(0, 500), (3, 4000)])])
+    before = drawn_contrast(blobs.synthesize(drawing), drawing)
+    after = drawn_contrast(blobs.synthesize(drawing | {"iterations": 5}), drawing)
+    assert after - before > 2
+    sound = blobs.synthesize(state(iterations=5, bands=[band([(0, 1000)])]))
+    cfs, level = band_levels(sound)
+    distance, power = np.abs(np.log2(cfs / 1000)), 10 ** (level / 10)
+    assert 10 * np.log10(power[distance <= 0.5].mean() / power[distance >= 1].mean()) > 40
+    assert sound.rms == pytest.approx(1)
+
+
+def test_with_bands_iterations_are_still_refused_on_the_harmonic_carrier():
+    with pytest.raises(ValueError, match="iterations"):
+        blobs.synthesize(state(carrier="harmonic", iterations=2, bands=[band([(0, 1000)])]))
+
+
 @pytest.mark.parametrize(
     "bands, message",
     [

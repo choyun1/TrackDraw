@@ -106,7 +106,7 @@ export function createBlobsTab(root, { commit }) {
             <button type="button" class="delete-band" title="Remove this band (Delete, with no breakpoint selected)">Delete band</button>
           </div>
           <button type="button" class="add-band" title="Confine the sound to a band, one octave wide, that you can then reshape on the spectrogram">Add band</button>
-          <p class="hint band-motion" hidden>A band that moves is a sweep of its own, so it adds modulation to what the blobs draw.</p>
+          <p class="hint band-motion" hidden>A band that moves is a sweep of its own, so it adds modulation to what the blobs draw. Iterations go back and forth between the blobs and the bands, pulling the sound toward the blobs inside them.</p>
         </fieldset>
         <fieldset><legend>Sound</legend>
           <label class="field" title="What carries the modulation: log-spaced tones (clearest), a harmonic complex on F0 (pitched), or noise (adds modulation of its own)">Carrier
