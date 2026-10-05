@@ -265,6 +265,24 @@ naive and 74.2 dB within: the naive loop lets the band leak, which is why
 it was not chosen. An iteration costs about what one of `to_sound`'s does
 (1.2 s against 1.05 s at 3 s in the cloud container).
 
+**K-M5a. It levels off, at a ceiling set by the bands' width.** [measure]
+The same contrast run to 50 rounds (the loop of `blobs._toward_blobs`;
+columns are rounds 0, 10, 20, 50):
+
+| Band | tones | noise |
+|---|---|---|
+| none (`to_sound`'s iterations) | 26.1, 35.0, 36.7, 38.9 | 14.7, 23.7, 25.5, 27.3 |
+| 1 oct at 1 kHz | 24.8, 30.4, 30.7, 30.7 | 13.7, 28.7, 29.5, 30.2 |
+| 1 oct gliding 500→4000 Hz | 22.5, 26.9, 27.5, 27.9 | 14.9, 27.0, 27.7, 28.2 |
+| 2 oct gliding 300→2400 Hz | 20.8, 28.3, 29.1, 29.7 | 12.8, 27.4, 28.6, 29.6 |
+| 1/2 oct at 500 Hz and 2 kHz | 20.7, 23.7, 23.8, 23.9 | 11.4, 22.6, 23.0, 23.4 |
+
+No case went backwards. With bands, 10 rounds give 85–95% of what 50
+do, and the level reached falls with the bands' width (about 24 dB for
+half-octave bands, 28–31 dB for one or two octaves), as a band *w* octaves
+wide resolves density only in steps of about 1/*w* cyc/oct (K-M2).
+Without bands the search keeps climbing slowly.
+
 **K-M6. Which dominates the whole sound: the blobs, unless the bands move
 fast or the blobs are shallow.** [measure] `tools/measure_dominance.py`:
 the blobs' share of the result's modulation power over the whole range,
