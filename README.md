@@ -21,6 +21,8 @@ browser, which takes 10–20 s; you can draw while it loads. After that,
 each change is heard as soon as you finish drawing it.
 
 - **Point** adds a breakpoint or drags one; double-click removes it.
+  With any tool, dragging a breakpoint's circle up or down moves it; with
+  Line or Freehand, dragging from a circle along time draws from it instead.
   **Line** replaces a span by a straight line. **Freehand** draws a stroke,
   kept as the fewest breakpoints within a small tolerance.
 - The selected track is the one you draw on. Select it with its button,

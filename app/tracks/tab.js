@@ -24,7 +24,9 @@ import {
 
 const SVG = "http://www.w3.org/2000/svg";
 const MARGIN = { left: 52, right: 10, top: 8, bottom: 8 };
-const GRAB_PX = 9; // a press this close in time to a breakpoint grabs it
+const GRAB_PX = 9; // a press this close in time to a breakpoint grabs it (Point tool)
+const HIT_PX = 10; // a press this close to a breakpoint's circle grabs it, whatever the tool
+const DECIDE_PX = 4; // with Line or Freehand, how far a press on a circle moves before it counts
 const SELECT_PX = 7; // a press this close to another track's line selects it
 
 const PANELS = [
@@ -223,6 +225,21 @@ export function createTracksTab(root, { commit }) {
       const box = svg.getBoundingClientRect();
       return [event.clientX - box.left, event.clientY - box.top];
     };
+    // The selected track's breakpoint whose circle is under (px, py), or -1.
+    const circleAt = (px, py) => {
+      if (!trackList(panel).includes(selected)) return -1;
+      const g = geometry(panel);
+      let best = -1;
+      let nearest = HIT_PX;
+      points(doc, selected).forEach(([t, v], i) => {
+        const d = Math.hypot(g.x(t) - px, g.y(v) - py);
+        if (d <= nearest) {
+          best = i;
+          nearest = d;
+        }
+      });
+      return best;
+    };
 
     svg.addEventListener("pointerdown", (event) => {
       if (!doc || event.button > 0) return;
@@ -247,8 +264,15 @@ export function createTracksTab(root, { commit }) {
       const v = clampValue(name, g.v(py));
       const pts = points(doc, name);
       const start = doc;
-      if (tool === "point") {
-        let index = nearestPoint(pts, t, (GRAB_PX / (g.x1 - g.x0)) * doc.duration);
+      // Point grabs the breakpoint under the press, or nearest in time, or
+      // adds one. With Line or Freehand a press on a circle waits to see the
+      // first movement: mostly up or down drags the breakpoint, mostly along
+      // time draws from it as usual.
+      const onCircle = circleAt(px, py);
+      if (tool !== "point" && onCircle >= 0) {
+        gesture = { panel, name, start, kind: "undecided", index: onCircle, at: [px, py], from: [t, v] };
+      } else if (tool === "point") {
+        let index = onCircle >= 0 ? onCircle : nearestPoint(pts, t, (GRAB_PX / (g.x1 - g.x0)) * doc.duration);
         let current = pts;
         if (index < 0) ({ pts: current, index } = insertPoint(pts, t, v));
         gesture = { panel, name, start, kind: "point", index, base: current };
@@ -262,6 +286,7 @@ export function createTracksTab(root, { commit }) {
     });
 
     svg.addEventListener("pointermove", (event) => {
+      if (!gesture) svg.classList.toggle("over-point", circleAt(...local(event)) >= 0);
       if (!gesture || gesture.panel !== panel) return;
       const g = geometry(panel);
       const moves = event.getCoalescedEvents?.() ?? [event];
@@ -269,6 +294,15 @@ export function createTracksTab(root, { commit }) {
         const [px, py] = local(move);
         const t = g.t(px);
         const v = clampValue(gesture.name, g.v(py));
+        if (gesture.kind === "undecided") {
+          const dx = Math.abs(px - gesture.at[0]);
+          const dy = Math.abs(py - gesture.at[1]);
+          if (Math.max(dx, dy) < DECIDE_PX) continue;
+          const { from } = gesture;
+          if (dy >= dx) gesture = { ...gesture, kind: "point", base: points(doc, gesture.name) };
+          else if (tool === "line") gesture = { ...gesture, kind: "line", preview: [from, from] };
+          else gesture = { ...gesture, kind: "freehand", stroke: [from], preview: [from] };
+        }
         if (gesture.kind === "point") {
           doc = withPoints(doc, gesture.name, movePoint(gesture.base, gesture.index, t, v));
         } else if (gesture.kind === "line") {
