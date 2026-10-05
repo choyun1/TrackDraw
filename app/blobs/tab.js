@@ -10,12 +10,24 @@
 //
 // Under the plane, the result's spectrogram (the shell's 5 ms STFT) on a
 // log-frequency axis over the carrier's bands, so a blob's density shows as
-// the slope of its stripes in octaves.
+// the slope of its stripes in octaves. The bands that confine the sound
+// (docs/design/tabs/bands.md) are drawn on it: each a centre track with
+// breakpoints and a strip its width wide. Drag a breakpoint to move it, click
+// a band's line to add one, drag inside a strip to move the whole band.
 
 import { magma } from "../colormap.js";
 import { fitCanvas, niceStep } from "../plot.js";
 import {
+  BAND_WIDTH_MAX,
+  BAND_WIDTH_MIN,
   CARRIERS,
+  MAX_BANDS,
+  bandCentre,
+  clampBandLevel,
+  clampBandWidth,
+  newBand,
+  tidyHz,
+  tidyTime,
   COARSE_BELOW_S,
   DENSITY_MAX,
   MAX_BLOBS,
@@ -42,12 +54,15 @@ export function createBlobsTab(root, { commit }) {
   let selected = null; // index of the selected blob
   let drag = null; // {kind, index, items, changed, added} while a gesture lasts
   let fits = null; // the depth sonore said fits, after it refused this one
+  let band = null; // {index, point} of the selected band (point: index or null)
+  let bandDrag = null; // {kind, index, point, bands, changed, ...} while a gesture on the spectrogram lasts
+  let focus = "blob"; // what Delete removes: the selected "blob" or "band"
 
   root.innerHTML = `
     <div class="blobs-body">
       <div class="paint-area">
         <canvas class="plane"></canvas>
-        <canvas class="stft" title="The result's spectrogram (5 ms window) on a log-frequency axis"></canvas>
+        <canvas class="stft" title="The result's spectrogram (5 ms window) on a log-frequency axis, with the bands"></canvas>
       </div>
       <aside class="side">
         <fieldset class="blob-fields"><legend>Blob</legend>
@@ -71,6 +86,16 @@ export function createBlobsTab(root, { commit }) {
           <button type="button" class="new-draw" title="Hear another draw with the same spectrum">New draw</button>
           <button type="button" class="clear" title="Remove every blob (Undo brings them back)">Clear</button>
         </fieldset>
+        <fieldset class="band-fields"><legend>Bands</legend>
+          <p class="hint band-count"></p>
+          <div class="band-edit">
+            <label class="field" title="How wide the band is, in octaves">Width <input type="number" class="band-width" min="${+BAND_WIDTH_MIN.toFixed(2)}" max="${BAND_WIDTH_MAX}" step="0.25"> oct</label>
+            <label class="field" title="The band's level relative to the others">Level <input type="number" class="band-level" min="-40" max="0" step="1"> dB</label>
+            <button type="button" class="delete-band" title="Remove this band (Delete, with no breakpoint selected)">Delete band</button>
+          </div>
+          <button type="button" class="add-band" title="Confine the sound to a band, one octave wide, that you can then reshape on the spectrogram">Add band</button>
+          <p class="hint band-motion" hidden>A band that moves is a sweep of its own, so it adds modulation to what the blobs draw.</p>
+        </fieldset>
         <p class="hint coarse" hidden></p>
         <p class="hint">Click to add a blob, drag to move it, drag its squares to change its width and height. Space plays.</p>
       </aside>
@@ -82,9 +107,16 @@ export function createBlobsTab(root, { commit }) {
     rateWidth: $(".rate-width"), densityWidth: $(".density-width"), level: $(".level"), remove: $(".delete"),
     carrier: $(".carrier"), f0: $(".f0"), f0Field: $(".f0-field"), stft: $("canvas.stft"), depth: $(".depth"), useDepth: $(".use-depth"), seed: $(".seed"),
     newDraw: $(".new-draw"), clear: $(".clear"), coarse: $(".coarse"),
+    bandCount: $(".band-count"), bandEdit: $(".band-edit"), bandWidth: $(".band-width"), bandLevel: $(".band-level"),
+    removeBand: $(".delete-band"), addBand: $(".add-band"), bandMotion: $(".band-motion"),
   };
 
   const items = () => drag?.items ?? state.items;
+  const bands = () => bandDrag?.bands ?? state.bands ?? [];
+
+  function commitBands(next) {
+    commit({ ...state, bands: next });
+  }
 
   function commitItems(next, changes = {}) {
     commit({ ...state, ...changes, items: next });
@@ -115,6 +147,19 @@ export function createBlobsTab(root, { commit }) {
     ui.seed.value = state.seed;
     ui.useDepth.hidden = fits === null;
     if (fits !== null) ui.useDepth.textContent = `Use depth ${fits}`;
+    const bandList = bands();
+    if (band !== null && !bandList[band.index]) band = null;
+    const chosen = band === null ? null : bandList[band.index];
+    ui.bandEdit.hidden = !chosen;
+    ui.addBand.disabled = bandList.length >= MAX_BANDS;
+    ui.bandCount.textContent = !bandList.length
+      ? "No bands: the sound fills 100–6400 Hz. Add one to confine it."
+      : `${bandList.length} of ${MAX_BANDS} bands.${chosen ? "" : " Click a band on the spectrogram to edit it."}`;
+    if (chosen) {
+      ui.bandWidth.value = +chosen.width.toFixed(2);
+      ui.bandLevel.value = chosen.level ?? 0;
+    }
+    ui.bandMotion.hidden = !bandList.some((b) => b.points.some(([, f]) => f !== b.points[0][1]));
     const { rateStep } = grid(state);
     ui.coarse.hidden = state.duration >= COARSE_BELOW_S;
     ui.coarse.textContent = `At ${state.duration} s, rates come in steps of ${+rateStep.toFixed(2)} Hz, coarse below about 8 Hz; ${COARSE_BELOW_S} s or more shows low rates finer.`;
@@ -137,6 +182,49 @@ export function createBlobsTab(root, { commit }) {
   ui.densityWidth.addEventListener("change", editSelected("density_width", clampWidth));
   ui.level.addEventListener("change", editSelected("level", (x) => Math.min(0, Math.max(-40, x))));
   ui.remove.addEventListener("click", removeSelected);
+
+  function editBand(key, clamp) {
+    return () => {
+      const chosen = band && state.bands?.[band.index];
+      const value = Number(ui[key === "width" ? "bandWidth" : "bandLevel"].value);
+      if (!chosen || !Number.isFinite(value)) return showSettings();
+      const next = Math.round(clamp(value) * 100) / 100;
+      if (next === (chosen[key] ?? 0)) return showSettings();
+      commitBands(state.bands.map((b, i) => (i === band.index ? { ...b, [key]: next } : b)));
+    };
+  }
+  ui.bandWidth.addEventListener("change", editBand("width", clampBandWidth));
+  ui.bandLevel.addEventListener("change", editBand("level", clampBandLevel));
+  ui.removeBand.addEventListener("click", () => {
+    focus = "band";
+    if (band) band.point = null;
+    removeBandOrPoint();
+  });
+  ui.addBand.addEventListener("click", () => {
+    const list = state.bands ?? [];
+    if (list.length >= MAX_BANDS) return;
+    band = { index: list.length, point: null };
+    focus = "band";
+    commitBands([...list, newBand(list, state.duration)]);
+  });
+
+  // Delete removes the selected breakpoint (a band keeps at least one), or,
+  // with none selected, the band.
+  function removeBandOrPoint() {
+    const list = state.bands ?? [];
+    const chosen = band && list[band.index];
+    if (!chosen) return false;
+    if (band.point !== null && chosen.points.length > 1) {
+      const points = chosen.points.filter((_, k) => k !== band.point);
+      band = { index: band.index, point: null };
+      commitBands(list.map((b, i) => (i === band.index ? { ...b, points } : b)));
+      return true;
+    }
+    const next = list.filter((_, i) => i !== band.index);
+    band = null;
+    commitBands(next);
+    return true;
+  }
 
   ui.carrier.addEventListener("change", () => commit({ ...state, carrier: ui.carrier.value }));
   ui.f0.addEventListener("change", () => {
@@ -393,6 +481,7 @@ export function createBlobsTab(root, { commit }) {
     }
     canvas.setPointerCapture(event.pointerId);
     selected = hit.index;
+    focus = "blob";
     const blob = list[hit.index];
     // a move keeps the blob's centre where it was relative to the pointer
     drag = { ...hit, items: list, added, changed: false, offset: [at[0] - g.x(blob.rate), at[1] - g.y(blob.density)] };
@@ -480,22 +569,37 @@ export function createBlobsTab(root, { commit }) {
     stftImage.getContext("2d").putImageData(pixels, 0, 0);
   }
 
-  function renderStft() {
-    const context = fitCanvas(ui.stft);
-    const ratio = ui.stft.width / (ui.stft.clientWidth || 1);
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  // The spectrogram panel's plot: pixels to and from time and frequency.
+  // Its time axis is the sound's own duration while a new one is made, so
+  // the picture does not jump; the bands are drawn on the same axis.
+  function stftGeometry() {
     const width = ui.stft.clientWidth || 600;
     const height = ui.stft.clientHeight || 200;
     const x0 = STFT_MARGIN.left;
     const x1 = width - STFT_MARGIN.right;
     const y0 = STFT_MARGIN.top;
     const y1 = height - STFT_MARGIN.bottom;
-    context.clearRect(0, 0, width, height);
-    if (!state) return;
     const { f_lo, f_hi } = state;
-    const duration = sound ? sound.samples.length / sound.fs : state.duration; // the sound's own, while a new one is made
+    const duration = sound ? sound.samples.length / sound.fs : state.duration;
     const span = Math.log2(f_hi / f_lo);
-    const y = (f) => y1 - (Math.log2(f / f_lo) / span) * (y1 - y0);
+    return {
+      width, height, x0, x1, y0, y1, duration, span,
+      x: (t) => x0 + (t / duration) * (x1 - x0),
+      y: (f) => y1 - (Math.log2(f / f_lo) / span) * (y1 - y0),
+      t: (px) => Math.min(state.duration, Math.max(0, ((px - x0) / (x1 - x0)) * duration)),
+      f: (py) => Math.min(f_hi, Math.max(f_lo, f_lo * 2 ** (((y1 - py) / (y1 - y0)) * span))),
+    };
+  }
+
+  function renderStft() {
+    const context = fitCanvas(ui.stft);
+    const ratio = ui.stft.width / (ui.stft.clientWidth || 1);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, ui.stft.clientWidth || 600, ui.stft.clientHeight || 200);
+    if (!state) return;
+    const sg = stftGeometry();
+    const { x0, x1, y0, y1, duration, span, y } = sg;
+    const { f_lo, f_hi } = state;
     const style = getComputedStyle(ui.stft);
     const muted = style.getPropertyValue("--muted").trim() || "#6b7280";
     const line = style.getPropertyValue("--line").trim() || "#d5d9e0";
@@ -540,6 +644,7 @@ export function createBlobsTab(root, { commit }) {
     }
     context.textAlign = "right";
     context.fillText("s", x1, y1 + 4);
+    drawBands(context, sg);
     if (playhead !== null) {
       const x = Math.round(x0 + (playhead / duration) * (x1 - x0)) + 0.5;
       context.strokeStyle = style.getPropertyValue("--accent").trim() || "#2e86ab";
@@ -550,6 +655,171 @@ export function createBlobsTab(root, { commit }) {
     }
   }
 
+  // --- the bands, on the spectrogram ---------------------------------------------------
+
+  // A band's centre in pixels along the plot, every few pixels.
+  function bandPath(sg, b) {
+    const path = [];
+    for (let px = sg.x0; px <= sg.x1 + 0.5; px += 3) {
+      const t = Math.min(state.duration, ((px - sg.x0) / (sg.x1 - sg.x0)) * sg.duration);
+      path.push([Math.min(px, sg.x1), bandCentre(b.points, t)]);
+    }
+    return path;
+  }
+
+  function drawBands(context, sg) {
+    const clampY = (v) => Math.min(sg.y1, Math.max(sg.y0, v));
+    context.save();
+    context.beginPath();
+    context.rect(sg.x0, sg.y0, sg.x1 - sg.x0, sg.y1 - sg.y0);
+    context.clip();
+    bands().forEach((b, i) => {
+      const chosen = band?.index === i;
+      const path = bandPath(sg, b);
+      const half = b.width / 2;
+      context.beginPath();
+      path.forEach(([px, f], k) => context[k ? "lineTo" : "moveTo"](px, clampY(sg.y(f * 2 ** half))));
+      for (let k = path.length - 1; k >= 0; k--) context.lineTo(path[k][0], clampY(sg.y(path[k][1] * 2 ** -half)));
+      context.closePath();
+      context.fillStyle = chosen ? "rgba(255, 255, 255, 0.16)" : "rgba(255, 255, 255, 0.08)";
+      context.fill();
+      context.strokeStyle = chosen ? "rgba(255, 255, 255, 0.7)" : "rgba(255, 255, 255, 0.35)";
+      context.lineWidth = 1;
+      context.setLineDash([3, 3]);
+      context.stroke();
+      context.setLineDash([]);
+      context.beginPath();
+      path.forEach(([px, f], k) => context[k ? "lineTo" : "moveTo"](px, sg.y(f)));
+      context.strokeStyle = chosen ? "#ffffff" : "rgba(255, 255, 255, 0.75)";
+      context.lineWidth = chosen ? 2 : 1.5;
+      context.stroke();
+      b.points.forEach(([t, f], k) => {
+        const on = chosen && band.point === k;
+        context.beginPath();
+        context.arc(sg.x(t), sg.y(f), on ? 5 : 4, 0, 2 * Math.PI);
+        context.fillStyle = on ? "#ffffff" : "rgba(0, 0, 0, 0.6)";
+        context.fill();
+        context.strokeStyle = "#ffffff";
+        context.lineWidth = 1.5;
+        context.stroke();
+      });
+    });
+    context.restore();
+  }
+
+  // What is under the pointer on the spectrogram: a breakpoint (the
+  // selected band's first), a band's centre line, or the inside of a
+  // band's strip (the narrowest).
+  function pickBand(sg, [px, py]) {
+    const list = bands();
+    const order = list.map((_, i) => i).sort((a, b) => (b === band?.index) - (a === band?.index));
+    for (const index of order) {
+      const k = list[index].points.findIndex(([t, f]) => Math.hypot(px - sg.x(t), py - sg.y(f)) <= PICK_PX);
+      if (k >= 0) return { kind: "point", index, point: k };
+    }
+    const t = sg.t(px);
+    for (const index of order) {
+      if (Math.abs(py - sg.y(bandCentre(list[index].points, t))) <= 5) return { kind: "line", index };
+    }
+    let inside = null;
+    list.forEach((b, index) => {
+      const octaves = Math.abs(Math.log2(sg.f(py) / bandCentre(b.points, t)));
+      if (octaves <= b.width / 2 && (!inside || b.width < list[inside.index].width)) inside = { kind: "shift", index };
+    });
+    return inside;
+  }
+
+  function stftLocal(event) {
+    const box = ui.stft.getBoundingClientRect();
+    return [event.clientX - box.left, event.clientY - box.top];
+  }
+
+  // The plot, and a breakpoint's reach around it: the first and last
+  // breakpoints sit on its edges.
+  const nearPlot = (sg, [px, py]) => px >= sg.x0 - PICK_PX && px <= sg.x1 + PICK_PX && py >= sg.y0 - PICK_PX && py <= sg.y1 + PICK_PX;
+
+  ui.stft.addEventListener("pointerdown", (event) => {
+    if (!state || event.button !== 0) return;
+    const sg = stftGeometry();
+    const at = stftLocal(event);
+    if (!nearPlot(sg, at)) return;
+    event.preventDefault();
+    const hit = pickBand(sg, at);
+    if (!hit) {
+      band = null;
+      showSettings();
+      return renderStft();
+    }
+    focus = "band";
+    let list = bands().map((b) => ({ ...b, points: b.points.map((p) => [...p]) }));
+    let point = hit.kind === "point" ? hit.point : null;
+    let added = false;
+    if (hit.kind === "line") {
+      // a new breakpoint on the line, where it was clicked
+      const t = tidyTime(sg.t(at[0]));
+      const points = list[hit.index].points;
+      if (!points.some(([pt]) => pt === t)) {
+        const f = tidyHz(bandCentre(points, t));
+        point = points.findIndex(([pt]) => pt > t);
+        if (point < 0) point = points.length;
+        points.splice(point, 0, [t, f]);
+        added = true;
+      }
+    }
+    ui.stft.setPointerCapture(event.pointerId);
+    band = { index: hit.index, point };
+    bandDrag = { kind: point === null ? "shift" : "point", index: hit.index, point, bands: list, added, changed: false, start: at, origin: list[hit.index].points.map((p) => [...p]) };
+    showSettings();
+    renderStft();
+  });
+
+  ui.stft.addEventListener("pointermove", (event) => {
+    if (!state) return;
+    const sg = stftGeometry();
+    const at = stftLocal(event);
+    if (!bandDrag) {
+      const hit = nearPlot(sg, at) ? pickBand(sg, at) : null;
+      ui.stft.style.cursor = !hit ? "default" : hit.kind === "point" ? "grab" : hit.kind === "line" ? "copy" : "ns-resize";
+      return;
+    }
+    const { f_lo, f_hi } = state;
+    const b = bandDrag.bands[bandDrag.index];
+    let points;
+    if (bandDrag.kind === "point") {
+      const k = bandDrag.point;
+      const before = k > 0 ? b.points[k - 1][0] + 0.001 : 0;
+      const after = k < b.points.length - 1 ? b.points[k + 1][0] - 0.001 : state.duration;
+      const t = tidyTime(Math.min(after, Math.max(before, sg.t(at[0]))));
+      points = b.points.map((p, i) => (i === k ? [t, tidyHz(sg.f(at[1]))] : p));
+    } else {
+      // the whole band, up or down in octaves, kept within the range
+      const octaves = Math.log2(sg.f(at[1]) / sg.f(bandDrag.start[1]));
+      const lo = Math.log2(f_lo / Math.min(...bandDrag.origin.map(([, f]) => f)));
+      const hi = Math.log2(f_hi / Math.max(...bandDrag.origin.map(([, f]) => f)));
+      const shift = Math.min(hi, Math.max(lo, octaves));
+      points = bandDrag.origin.map(([t, f]) => [t, Math.min(f_hi, Math.max(f_lo, tidyHz(f * 2 ** shift)))]);
+    }
+    if (points.some(([t, f], i) => t !== b.points[i][0] || f !== b.points[i][1])) {
+      bandDrag.bands = bandDrag.bands.map((x, i) => (i === bandDrag.index ? { ...x, points } : x));
+      bandDrag.changed = true;
+      showSettings();
+      renderStft();
+    }
+  });
+
+  function finishBand(event) {
+    if (!bandDrag) return;
+    const { bands: next, added, changed } = bandDrag;
+    bandDrag = null;
+    if (event.type === "pointercancel" || !(added || changed)) {
+      showSettings();
+      return renderStft();
+    }
+    commitBands(next);
+  }
+  ui.stft.addEventListener("pointerup", finishBand);
+  ui.stft.addEventListener("pointercancel", finishBand);
+
   new ResizeObserver(render).observe(canvas);
   new ResizeObserver(renderStft).observe(ui.stft);
 
@@ -558,9 +828,11 @@ export function createBlobsTab(root, { commit }) {
     setDocument(next) {
       fits = null; // a refusal is shown again if this drawing is refused again
       drag = null;
+      bandDrag = null;
       state = next;
       showSettings();
       render();
+      renderStft();
     },
     setResult(next) {
       sound = next ?? null;
@@ -588,7 +860,7 @@ export function createBlobsTab(root, { commit }) {
       return state.items.length ? null : "No blobs yet: click the plane to add one.";
     },
     key(event) {
-      if (event.key === "Delete" || event.key === "Backspace") return removeSelected();
+      if (event.key === "Delete" || event.key === "Backspace") return focus === "band" ? removeBandOrPoint() : removeSelected();
       return false;
     },
   };

@@ -94,10 +94,13 @@ export function openDocument(doc) {
 
 // Change the duration, stretching what every tab has drawn (a painting's
 // columns are fractions of the duration, so it stretches by itself; blobs
-// are in Hz and stay where they are).
+// are in Hz and stay where they are, but the Modulation tab's bands are
+// tracks in time and stretch).
 export function stretchPage(page, duration) {
   const state = tracks.stretch(tabState(page, "tracks"), duration);
-  return withTabState({ ...page, duration }, "tracks", state);
+  const stretched = withTabState({ ...page, duration }, "tracks", state);
+  if (!page.blobs?.bands?.length) return stretched;
+  return { ...stretched, blobs: { ...page.blobs, bands: blobs.stretchBands(page.blobs.bands, page.duration, duration) } };
 }
 
 // Reset: the duration, sampling rate and `tab`'s drawing go back to their

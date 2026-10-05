@@ -6,8 +6,11 @@ sound covers the whole spectrogram. Cho asked (2026-10-05) for a way to
 band-limit it, perhaps as drawn tracks: a time-varying filter like a
 formant, with up to about five bands. This note designs that.
 
-Status: proposed (2026-10-05), waiting on Cho's answers to K1–K7. Nothing
-is built yet beyond `tools/measure_bands.py`.
+Status: decided (2026-10-05). Cho accepted every recommendation (K1–K7),
+and, for K7, chose that the measured modulation spectrum be analysed within
+the bands. Built: steps 1 and 2 of the order of work. K7's analysis waits
+for the measured plane itself (`blobs.md`, B7), which is not built yet; the
+hint is.
 
 This project is AI-assisted: the document and `tools/measure_bands.py`
 were drafted by Claude (Claude Code), for Cho to review.
@@ -203,10 +206,19 @@ rather than a 3 dB bump where they cross.
 time × frequency view.
 
 **K7. What the measured result shows.**
-The measured modulation spectrum (blobs.md, B7) stays over the whole
-range. With bands drawn, a one-line hint says that moving bands add
-modulation of their own (K-M2).
+With bands drawn, a one-line hint says that moving bands add modulation
+of their own (K-M2).
 *Recommended:* as stated.
+
+*Added (2026-10-05, Cho):* a band confined in time and frequency cannot
+leave the whole sound's modulation spectrum as drawn (a moving band is
+itself a sweep), so the blobs are read as the modulation *inside* the
+bands, and the bands' motion as a layer of its own, as formants carry a
+syllable rhythm. When the measured modulation spectrum is built (B7), it
+is analysed within the bands, following them, so it shows what the blobs
+drew. Searching for a sound that meets both whole-sound constraints at
+once (alternating between the bands and the blobs, as Griffin & Lim do)
+was considered and not chosen: it can only partly cancel a band's motion.
 
 ## Order of work
 

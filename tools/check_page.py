@@ -353,6 +353,44 @@ def main() -> None:
             )
             assert colours > 50, f"the spectrogram under the plane looks empty ({colours} colours)"
             print(f"modulation: the harmonic carrier on 150 Hz plays, and the spectrogram under the plane is drawn ({colours} colours)")
+
+            # Bands (bands.md): Add band puts a flat band at 500 Hz; dragging
+            # its last breakpoint bends it up; a click on its line adds a
+            # breakpoint, Delete removes it, Delete band removes the band.
+            def bands_now():
+                return page_document_in(page)["blobs"].get("bands", [])
+
+            page.select_option("#tab-blobs .carrier", "tones")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            page.click("#tab-blobs .add-band")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert bands_now() == [{"points": [[0, 500], [0.6, 500]], "width": 1, "level": 0}], bands_now()
+            stft = page.locator("#tab-blobs canvas.stft").bounding_box()
+            s_left, s_right = stft["x"] + 52, stft["x"] + stft["width"] - 10
+            s_top, s_bottom = stft["y"] + 6, stft["y"] + stft["height"] - 20
+
+            def sx(t):
+                return s_left + t / 0.6 * (s_right - s_left)
+
+            def sy(hz):
+                return s_bottom - math.log2(hz / 100) / 6 * (s_bottom - s_top)
+
+            gesture([(sx(0.6), sy(500)), (sx(0.6), sy(2000))])
+            end = bands_now()[0]["points"][-1]
+            assert end[0] == 0.6 and abs(math.log2(end[1] / 2000)) < 0.1, bands_now()
+            expect(page.locator("#tab-blobs .band-motion")).to_be_visible()
+            expect(status).to_contain_text("Made", timeout=60_000)
+            gesture([(sx(0.3), sy(1000))])
+            assert len(bands_now()[0]["points"]) == 3, bands_now()
+            expect(status).to_contain_text("Made", timeout=60_000)
+            page.mouse.move(sx(0.3), stft["y"] - 30)
+            page.keyboard.press("Delete")
+            assert len(bands_now()[0]["points"]) == 2, bands_now()
+            expect(status).to_contain_text("Made", timeout=60_000)
+            page.click("#tab-blobs .delete-band")
+            assert bands_now() == []
+            expect(status).to_contain_text("Made", timeout=60_000)
+            print(f"modulation: added a band, bent it up to {end[1]} Hz, added and removed a breakpoint, removed the band")
             page.click("#reset")
             expect(status).to_contain_text("Made", timeout=60_000)
             assert page_document_in(page)["blobs"] == example, "Reset did not restore the example blobs"
