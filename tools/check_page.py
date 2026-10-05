@@ -100,6 +100,18 @@ def main() -> None:
             assert len(f3[0]) == 4 and abs(f3[1][1] - 2400) < 30 and abs(f3[1][2] - 3000) < 30, f3
             print(f"line: F3 is now {f3}")
 
+            # With the Line tool still on, a press on a breakpoint's circle
+            # drags that breakpoint instead of starting a new line.
+            page.mouse.move(x_of(0.5), y_of(3000))
+            page.mouse.down()
+            page.mouse.move(x_of(0.5), y_of(3300), steps=5)
+            page.mouse.up()
+            dragged = document_in(page)["params"]["F3"]
+            assert len(dragged[0]) == len(f3[0]) and abs(dragged[1][2] - 3300) < 30, f"circle not dragged: {dragged}"
+            print(f"line tool on a circle: dragged to {dragged[1][2]:.0f} Hz, no new breakpoint")
+            page.keyboard.press("Control+z")
+            assert document_in(page)["params"]["F3"] == f3
+
             # Freehand on the F0 strip: a rise and fall becomes a few breakpoints.
             strip = page.locator(".panel-F0 svg").bounding_box()
             sx = lambda t: strip["x"] + 52 + t / doc["duration"] * (strip["width"] - 62)  # noqa: E731
