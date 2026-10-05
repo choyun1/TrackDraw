@@ -267,6 +267,8 @@ The limit is one constant, so it can change after measuring in the browser.
 
 The Tracks tab's own decisions (scope, track model, file format, sine-wave
 speech upstream, drawing interaction) are in `tabs/tracks.md`.
+The Painted tab's and the Paint primitive's decisions are in
+`tabs/painted.md`.
 
 ## Order of work
 
