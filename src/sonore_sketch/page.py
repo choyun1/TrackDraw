@@ -20,6 +20,43 @@ from . import tracks
 
 TABS = {"tracks": tracks.synthesize}
 
+# The page's document (docs/design/tabs/painted.md, "Data model"), as
+# app/document.js writes it: duration and fs for the page, a section per tab.
+APP = "sonore-sketch"
+VERSION = 2
+
+
+def upgrade(document: Mapping[str, Any]) -> dict[str, Any]:
+    """``document`` as a version-2 page document. A TrackDraw document
+    (format 1, the Tracks tab's own) becomes its ``tracks`` section."""
+    if document.get("trackdraw") == tracks.FORMAT:
+        return {
+            "app": APP, "version": VERSION, "sonore": document.get("sonore"),
+            "duration": document["duration"], "fs": document["fs"], "tab": "tracks",
+            "tracks": {"mode": document.get("mode", "klatt"), "params": dict(document.get("params", {}))},
+        }
+    if document.get("app") != APP or document.get("version") != VERSION:
+        raise ValueError(f"not a sonore sketch document of version {VERSION}, or a TrackDraw document of format {tracks.FORMAT}")
+    return dict(document)
+
+
+def tab_state(document: Mapping[str, Any], tab: str | None = None) -> dict[str, Any]:
+    """The state ``tab`` (default: the tab the document was saved on) draws
+    on, which is what that tab's ``synthesize`` takes."""
+    page = upgrade(document)
+    tab = tab or page.get("tab", "tracks")
+    if tab == "tracks":
+        return {"trackdraw": tracks.FORMAT, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page["tracks"]}
+    raise ValueError(f"unknown tab {tab!r}; known: {sorted(TABS)}")
+
+
+def synthesize(document: Mapping[str, Any], tab: str | None = None) -> so.Sound:
+    """The sound of a saved document (a file from the page's Save), as the
+    page makes it for ``tab`` (default: the tab it was saved on)."""
+    page = upgrade(document)
+    tab = tab or page.get("tab", "tracks")
+    return TABS[tab](tab_state(page, tab))
+
 # The result's spectrogram: wideband, 5 ms Hann, as on the Seeing speech page
 # (docs/design/tabs/tracks.md, "What sonore provides").
 WINDOW_S = 0.005

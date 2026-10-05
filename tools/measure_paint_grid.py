@@ -27,7 +27,7 @@ import numpy as np
 import sonore as so
 
 FS = 16000
-F_LO, F_HI = 200.0, 6400.0  # exactly 5 octaves, below 16 kHz Nyquist
+F_LO, F_HI = 100.0, 6400.0  # exactly 6 octaves, below 16 kHz Nyquist (P3, decided)
 N_COLUMNS, ROWS_PER_OCTAVE = 256, 12
 OCTAVES = np.log2(F_HI / F_LO)
 N_ROWS = int(round(OCTAVES * ROWS_PER_OCTAVE))

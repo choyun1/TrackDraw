@@ -39,9 +39,9 @@ A saved drawing gives the same sound in Python:
 
 ```python
 import json
-from sonore_sketch import tracks
+from sonore_sketch import page
 
-sound = tracks.synthesize(json.load(open("tracks.json")))
+sound = page.synthesize(json.load(open("sketch.json")))
 ```
 
 ## Developing

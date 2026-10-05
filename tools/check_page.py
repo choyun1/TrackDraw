@@ -34,10 +34,17 @@ def free_port() -> int:
         return s.getsockname()[1]
 
 
-def document_in(page) -> dict:
-    """The drawing the page holds, read back from its link (#state=...)."""
+def page_document_in(page) -> dict:
+    """The page's document, read back from its link (#state=...)."""
     state = page.evaluate("location.hash").split("state=")[1]
     return json.loads(base64.urlsafe_b64decode(state + "=" * (-len(state) % 4)))
+
+
+def document_in(page) -> dict:
+    """The Tracks tab's drawing, as a TrackDraw document (sonore_sketch.page.tab_state)."""
+    document = page_document_in(page)
+    assert document.get("app") == "sonore-sketch" and document.get("version") == 2, document
+    return {"trackdraw": 1, "sonore": document["sonore"], "duration": document["duration"], "fs": document["fs"], **document["tracks"]}
 
 
 def main() -> None:
