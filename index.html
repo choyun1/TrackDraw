@@ -20,7 +20,9 @@
         data-caption="Paint loudness over time and frequency, and hear a sound whose spectrogram is your painting."
         title="Level painted on time × log-frequency, heard through sonore's ripple_sound">Spectrogram</button>
       <button role="tab" disabled title="Not built yet: erase parts of a recording's spectrogram and hear what is left">Filter recording</button>
-      <button role="tab" disabled title="Not built yet: place blobs of temporal and spectral modulation and hear them">Modulation</button>
+      <button role="tab" aria-selected="false" data-tab="blobs"
+        data-caption="Place blobs on a modulation spectrum, how fast loudness changes in time (rate) and across frequency (density), and hear a sound with that modulation."
+        title="Gaussian blobs on rate × density, heard through sonore's ModulationSpectrum.from_blobs">Modulation</button>
       <button role="tab" disabled title="Not built yet: repaint a recording's modulation spectrum">Edit modulation</button>
     </nav>
     <div class="controls">
@@ -44,6 +46,7 @@
     <p class="tab-caption" id="tab-caption"></p>
     <section class="tab-body" id="tab-tracks"></section>
     <section class="tab-body" id="tab-painted" hidden></section>
+    <section class="tab-body" id="tab-blobs" hidden></section>
     <section class="result">
       <div class="result-row">
         <span class="result-label">Result</span>

@@ -258,6 +258,84 @@ def main() -> None:
             expect(status).to_contain_text("Made", timeout=60_000)
             assert document_in(page) == doc, "the Tracks drawing changed while painting"
             print("painted: Clear, Undo, the noise carrier and switching tabs work")
+
+            # The Modulation tab: the example plays; clicking adds a blob,
+            # dragging moves it across the seam and resizes it; a depth sonore
+            # refuses offers the depth that fits; New draw, Delete, Clear, Undo.
+            page.click(".tabs [data-tab=blobs]")
+            expect(page.locator("#tab-blobs")).to_be_visible()
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page_document_in(page)["tab"] == "blobs"
+            example = page_document_in(page)["blobs"]
+            expect(page.locator("#tab-blobs .coarse")).to_be_visible()  # 0.6 s is under 2 s
+            plane = page.locator("canvas.plane").bounding_box()
+            left, right = plane["x"] + 52, plane["x"] + plane["width"] - 10
+            top, bottom = plane["y"] + 8, plane["y"] + plane["height"] - 36
+            centre, half = (left + right) / 2, (right - left) / 2 - 7
+
+            def bx(rate):
+                side = 1 if rate > 0 else -1
+                return centre + side * (7 + math.log2(abs(rate)) / 6 * half)
+
+            def by(density):
+                return bottom - density / 6 * (bottom - top)
+
+            def blobs_now():
+                return page_document_in(page)["blobs"]["items"]
+
+            def gesture(points):
+                before = page.evaluate("location.hash")
+                page.mouse.move(*points[0])
+                page.mouse.down()
+                for point in points[1:]:
+                    page.mouse.move(*point, steps=6)
+                page.mouse.up()
+                page.wait_for_function("(before) => location.hash !== before", arg=before, timeout=10_000)
+
+            gesture([(bx(-16), by(3))])
+            added = blobs_now()[-1]
+            assert len(blobs_now()) == 3 and abs(math.log2(-added["rate"] / 16)) < 0.1 and abs(added["density"] - 3) < 0.1, added
+            expect(status).to_contain_text("Made", timeout=60_000)
+            gesture([(bx(added["rate"]), by(added["density"])), (bx(16), by(2))])
+            moved = blobs_now()[-1]
+            assert moved["rate"] > 0 and abs(math.log2(moved["rate"] / 16)) < 0.1 and abs(moved["density"] - 2) < 0.1, moved
+            gesture([(bx(moved["rate"] * 2**0.5), by(moved["density"])), (bx(moved["rate"] * 2), by(moved["density"]))])
+            assert abs(blobs_now()[-1]["rate_width"] - 1) < 0.1, blobs_now()[-1]
+            print(f"modulation: added a blob, moved it to {moved['rate']} Hz across the seam, widened it to {blobs_now()[-1]['rate_width']} octave")
+            expect(status).to_contain_text("Made", timeout=60_000)
+
+            # A new draw first: at the depth offered below, another draw may not fit.
+            page.click("#tab-blobs .new-draw")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page_document_in(page)["blobs"]["seed"] == 2
+            before_failure = len(errors)
+            page.locator("#tab-blobs .depth").fill("0.95")
+            page.locator("#tab-blobs .depth").press("Enter")
+            expect(status).to_contain_text("Synthesis failed", timeout=60_000)
+            use = page.locator("#tab-blobs .use-depth")
+            expect(use).to_be_visible()
+            offered = float(use.inner_text().split()[-1])
+            use.click()
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page_document_in(page)["blobs"]["rms_depth"] == offered < 0.95
+            expect(use).to_be_hidden()
+            page.wait_for_timeout(300)
+            errors[before_failure:] = [e for e in errors[before_failure:] if "400 (Bad Request)" not in e]
+            print(f"modulation: a depth of 0.95 was refused and {offered} offered and used")
+
+            page.mouse.move(centre, plane["y"] - 30)  # off the plane, so keys go to the page
+            page.keyboard.press("Delete")
+            assert len(blobs_now()) == 2
+            page.click("#tab-blobs .clear")
+            expect(status).to_contain_text("No blobs yet", timeout=10_000)
+            page.keyboard.press("Control+z")
+            page.keyboard.press("Control+z")
+            assert len(blobs_now()) == 3
+            expect(status).to_contain_text("Made", timeout=60_000)
+            page.click("#reset")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page_document_in(page)["blobs"] == example, "Reset did not restore the example blobs"
+            print("modulation: New draw, Delete, Clear, Undo and Reset work")
             if args.screenshot:
                 page.screenshot(path=args.screenshot)
             browser.close()

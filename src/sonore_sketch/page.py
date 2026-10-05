@@ -16,9 +16,9 @@ from typing import Any
 import numpy as np
 import sonore as so
 
-from . import painted, tracks
+from . import blobs, painted, tracks
 
-TABS = {"tracks": tracks.synthesize, "painted": painted.synthesize}
+TABS = {"tracks": tracks.synthesize, "painted": painted.synthesize, "blobs": blobs.synthesize}
 
 # The page's document (docs/design/tabs/painted.md, "Data model"), as
 # app/document.js writes it: duration and fs for the page, a section per tab.
@@ -49,6 +49,8 @@ def tab_state(document: Mapping[str, Any], tab: str | None = None) -> dict[str, 
         return {"trackdraw": tracks.FORMAT, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page["tracks"]}
     if tab == "painted" and "painted" in page:
         return {"painted": painted.FORMAT, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page["painted"]}
+    if tab == "blobs" and "blobs" in page:
+        return {"blobs": blobs.FORMAT, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page["blobs"]}
     raise ValueError(f"unknown tab {tab!r}; known: {sorted(TABS)}")
 
 

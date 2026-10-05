@@ -6,7 +6,8 @@
 //   {"app": "sonore-sketch", "version": 2, "sonore": "0.5.0",
 //    "duration": 0.6, "fs": 16000, "tab": "tracks",
 //    "tracks": {"mode": "klatt", "params": {...}},
-//    "painted": {"f_lo": 100, "f_hi": 6400, ..., "levels": "..."}}
+//    "painted": {"f_lo": 100, "f_hi": 6400, ..., "levels": "..."},
+//    "blobs": {"carrier": "tones", ..., "items": [{"rate": 4, ...}]}}
 //
 // A tab works on its own state, the shape its Python function takes
 // (sonore_sketch.page.tab_state does the same in Python). A version-1
@@ -15,18 +16,19 @@
 //
 // No DOM here, so this file runs under `node --test`.
 
+import * as blobs from "./blobs/model.js";
 import * as painted from "./painted/model.js";
 import * as tracks from "./tracks/model.js";
 
 export const APP = "sonore-sketch";
 export const VERSION = 2;
-export const TABS = ["tracks", "painted"];
+export const TABS = ["tracks", "painted", "blobs"];
 
 export function defaultPage() {
   const { sonore, duration, fs, mode, params } = tracks.defaultDocument();
   return {
     app: APP, version: VERSION, sonore, duration, fs, tab: "tracks",
-    tracks: { mode, params }, painted: painted.defaultSection(),
+    tracks: { mode, params }, painted: painted.defaultSection(), blobs: blobs.defaultSection(),
   };
 }
 
@@ -37,14 +39,14 @@ export function upgrade(doc) {
     const { sonore, duration, fs, mode = "klatt", params = {} } = doc;
     return {
       app: APP, version: VERSION, sonore, duration, fs, tab: "tracks",
-      tracks: { mode, params }, painted: painted.defaultSection(),
+      tracks: { mode, params }, painted: painted.defaultSection(), blobs: blobs.defaultSection(),
     };
   }
   if (doc?.app !== APP || doc.version !== VERSION) {
     throw new Error(`not a sonore sketch document of version ${VERSION}, or a TrackDraw document of format ${tracks.FORMAT}`);
   }
   // A tab added since the document was saved starts from its default.
-  return { ...doc, painted: doc.painted ?? painted.defaultSection() };
+  return { ...doc, painted: doc.painted ?? painted.defaultSection(), blobs: doc.blobs ?? blobs.defaultSection() };
 }
 
 // The state a tab draws on and its Python function takes.
@@ -56,6 +58,10 @@ export function tabState(page, tab) {
   if (tab === "painted") {
     const { sonore, duration, fs } = page;
     return { painted: painted.FORMAT, sonore, duration, fs, ...page.painted };
+  }
+  if (tab === "blobs") {
+    const { sonore, duration, fs } = page;
+    return { blobs: blobs.FORMAT, sonore, duration, fs, ...page.blobs };
   }
   throw new Error(`unknown tab ${tab}`);
 }
@@ -70,6 +76,10 @@ export function withTabState(page, tab, state) {
     const { painted: _format, sonore: _sonore, duration: _duration, fs: _fs, ...section } = state;
     return { ...page, painted: section };
   }
+  if (tab === "blobs") {
+    const { blobs: _format, sonore: _sonore, duration: _duration, fs: _fs, ...section } = state;
+    return { ...page, blobs: section };
+  }
   throw new Error(`unknown tab ${tab}`);
 }
 
@@ -78,11 +88,13 @@ export function openDocument(doc) {
   const page = upgrade(doc);
   const state = tracks.tidyDocument(tracks.check(tabState(page, "tracks")));
   painted.check(tabState(page, "painted"));
+  blobs.check(tabState(page, "blobs"));
   return withTabState({ ...page, tab: TABS.includes(page.tab) ? page.tab : "tracks" }, "tracks", state);
 }
 
 // Change the duration, stretching what every tab has drawn (a painting's
-// columns are fractions of the duration, so it stretches by itself).
+// columns are fractions of the duration, so it stretches by itself; blobs
+// are in Hz and stay where they are).
 export function stretchPage(page, duration) {
   const state = tracks.stretch(tabState(page, "tracks"), duration);
   return withTabState({ ...page, duration }, "tracks", state);

@@ -8,7 +8,9 @@ whose envelopes have that spectrum. The shapes, handles and dragging are the
 designs both. Its internal tab id is `blobs`, as the Spectrogram tab's is
 `painted`.
 
-Status: proposed (2026-10-05), for Cho to decide B1–B9. The Filter
+Status: decided (2026-10-05). Cho accepted every recommendation (B1–B9).
+Built: steps 1 and 2 of the order of work below together, so the tab arrived
+audible; step 3 (the measured result and iterations) is next. The Filter
 recording design (`mask.md`, PR #14) is parked, so nothing here depends on
 a loaded recording: a recording as carrier waits for that tab.
 
@@ -232,6 +234,12 @@ it, with a button that sets the depth it names;
 *Recommended:* (a). The depth is what makes the modulation audible, and
 B-M3 shows the limit moves with the drawing, so hiding it or changing it
 silently would confuse.
+
+As built, the button offers a little less than the depth sonore names
+(0.005 less, rounded down to hundredths): sonore prints it rounded, and the
+limit moves by a few thousandths with the depth asked for (the page check
+saw 0.27 named at 0.95, then "at most 0.261" at 0.27). A new draw can
+also stop a depth from fitting; the refusal then offers one again.
 
 **B6. Seed.**
 *Recommended:* a seed field and a "New draw" button that adds 1 to it, the
