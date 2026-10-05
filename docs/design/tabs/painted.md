@@ -9,7 +9,8 @@ particular to Mask and Edit to their own documents.
 
 Status: decided (2026-10-05). Cho accepted every recommendation except
 P3's frequency range, which goes down to 100 Hz; the numbers below are
-measured at that range.
+measured at that range. Built: step 1 of the order of work below, then steps 2
+and 3 together, so the tab arrived audible.
 
 This project is AI-assisted: the document and `tools/measure_paint_grid.py`
 were drafted by Claude (Claude Code), for Cho to review.

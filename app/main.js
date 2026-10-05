@@ -9,7 +9,8 @@ import { History } from "./history.js";
 import { Log } from "./log.js";
 import { drawSpectrogram, drawWaveform } from "./plot.js";
 import { encodeState, stateFromHash } from "./share.js";
-import { defaultPage, openDocument, stretchPage, tabState, withTabState } from "./document.js";
+import { defaultPage, openDocument, resetTab, stretchPage, tabState, withTabState } from "./document.js";
+import { createPaintedTab } from "./painted/tab.js";
 import { clampDuration } from "./tracks/model.js";
 import { createTracksTab } from "./tracks/tab.js";
 
@@ -58,7 +59,7 @@ const engine = new LatestOnly(
       log.info(`ready: ${versions}`);
       ui.versions.textContent = versions;
       ui.play.disabled = false;
-      status("Ready. Draw on a track, then press Play.");
+      status("Ready. Draw, then press Play.");
       synthesize({ play: false });
     },
     onFailed: (message) => {
@@ -69,7 +70,7 @@ const engine = new LatestOnly(
 );
 
 const player = new Player();
-let result = null; // {doc, sound}: the last sound made, and from which document
+let result = null; // {key, doc, sound}: the last sound made, from which tab's state
 
 function status(text, error = false) {
   ui.status.textContent = text;
@@ -86,9 +87,40 @@ try {
   log.error(`ignored the drawing in the link: ${error.message}`);
 }
 const history = new History(initial);
-const tab = createTracksTab($("tab-tracks"), {
-  commit: (state) => change(withTabState(history.present, tab.id, state)),
-});
+const commitFrom = (id) => (state) => change(withTabState(history.present, id, state));
+const tabs = {
+  tracks: createTracksTab($("tab-tracks"), { commit: commitFrom("tracks") }),
+  painted: createPaintedTab($("tab-painted"), { commit: commitFrom("painted"), log }),
+};
+// The tab shown is not an edit (undo does not switch tabs); it is saved with
+// the document, so a link opens on the tab it was made on.
+let tab = tabs[initial.tab] ?? tabs.tracks;
+const tabButtons = [...document.querySelectorAll(".tabs [data-tab]")];
+
+function showTab() {
+  for (const button of tabButtons) {
+    const active = button.dataset.tab === tab.id;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  }
+  for (const id of Object.keys(tabs)) $(`tab-${id}`).hidden = id !== tab.id;
+}
+
+function switchTab(id) {
+  if (!tabs[id] || tabs[id] === tab) return;
+  player.stop();
+  tab.setPlayhead(null);
+  tab = tabs[id];
+  showTab();
+  show();
+  showResult();
+  log.info(`switched to the ${id} tab`);
+  if (ready) synthesize({ play: false });
+}
+for (const button of tabButtons) button.addEventListener("click", () => switchTab(button.dataset.tab));
+
+// The document as saved and linked: with the tab shown.
+const saved = () => ({ ...history.present, tab: tab.id });
 
 function show() {
   const doc = history.present;
@@ -96,7 +128,7 @@ function show() {
   ui.duration.value = doc.duration;
   ui.undo.disabled = !history.past.length;
   ui.redo.disabled = !history.future.length;
-  window.history.replaceState(null, "", `${location.pathname}${location.search}#state=${encodeState(doc)}`);
+  window.history.replaceState(null, "", `${location.pathname}${location.search}#state=${encodeState(saved())}`);
 }
 
 // An edit has ended: keep it, and hear it if it is short enough.
@@ -116,21 +148,30 @@ function afterChange() {
 
 async function synthesize({ play }) {
   const doc = history.present;
-  if (result?.doc === doc) {
+  const state = tabState(doc, tab.id);
+  const key = `${tab.id} ${JSON.stringify(state)}`;
+  if (result?.key === key) {
     if (play) start(result.sound);
     return result.sound;
+  }
+  const blocked = tab.blocked?.();
+  if (blocked) {
+    result = null;
+    showResult();
+    status(blocked);
+    return null;
   }
   status(doc.duration > 1 ? `Synthesizing ${doc.duration} s…` : "Synthesizing…");
   let sound;
   try {
-    sound = await engine.synthesize({ tab: tab.id, state: tabState(doc, tab.id) });
+    sound = await engine.synthesize({ tab: tab.id, state });
   } catch (error) {
     status(`Synthesis failed: ${error.message} (see Log; Reset starts again)`, true);
     log.error(`synthesis failed: ${error.message}`, error.detail ?? "");
     return null;
   }
   if (!sound) return null; // a newer drawing replaced this request
-  result = { doc, sound };
+  result = { key, doc, sound };
   showResult();
   status(`Made ${doc.duration} s in ${sound.synthesisSeconds.toFixed(2)} s.`);
   log.info(`made ${doc.duration} s in ${sound.synthesisSeconds.toFixed(2)} s`);
@@ -139,6 +180,7 @@ async function synthesize({ play }) {
 }
 
 function showResult() {
+  if (result && !result.key.startsWith(`${tab.id} `)) result = null;
   const sound = result?.sound;
   const duration = result?.doc.duration ?? history.present.duration;
   tab.setResult(sound);
@@ -194,8 +236,8 @@ function redo() {
 ui.undo.addEventListener("click", undo);
 // Reset is an edit like any other, so Undo brings the drawing back.
 ui.reset.addEventListener("click", () => {
-  change(defaultPage());
-  log.info("reset to the default drawing");
+  change(resetTab(history.present, tab.id));
+  log.info(`reset the ${tab.id} tab to its default drawing`);
   if (!ready) status("Reset to the default drawing.");
 });
 ui.redo.addEventListener("click", redo);
@@ -208,7 +250,7 @@ function download(blob, name) {
 }
 
 ui.save.addEventListener("click", () => {
-  const text = JSON.stringify(history.present, null, 1);
+  const text = JSON.stringify(saved(), null, 1);
   download(new Blob([text], { type: "application/json" }), "sketch.json");
 });
 ui.wav.addEventListener("click", () => {
@@ -253,7 +295,7 @@ ui.logCopy.addEventListener("click", async () => {
     log.text(),
     "",
     "current drawing:",
-    JSON.stringify(history.present),
+    JSON.stringify(saved()),
   ].join("\n");
   try {
     await navigator.clipboard.writeText(report);
@@ -283,4 +325,5 @@ document.addEventListener("keydown", (event) => {
 });
 
 new ResizeObserver(showResult).observe(ui.waveform);
+showTab();
 show();

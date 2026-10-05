@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import math
 import socket
 import subprocess
 import sys
@@ -216,6 +217,47 @@ def main() -> None:
             # console; those are expected.
             page.wait_for_timeout(500)
             errors[before_failure:] = [e for e in errors[before_failure:] if "400 (Bad Request)" not in e]
+
+            # The Painted tab: the example plays; a stroke changes the painting
+            # and is heard; Clear leaves nothing to hear; Undo brings it back.
+            page.keyboard.press("Control+Shift+z")  # back to the reset drawing (fs 16 kHz)
+            page.click(".tabs [data-tab=painted]")
+            expect(page.locator("#tab-painted")).to_be_visible()
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page_document_in(page)["tab"] == "painted"
+            example = page_document_in(page)["painted"]["levels"]
+            canvas = page.locator("canvas.paint").bounding_box()
+            px = lambda fraction: canvas["x"] + 52 + fraction * (canvas["width"] - 62)  # noqa: E731
+            py = lambda f: canvas["y"] + canvas["height"] - 22 - math.log2(f / 100) / 6 * (canvas["height"] - 30)  # noqa: E731
+            page.locator("#tab-painted .level").fill("-6")
+            before = page.evaluate("location.hash")
+            page.mouse.move(px(0.05), py(5000))
+            page.mouse.down()
+            page.mouse.move(px(0.4), py(5000), steps=12)
+            page.mouse.up()
+            page.wait_for_function("(before) => location.hash !== before", arg=before, timeout=10_000)
+            expect(status).to_contain_text("Made", timeout=60_000)
+            painted = page_document_in(page)["painted"]
+            assert painted["levels"] != example, "the stroke did not change the painting"
+            from sonore_sketch import painted as painted_tab  # the Python half reads what the page wrote
+
+            grid = painted_tab.levels({**painted, "duration": 0.6, "fs": 16000})
+            row, column = round(math.log2(5000 / 100) * 12 - 0.5), round(0.2 * 256 - 0.5)
+            assert grid[row, column] == -6, grid[row - 2 : row + 3, column]
+            print(f"painted: a stroke at 5 kHz painted at {grid[row, column]:g} dB and was heard")
+            page.click("#tab-painted .clear")
+            expect(status).to_contain_text("Nothing painted yet", timeout=10_000)
+            page.mouse.move(px(0.5), canvas["y"] - 30)  # off the canvas, so keys go to the page
+            page.keyboard.press("Control+z")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page_document_in(page)["painted"]["levels"] == painted["levels"], "undo did not restore the painting"
+            page.select_option("#tab-painted .carrier", "noise")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page_document_in(page)["painted"]["carrier"] == "noise"
+            page.click(".tabs [data-tab=tracks]")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert document_in(page) == doc, "the Tracks drawing changed while painting"
+            print("painted: Clear, Undo, the noise carrier and switching tabs work")
             if args.screenshot:
                 page.screenshot(path=args.screenshot)
             browser.close()
