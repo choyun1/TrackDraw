@@ -352,6 +352,14 @@ def main() -> None:
                     return seen.size; }"""
             )
             assert colours > 50, f"the spectrogram under the plane looks empty ({colours} colours)"
+            measured_colours = page.evaluate(
+                """() => { const c = document.querySelector('canvas.measured');
+                    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+                    const seen = new Set(); for (let i = 0; i < d.length; i += 4) seen.add(d[i] * 65536 + d[i + 1] * 256 + d[i + 2]);
+                    return seen.size; }"""
+            )
+            assert measured_colours > 30, f"the measured plane looks empty ({measured_colours} colours)"
+            print(f"modulation: the measured modulation spectrum is drawn under the plane ({measured_colours} colours)")
             print(f"modulation: the harmonic carrier on 150 Hz plays, and the spectrogram under the plane is drawn ({colours} colours)")
 
             # Bands (bands.md): Add band puts a flat band at 500 Hz; dragging

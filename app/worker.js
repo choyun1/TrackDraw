@@ -80,6 +80,7 @@ lambda text: handle(json.loads(text))
 
 function convert(result) {
   const picture = result.get("spectrogram");
+  const modulation = result.has("modulation") ? result.get("modulation") : null;
   try {
     return {
       fs: result.get("fs"),
@@ -93,8 +94,17 @@ function convert(result) {
         tStart: picture.get("t_start"),
         tStep: picture.get("t_step"),
       },
+      modulation: modulation && {
+        data: toBytes(modulation.get("data")),
+        nDensities: modulation.get("n_densities"),
+        nRates: modulation.get("n_rates"),
+        rateFirst: modulation.get("rate_first"),
+        rateStep: modulation.get("rate_step"),
+        densityStep: modulation.get("density_step"),
+      },
     };
   } finally {
+    modulation?.destroy();
     picture.destroy();
     result.destroy();
   }
@@ -109,7 +119,9 @@ onmessage = async ({ data: { id, request } }) => {
   try {
     await loading;
     const result = convert(handle(JSON.stringify(request)));
-    postMessage({ id, type: "result", result }, [result.samples.buffer, result.spectrogram.data.buffer]);
+    const transfer = [result.samples.buffer, result.spectrogram.data.buffer];
+    if (result.modulation) transfer.push(result.modulation.data.buffer);
+    postMessage({ id, type: "result", result }, transfer);
   } catch (error) {
     // A PythonError's message is the traceback, ending with the exception's
     // own line: that line is the message, the whole traceback the detail.

@@ -195,6 +195,60 @@ def _on_harmonics(state: Mapping[str, Any]) -> so.Sound:
     return sound.normalize()
 
 
+# The measured result under the plane (blobs.md, B7): the plane's own range.
+MEASURED_RATE_MAX = 64.0  # Hz, each side
+MEASURED_DENSITY_MAX = 6.0  # cycles/octave
+MEASURED_FLOOR_DB = -40.0  # the picture's range below its peak, as the plane's
+ENV_FS = 1000.0  # sonore's envelope rate for octave() and from_blobs
+
+
+def measured(sound: so.Sound, state: Mapping[str, Any]) -> so.ModulationSpectrum:
+    """The modulation spectrum of ``sound``, analysed as ``octave`` does
+    (1/``bands_per_octave``-octave cosine filterbank over the tab's range,
+    envelopes at 1 kHz).
+
+    With bands, within the bands, following them (bands.md, K7): each band's
+    envelope is divided by the gain the bands gave it, taken relative to its
+    mean, and weighted by that gain before the transform. The bands' own
+    shape and motion (their gain) then drop out, and what is measured is the
+    modulation inside them, which is what the blobs draw; the weighting blurs
+    it by the bands' extent, as any window does."""
+    bank = so.cosine_filterbank(
+        f_lo=float(state["f_lo"]), f_hi=float(state["f_hi"]), spacing=1 / int(state["bands_per_octave"]), scale="octave"
+    )
+    env = bank.analyze(sound.mono()).envelopes(fs=ENV_FS).data.mean(axis=2)[:, 1:-1]  # (time, band), edges dropped
+    if state.get("bands"):
+        t = np.arange(env.shape[0]) / ENV_FS
+        gain = band_gain(state["bands"], bank.cfs[1:-1], t)
+        weight = gain / gain.max()
+        relative = env / np.maximum(gain, 10 ** (BAND_FLOOR_DB / 20))
+        mean = np.sum(weight * relative) / np.sum(weight)
+        env = weight * (relative / mean - 1)
+    return so.ModulationSpectrum.from_array(env.T, dt=1 / ENV_FS, dx=bank.spacing, spectral_unit=f"cyc/{bank.unit}")
+
+
+def measured_picture(spectrum: so.ModulationSpectrum) -> dict[str, Any]:
+    """The measured spectrum on the plane's range as 8-bit levels, 0 at
+    ``MEASURED_FLOOR_DB`` below the peak and 255 at it, the peak taken away
+    from rate 0 (the long-term spectrum, which the plane does not show).
+    Rows are densities from 0 up, columns rates from the most negative."""
+    rates = np.abs(spectrum.w_t) <= MEASURED_RATE_MAX
+    densities = spectrum.w_f <= MEASURED_DENSITY_MAX + 1e-9
+    level = spectrum.level[np.ix_(densities, rates)]
+    w_t = spectrum.w_t[rates]
+    peak = level[:, np.abs(w_t) > 0].max()
+    scaled = np.round(255 * (1 - np.clip(level - peak, MEASURED_FLOOR_DB, 0) / MEASURED_FLOOR_DB))
+    return {
+        "data": np.ascontiguousarray(scaled, dtype=np.uint8).tobytes(),
+        "n_densities": int(level.shape[0]),
+        "n_rates": int(level.shape[1]),
+        "rate_first": float(w_t[0]),
+        "rate_step": float(w_t[1] - w_t[0]),
+        "density_step": float(spectrum.w_f[1]),
+        "floor_db": MEASURED_FLOOR_DB,
+    }
+
+
 # The drawing the tab starts from (B9): a syllable-rate flutter, and ripples
 # sweeping down at twice the rate, 3 dB weaker.
 EXAMPLE_ITEMS = [

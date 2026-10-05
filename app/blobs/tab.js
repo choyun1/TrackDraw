@@ -8,7 +8,9 @@
 // edit is one gesture: adding, moving or resizing a blob is committed when
 // the pointer comes up.
 //
-// Under the plane, the result's spectrogram (the shell's 5 ms STFT) on a
+// Under the plane, the result's own modulation spectrum, measured from the
+// sound (blobs.md, B7) on the plane's axes, so drawn and heard compare by
+// eye; with bands, measured within them (bands.md, K7). Then the result's spectrogram (the shell's 5 ms STFT) on a
 // log-frequency axis over the carrier's bands, so a blob's density shows as
 // the slope of its stripes in octaves. The bands that confine the sound
 // (docs/design/tabs/bands.md) are drawn on it: each a centre track with
@@ -62,6 +64,7 @@ export function createBlobsTab(root, { commit }) {
     <div class="blobs-body">
       <div class="paint-area">
         <canvas class="plane"></canvas>
+        <canvas class="measured" title="The result's own modulation spectrum, measured from the sound after Play, on the plane's axes"></canvas>
         <canvas class="stft" title="The result's spectrogram (5 ms window) on a log-frequency axis, with the bands"></canvas>
       </div>
       <aside class="side">
@@ -531,6 +534,93 @@ export function createBlobsTab(root, { commit }) {
   canvas.addEventListener("pointerup", finish);
   canvas.addEventListener("pointercancel", finish);
 
+  // --- the result's measured modulation spectrum ---------------------------------------
+
+  const measuredCanvas = $("canvas.measured");
+  const MEASURED_MARGIN = { left: MARGIN.left, right: MARGIN.right, top: 6, bottom: 22 };
+  const measuredImage = document.createElement("canvas");
+  let measuredDrawn = { picture: null, key: "" };
+
+  function renderMeasured() {
+    const context = fitCanvas(measuredCanvas);
+    const ratio = measuredCanvas.width / (measuredCanvas.clientWidth || 1);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const width = measuredCanvas.clientWidth || 600;
+    const height = measuredCanvas.clientHeight || 160;
+    context.clearRect(0, 0, width, height);
+    if (!state) return;
+    // the plane's rate axis, at this canvas's height
+    const g = { ...geometry() };
+    const y0 = MEASURED_MARGIN.top;
+    const y1 = height - MEASURED_MARGIN.bottom;
+    const yOf = (d) => y1 - (d / DENSITY_MAX) * (y1 - y0);
+    const style = getComputedStyle(measuredCanvas);
+    const muted = style.getPropertyValue("--muted").trim() || "#6b7280";
+    const line = style.getPropertyValue("--line").trim() || "#d5d9e0";
+    const picture = sound?.modulation ?? null;
+    const w = Math.max(1, Math.round(g.x1 - g.x0));
+    const h = Math.max(1, Math.round(y1 - y0));
+    const key = [w, h].join(" ");
+    if (measuredDrawn.picture !== picture || measuredDrawn.key !== key) {
+      measuredImage.width = w;
+      measuredImage.height = h;
+      const pixels = measuredImage.getContext("2d").createImageData(w, h);
+      const floor = magma(0);
+      for (let px = 0; px < w; px++) {
+        const x = g.x0 + px + 0.5;
+        const seam = Math.abs(x - g.xc) < SEAM;
+        const k = picture && !seam ? Math.round((g.rate(x) - picture.rateFirst) / picture.rateStep) : -1;
+        for (let py = 0; py < h; py++) {
+          const i = 4 * (py * w + px);
+          const j = picture ? Math.round(((1 - (py + 0.5) / h) * DENSITY_MAX) / picture.densityStep) : -1;
+          const inside = k >= 0 && k < (picture?.nRates ?? 0) && j >= 0 && j < picture.nDensities;
+          pixels.data.set(inside ? magma(picture.data[j * picture.nRates + k] / 255) : floor, i);
+          pixels.data[i + 3] = seam ? 0 : 255;
+        }
+      }
+      measuredImage.getContext("2d").putImageData(pixels, 0, 0);
+      measuredDrawn = { picture, key };
+    }
+    context.imageSmoothingEnabled = false;
+    context.drawImage(measuredImage, g.x0, y0, g.x1 - g.x0, y1 - y0);
+
+    context.lineWidth = 1;
+    context.font = "11px system-ui, sans-serif";
+    context.strokeStyle = line;
+    context.strokeRect(g.x0 + 0.5, y0 + 0.5, g.x1 - g.x0 - 1, y1 - y0 - 1);
+    context.fillStyle = muted;
+    context.textAlign = "right";
+    context.textBaseline = "middle";
+    for (const d of [0, 2, 4, 6]) {
+      const y = Math.round(yOf(d)) + 0.5;
+      context.strokeStyle = "rgba(255, 255, 255, 0.15)";
+      context.beginPath();
+      context.moveTo(g.x0, y);
+      context.lineTo(g.x1, y);
+      context.stroke();
+      context.fillText(`${d}`, g.x0 - 6, Math.min(Math.max(y, y0 + 5), y1 - 5));
+    }
+    context.textAlign = "center";
+    context.textBaseline = "top";
+    for (const sign of [-1, 1]) {
+      for (const r of RATE_TICKS) {
+        const x = Math.round(g.x(sign * r)) + 0.5;
+        context.strokeStyle = "rgba(255, 255, 255, 0.15)";
+        context.beginPath();
+        context.moveTo(x, y0);
+        context.lineTo(x, y1);
+        context.stroke();
+        context.fillText(`${sign * r}`.replace("-", "−"), x, y1 + 4);
+      }
+    }
+    context.textAlign = "left";
+    context.fillStyle = "rgba(255, 255, 255, 0.85)";
+    context.fillText(
+      !picture ? "Heard: play to measure the result" : (state.bands ?? []).length ? "Heard: measured from the result, within the bands" : "Heard: measured from the result",
+      g.x0 + 6, y0 + 4,
+    );
+  }
+
   // --- the result's spectrogram ------------------------------------------------------
 
   const STFT_MARGIN = { left: 52, right: 10, top: 6, bottom: 20 };
@@ -821,6 +911,7 @@ export function createBlobsTab(root, { commit }) {
   ui.stft.addEventListener("pointercancel", finishBand);
 
   new ResizeObserver(render).observe(canvas);
+  new ResizeObserver(renderMeasured).observe(measuredCanvas);
   new ResizeObserver(renderStft).observe(ui.stft);
 
   return {
@@ -832,6 +923,7 @@ export function createBlobsTab(root, { commit }) {
       state = next;
       showSettings();
       render();
+      renderMeasured();
       renderStft();
     },
     setResult(next) {
@@ -840,6 +932,7 @@ export function createBlobsTab(root, { commit }) {
         fits = null;
         showSettings();
       }
+      renderMeasured();
       renderStft();
     },
     setPlayhead(t) {

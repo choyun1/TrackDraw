@@ -8,9 +8,8 @@ formant, with up to about five bands. This note designs that.
 
 Status: decided (2026-10-05). Cho accepted every recommendation (K1–K7),
 and, for K7, chose that the measured modulation spectrum be analysed within
-the bands. Built: steps 1 and 2 of the order of work. K7's analysis waits
-for the measured plane itself (`blobs.md`, B7), which is not built yet; the
-hint is.
+the bands. Built: steps 1 and 2 of the order of work, and the measured
+plane (`blobs.md`, B7) with K7's analysis within the bands (K-M4).
 
 This project is AI-assisted: the document and `tools/measure_bands.py`
 were drafted by Claude (Claude Code), for Cho to review.
@@ -108,6 +107,21 @@ band, warm median of three:
 | envelopes route (synthesis included) | 0.25 s | 1.62 s |
 | subbands route (added to synthesis) | 0.55 s | 1.97 s |
 | stft route (added to synthesis) | 0.03 s | 0.09 s |
+
+**K-M4. Measured within the bands, a moving band no longer hides the
+blobs.** [measure] The same contrast on the result's measured plane, tones,
+3 s, analysed over the whole range or within the bands
+(`sonore_sketch.blobs.measured`: each band's envelope divided by the gain
+the bands gave it, relative to its mean, weighted by that gain):
+
+| Band | whole range | within the bands |
+|---|---|---|
+| 1 oct at 1 kHz | 24.8 dB | 24.8 dB |
+| 1 oct gliding 500 → 4000 Hz | 10.5 dB | 22.5 dB |
+| 2 oct gliding 300 → 2400 Hz | 14.1 dB | 20.8 dB |
+
+A static band changes nothing away from rate 0; a moving band's sweep
+drops out, leaving the blobs blurred by the band's extent.
 
 ## Proposed design
 

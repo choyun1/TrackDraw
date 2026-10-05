@@ -197,6 +197,39 @@ def test_bad_bands_are_refused(bands, message):
         blobs.check(state(bands=bands))
 
 
+def contrast(spectrum, drawn):
+    """blobs.md, B-M4: measured power where the drawing is within 6 dB of its
+    peak over where it is 30 dB or more below, 1 <= |rate| <= 32 Hz."""
+    near = ((np.abs(drawn.w_t) <= 32) & (np.abs(drawn.w_t) >= 1))[None, :] & (drawn.w_f <= 4)[:, None]
+    inside = near & (drawn.level >= drawn.level[near].max() - 6)
+    outside = near & (drawn.level <= drawn.level[near].max() - 30)
+    power = 10 ** (spectrum.level / 10)
+    return 10 * np.log10(power[inside].mean() / power[outside].mean())
+
+
+def test_the_measured_plane_is_the_results_own_modulation_spectrum():
+    drawing = state(duration=3.0)
+    sound = blobs.synthesize(drawing)
+    ours, sonores = blobs.measured(sound, drawing), so.ModulationSpectrum.octave(sound, f_lo=100, f_hi=6400)
+    assert np.allclose(ours.level, sonores.level) and np.allclose(ours.w_t, sonores.w_t)
+
+
+def test_within_the_bands_a_moving_band_does_not_hide_the_blobs():
+    # bands.md, K-M4: 10.5 dB over the whole range, 22.5 dB within the band.
+    drawing = state(duration=3.0, bands=[band([(0, 500), (3, 4000)])])
+    sound, drawn = blobs.synthesize(drawing), blobs.target(drawing)
+    whole, within = contrast(blobs.measured(sound, state(duration=3.0)), drawn), contrast(blobs.measured(sound, drawing), drawn)
+    assert whole < 15 and within > 18, (whole, within)
+
+
+def test_the_page_gets_the_measured_plane_on_the_modulation_tab():
+    result = page.handle({"tab": "blobs", "state": state()})
+    picture = result["modulation"]
+    assert len(picture["data"]) == picture["n_densities"] * picture["n_rates"]
+    assert picture["rate_first"] == pytest.approx(-64, abs=picture["rate_step"]) and picture["n_densities"] >= 30
+    assert max(picture["data"]) == 255
+
+
 if __name__ == "__main__":
     FIXTURE.write_text(json.dumps(picture_fixture(), indent=0) + "\n")
     print(f"wrote {FIXTURE.relative_to(ROOT)}")

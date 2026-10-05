@@ -23,6 +23,7 @@ The script prints:
    and a band gliding 1 octave per second.
 3. Speed: plain synthesis, the envelopes route (synthesis included) and
    what the subbands and stft routes add, at 3 and 10 s.
+4. The measured plane analysed within the bands, against the whole range.
 
     python tools/measure_bands.py
 """
@@ -197,3 +198,23 @@ for duration in (3.0, 10.0):
     for name, f in {"plain": lambda: plain(duration, "tones"), **routes(duration, "tones", bands)}.items():
         f()
         print(f"  {duration:4.1f} s {name:<10s} {statistics.median(timed(f) for _ in range(WARM_REPEATS)):6.2f} s")
+
+print("\n4. the measured plane within the bands (sonore_sketch.blobs.measured): B-M4 contrast as in 2, tones, 3 s")
+from sonore_sketch import blobs as tab  # noqa: E402
+
+for name, bands in {
+    "1 oct at 1 kHz": [{"points": [[0, 1000]], "width": 1, "level": 0}],
+    "1 oct gliding 500->4000 Hz": [{"points": [[0, 500], [3, 4000]], "width": 1, "level": 0}],
+    "2 oct gliding 300->2400 Hz": [{"points": [[0, 300], [3, 2400]], "width": 2, "level": 0}],
+}.items():
+    state = {"blobs": 1, "duration": 3.0, "fs": FS, "f_lo": F_LO, "f_hi": F_HI, "bands_per_octave": BPO, "carrier": "tones",
+             "iterations": 0, "rms_depth": 0.2, "seed": 1, "items": tab.EXAMPLE_ITEMS, "bands": bands}
+    drawn, sound = tab.target(state), tab.synthesize(state)
+    near = ((np.abs(drawn.w_t) <= 32) & (np.abs(drawn.w_t) >= 1))[None, :] & (drawn.w_f <= 4)[:, None]
+    inside = near & (drawn.level >= drawn.level[near].max() - 6)
+    outside = near & (drawn.level <= drawn.level[near].max() - 30)
+    cells = []
+    for analysed in ({**state, "bands": []}, state):
+        power = 10 ** (tab.measured(sound, analysed).level / 10)
+        cells.append(10 * np.log10(power[inside].mean() / power[outside].mean()))
+    print(f"  {name:<28s} whole range {cells[0]:5.1f} dB, within the bands {cells[1]:5.1f} dB")

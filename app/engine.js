@@ -3,7 +3,8 @@
 // working offline or testing without the Pyodide CDN (?engine=local).
 //
 // Both resolve a request {tab, state} to
-// {fs, samples: Float32Array, synthesisSeconds, spectrogram: {...}}.
+// {fs, samples: Float32Array, synthesisSeconds, spectrogram: {...}}, and on
+// the Modulation tab modulation: {...} (modulationPicture).
 
 function bytesFromBase64(text) {
   const binary = atob(text);
@@ -75,8 +76,21 @@ class LocalEngine {
         tStart: body.spectrogram.t_start,
         tStep: body.spectrogram.t_step,
       },
+      modulation: body.modulation && modulationPicture(body.modulation, bytesFromBase64(body.modulation.data)),
     };
   }
+}
+
+// The Modulation tab's measured modulation spectrum (sonore_sketch.blobs.measured_picture).
+export function modulationPicture(picture, data) {
+  return {
+    data,
+    nDensities: picture.n_densities,
+    nRates: picture.n_rates,
+    rateFirst: picture.rate_first,
+    rateStep: picture.rate_step,
+    densityStep: picture.density_step,
+  };
 }
 
 export function createEngine(kind, callbacks) {
