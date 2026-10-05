@@ -225,6 +225,7 @@ def main() -> None:
             expect(page.locator("#tab-painted")).to_be_visible()
             expect(status).to_contain_text("Made", timeout=60_000)
             assert page_document_in(page)["tab"] == "painted"
+            expect(page.locator("#spectrogram-row")).to_be_hidden()  # the painting is the spectrogram
             example = page_document_in(page)["painted"]["levels"]
             canvas = page.locator("canvas.paint").bounding_box()
             px = lambda fraction: canvas["x"] + 52 + fraction * (canvas["width"] - 62)  # noqa: E731
@@ -257,6 +258,7 @@ def main() -> None:
             page.click(".tabs [data-tab=tracks]")
             expect(status).to_contain_text("Made", timeout=60_000)
             assert document_in(page) == doc, "the Tracks drawing changed while painting"
+            expect(page.locator("#spectrogram-row")).to_be_visible()  # back on Speech
             print("painted: Clear, Undo, the noise carrier and switching tabs work")
 
             # The Modulation tab: the example plays; clicking adds a blob,
@@ -268,6 +270,7 @@ def main() -> None:
             assert page_document_in(page)["tab"] == "blobs"
             example = page_document_in(page)["blobs"]
             expect(page.locator("#tab-blobs .coarse")).to_be_visible()  # 0.6 s is under 2 s
+            expect(page.locator("#spectrogram-row")).to_be_hidden()  # the tab shows its own, under the plane
             plane = page.locator("canvas.plane").bounding_box()
             left, right = plane["x"] + 52, plane["x"] + plane["width"] - 10
             top, bottom = plane["y"] + 8, plane["y"] + plane["height"] - 36
