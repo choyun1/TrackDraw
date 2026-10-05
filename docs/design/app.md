@@ -269,6 +269,7 @@ The Tracks tab's own decisions (scope, track model, file format, sine-wave
 speech upstream, drawing interaction) are in `tabs/tracks.md`.
 The Painted tab's and the Paint primitive's decisions are in
 `tabs/painted.md`.
+The Filter recording (Mask) tab's decisions are in `tabs/mask.md`.
 
 ## Order of work
 
