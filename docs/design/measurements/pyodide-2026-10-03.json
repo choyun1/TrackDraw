@@ -1,0 +1,94 @@
+[
+  {
+    "load_pyodide_s": 3.2019000000022353,
+    "install_sonore_s": 8.6025,
+    "import_sonore_s": 3.90139999999851,
+    "python": "3.14.2 (main, Sep 14 2026, 03:03:51) [Clang 23.0.0git (https:/github.com/llvm/llvm-project e5927fecf8a6ce89e1a4eac5b8",
+    "pyodide": "314.0.7",
+    "synthesis": [
+      {
+        "case": "klatt, drawn tracks",
+        "duration_s": 1,
+        "cold_s": 0.12719999999999843,
+        "warm_s": 0.13589999999999947
+      },
+      {
+        "case": "klatt, drawn tracks",
+        "duration_s": 3,
+        "cold_s": 0.3678999999999988,
+        "warm_s": 0.3613999999999997
+      },
+      {
+        "case": "klatt, constant parameters",
+        "duration_s": 1,
+        "cold_s": 0.073599999999999,
+        "warm_s": 0.09580000000000055
+      },
+      {
+        "case": "klatt, constant parameters",
+        "duration_s": 3,
+        "cold_s": 0.3241999999999976,
+        "warm_s": 0.2558000000000007
+      },
+      {
+        "case": "sine-wave tones (3)",
+        "duration_s": 1,
+        "cold_s": 0.01419999999999888,
+        "warm_s": 0.0146000000000015
+      },
+      {
+        "case": "sine-wave tones (3)",
+        "duration_s": 3,
+        "cold_s": 0.0373999999999981,
+        "warm_s": 0.024499999999999744
+      }
+    ],
+    "page_load": "cold cache"
+  },
+  {
+    "load_pyodide_s": 1.825199999999255,
+    "install_sonore_s": 2.5945,
+    "import_sonore_s": 4.227199999999255,
+    "python": "3.14.2 (main, Sep 14 2026, 03:03:51) [Clang 23.0.0git (https:/github.com/llvm/llvm-project e5927fecf8a6ce89e1a4eac5b8",
+    "pyodide": "314.0.7",
+    "synthesis": [
+      {
+        "case": "klatt, drawn tracks",
+        "duration_s": 1,
+        "cold_s": 0.2220000000000013,
+        "warm_s": 0.17169999999999952
+      },
+      {
+        "case": "klatt, drawn tracks",
+        "duration_s": 3,
+        "cold_s": 0.46000000000000085,
+        "warm_s": 0.48409999999999975
+      },
+      {
+        "case": "klatt, constant parameters",
+        "duration_s": 1,
+        "cold_s": 0.09869999999999912,
+        "warm_s": 0.14509999999999934
+      },
+      {
+        "case": "klatt, constant parameters",
+        "duration_s": 3,
+        "cold_s": 0.4520999999999997,
+        "warm_s": 0.34830000000000005
+      },
+      {
+        "case": "sine-wave tones (3)",
+        "duration_s": 1,
+        "cold_s": 0.007299999999998974,
+        "warm_s": 0.006199999999999761
+      },
+      {
+        "case": "sine-wave tones (3)",
+        "duration_s": 3,
+        "cold_s": 0.03059999999999974,
+        "warm_s": 0.021399999999999864
+      }
+    ],
+    "page_load": "warm cache"
+  }
+]
