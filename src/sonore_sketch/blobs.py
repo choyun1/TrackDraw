@@ -27,6 +27,7 @@ octaves and a level, applied last as a time-varying filter on a 20 ms STFT
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -161,22 +162,52 @@ def target(state: Mapping[str, Any]) -> so.ModulationSpectrum:
     )
 
 
+# A draw that misses the asked depth by this little is heard at the depth
+# that fits instead of refused (blobs.md, B5): sonore names that depth
+# rounded, a whole-percent refusal is a real choice for the user, a hair's
+# breadth one is not (Cho hit "0.0% ... at most 0.2 fits" at 0.2).
+NEAR_MISS = 0.9
+
+
 def synthesize(state: Mapping[str, Any]) -> so.Sound:
     """The sound ``state`` describes. A depth one draw cannot reach is
-    sonore's ``ValueError``, which names the depth that fits."""
+    sonore's ``ValueError``, which names the depth that fits; when that is
+    within 10% of the depth asked, the draw is heard at it instead."""
     check(state)
     if not state["items"]:
         raise ValueError("no blobs yet: add a blob to hear something")
-    if state.get("carrier") == "harmonic":
-        sound = _on_harmonics(state)
-    else:
-        sound = target(state).to_sound(
-            carrier=state.get("carrier", "tones"),
-            fs=float(state["fs"]),
-            rng=int(state.get("seed", 1)),
-            iterations=int(state.get("iterations", 0)),
-        )
+    try:
+        sound = _carried(state)
+    except ValueError as refusal:
+        depth, fits = float(state.get("rms_depth", 0.2)), depth_that_fits(str(refusal))
+        if fits is None or fits < NEAR_MISS * depth:
+            raise
+        for factor in (0.995, 0.98, 0.95, 0.92):  # sonore's figure is rounded to 3 digits
+            try:
+                sound = _carried({**state, "rms_depth": min(fits, depth) * factor})
+                break
+            except ValueError:
+                continue
+        else:
+            raise refusal from None
     return band_limit(sound, state["bands"]) if state.get("bands") else sound
+
+
+def depth_that_fits(message: str) -> float | None:
+    """The depth sonore's refusal names ("... at most 0.342 fits it ..."), or None."""
+    match = re.search(r"at most ([0-9]*\.?[0-9]+) fits", message)
+    return float(match.group(1)) if match else None
+
+
+def _carried(state: Mapping[str, Any]) -> so.Sound:
+    if state.get("carrier") == "harmonic":
+        return _on_harmonics(state)
+    return target(state).to_sound(
+        carrier=state.get("carrier", "tones"),
+        fs=float(state["fs"]),
+        rng=int(state.get("seed", 1)),
+        iterations=int(state.get("iterations", 0)),
+    )
 
 
 def _on_harmonics(state: Mapping[str, Any]) -> so.Sound:

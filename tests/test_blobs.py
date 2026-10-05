@@ -98,6 +98,17 @@ def test_too_deep_a_drawing_is_refused_with_the_depth_that_fits():
         blobs.synthesize(state(rms_depth=0.95))
 
 
+def test_a_near_miss_is_heard_at_the_depth_that_fits():
+    # Cho's report: "rms_depth 0.2 would push 0.0% ... at most 0.2 fits it".
+    with pytest.raises(ValueError) as refusal:
+        blobs.synthesize(state(rms_depth=0.95))
+    fits = blobs.depth_that_fits(str(refusal.value))
+    sound = blobs.synthesize(state(rms_depth=round(fits * 1.05, 3)))
+    assert sound.rms == pytest.approx(1)
+    with pytest.raises(ValueError, match="at most"):
+        blobs.synthesize(state(rms_depth=round(fits * 1.2, 3)))
+
+
 def test_no_blobs_says_so():
     with pytest.raises(ValueError, match="no blobs yet"):
         blobs.synthesize(state(items=[]))
