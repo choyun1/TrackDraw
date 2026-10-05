@@ -9,7 +9,7 @@
 //               {id, type: "result", result} or {id, type: "error", message}.
 
 const PYODIDE_VERSION = "314.0.7"; // what Cho measured on 2026-10-03 (tracks.md, M6)
-const SONORE_VERSION = "0.4.0"; // keep in step with pyproject.toml (app.md, D5)
+const SONORE_VERSION = "0.5.0"; // keep in step with pyproject.toml (app.md, D5)
 const PYTHON_FILES = ["__init__.py", "tracks.py", "page.py"];
 
 let handle = null;

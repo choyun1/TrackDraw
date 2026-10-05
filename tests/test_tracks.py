@@ -8,7 +8,7 @@ from sonore_sketch import page, tracks
 
 DOCUMENT = {
     "trackdraw": 1,
-    "sonore": "0.4.0",
+    "sonore": "0.5.0",
     "duration": 0.6,
     "fs": 16000,
     "mode": "klatt",
