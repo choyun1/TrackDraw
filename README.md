@@ -9,12 +9,16 @@ point-and-click surface; sonore does the synthesis, in your browser.
 synthesizer makes from them. It follows Track-Draw (Assmann, Ballard,
 Bornstein & Paschall, 1994). **Spectrogram** lets you paint level on time ×
 log-frequency and hear a sound whose spectrotemporal envelope is the
-painting (sonore's `ripple_sound`). Spectrogram masks and
-modulation-spectrum blobs are planned (`docs/design/app.md`).
+painting (sonore's `ripple_sound`). **Modulation** lets you place blobs on
+a modulation spectrum (rate × density) and hear a sound with that
+modulation (sonore's `ModulationSpectrum.from_blobs`). Spectrogram masks are
+planned (`docs/design/app.md`).
 
 ## Using it
 
-The page is static: serve the repository's root and open `index.html`.
+Open **https://choyun1.github.io/sonore-sketch/**, published from `main`
+by `.github/workflows/pages.yml`. The page is static, so you can also serve
+the repository's root yourself and open `index.html`:
 
     python tools/serve.py        # http://localhost:8000/
 
