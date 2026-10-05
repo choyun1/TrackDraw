@@ -1,0 +1,41 @@
+name: pages
+
+# Publish the page to GitHub Pages on every push to main, so it can be used
+# without running tools/serve.py. The page is static: index.html, app/, and
+# the Python package the Pyodide worker fetches (../src/sonore_sketch/*.py).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect the page's files
+        run: |
+          mkdir -p _site/src
+          cp index.html _site/
+          cp -r app _site/
+          cp -r src/sonore_sketch _site/src/
+          find _site -name "__pycache__" -prune -exec rm -rf {} +
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
