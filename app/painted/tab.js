@@ -6,6 +6,7 @@
 // stroke collects each cell's largest brush weight, and every cell moves
 // toward the brush's level by its weight when the stroke ends.
 
+import { magma } from "../colormap.js";
 import { fitCanvas } from "../plot.js";
 import {
   CARRIERS,
@@ -160,7 +161,6 @@ export function createPaintedTab(root, { commit, log }) {
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     const g = geometry();
     const style = getComputedStyle(canvas);
-    const ink = style.getPropertyValue("--ink-rgb").trim() || "20, 24, 31";
     const muted = style.getPropertyValue("--muted").trim() || "#6b7280";
     const line = style.getPropertyValue("--line").trim() || "#d5d9e0";
     context.clearRect(0, 0, g.width, g.height);
@@ -172,16 +172,13 @@ export function createPaintedTab(root, { commit, log }) {
       image.width = columns;
       image.height = nRows;
       const pixels = image.getContext("2d").createImageData(columns, nRows);
-      const [r, gr, b] = ink.split(",").map(Number);
       const floor = -state.floor_db;
       for (let row = 0; row < nRows; row++) {
         for (let c = 0; c < columns; c++) {
           const level = 1 - Math.min(shown[row * columns + c], floor) / floor;
           const i = 4 * ((nRows - 1 - row) * columns + c);
-          pixels.data[i] = r;
-          pixels.data[i + 1] = gr;
-          pixels.data[i + 2] = b;
-          pixels.data[i + 3] = Math.round(255 * level ** 1.5);
+          pixels.data.set(magma(level), i); // in magma, as sonore plots levels
+          pixels.data[i + 3] = 255;
         }
       }
       image.getContext("2d").putImageData(pixels, 0, 0);
@@ -199,12 +196,11 @@ export function createPaintedTab(root, { commit, log }) {
     context.textBaseline = "middle";
     for (const f of FREQUENCY_TICKS.filter((f) => f >= state.f_lo && f <= state.f_hi)) {
       const y = Math.round(g.y(f)) + 0.5;
-      context.globalAlpha = 0.5;
+      context.strokeStyle = "rgba(255, 255, 255, 0.18)"; // over the dark picture
       context.beginPath();
       context.moveTo(g.x0, y);
       context.lineTo(g.x1, y);
       context.stroke();
-      context.globalAlpha = 1;
       context.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, g.x0 - 6, y);
     }
     context.save();
@@ -231,7 +227,7 @@ export function createPaintedTab(root, { commit, log }) {
       context.stroke();
     }
     if (pointer) {
-      context.strokeStyle = muted;
+      context.strokeStyle = "rgba(255, 255, 255, 0.8)";
       context.setLineDash([3, 3]);
       context.beginPath();
       context.arc(pointer[0], pointer[1], Number(ui.size.value) / 2, 0, 2 * Math.PI);

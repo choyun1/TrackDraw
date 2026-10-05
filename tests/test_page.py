@@ -42,3 +42,12 @@ def test_the_browser_worker_loads_every_module_of_the_package():
     root = Path(__file__).resolve().parents[1]
     listed = re.search(r"PYTHON_FILES = \[([^\]]*)\]", (root / "app" / "worker.js").read_text()).group(1)
     assert sorted(re.findall(r'"([^"]+)"', listed)) == sorted(p.name for p in (root / "src" / "sonore_sketch").glob("*.py"))
+
+
+def test_the_page_colours_levels_with_matplotlibs_magma_as_sonore_does():
+    matplotlib = pytest.importorskip("matplotlib")
+    root = Path(__file__).resolve().parents[1]
+    table = "".join(re.findall(r'"([0-9a-f]+)"', (root / "app" / "colormap.js").read_text()))
+    colours = np.array([[int(table[6 * i + k : 6 * i + k + 2], 16) for k in (0, 2, 4)] for i in range(256)])
+    expected = np.round(np.array([matplotlib.colormaps["magma"].resampled(256)(i)[:3] for i in range(256)]) * 255)
+    np.testing.assert_array_equal(colours, expected)
