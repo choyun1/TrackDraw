@@ -8,14 +8,15 @@
 // edit is one gesture: adding, moving or resizing a blob is committed when
 // the pointer comes up.
 //
-// Under the plane, the result's own modulation spectrum, measured from the
-// sound (blobs.md, B7) on the plane's axes, so drawn and heard compare by
-// eye; with bands, measured within them (bands.md, K7). Then the result's spectrogram (the shell's 5 ms STFT) on a
-// log-frequency axis over the carrier's bands, so a blob's density shows as
-// the slope of its stripes in octaves. The bands that confine the sound
+// The design panels come first: the plane, then the result's spectrogram
+// (the shell's 5 ms STFT) on a log-frequency axis over the carrier's bands,
+// so a blob's density shows as the slope of its stripes in octaves. The bands that confine the sound
 // (docs/design/tabs/bands.md) are drawn on it: each a centre track with
 // breakpoints and a strip its width wide. Drag a breakpoint to move it, click
 // a band's line to add one, drag inside a strip to move the whole band.
+// Then the result: its own modulation spectrum, measured from the sound
+// (blobs.md, B7) on the plane's axes, so drawn and heard compare by eye
+// (with bands, measured within them: bands.md, K7), above the page's waveform.
 
 import { magma } from "../colormap.js";
 import { fitCanvas, niceStep } from "../plot.js";
@@ -63,9 +64,11 @@ export function createBlobsTab(root, { commit }) {
   root.innerHTML = `
     <div class="blobs-body">
       <div class="paint-area">
+        <h3 class="panel-group">Design <span>blobs on the modulation plane, then bands over the result's spectrogram</span></h3>
         <canvas class="plane"></canvas>
+        <canvas class="stft" title="The bands, drawn over the result's spectrogram (5 ms window) on a log-frequency axis"></canvas>
+        <h3 class="panel-group result-group">Result <span>measured from the sound after Play</span></h3>
         <canvas class="measured" title="The result's own modulation spectrum, measured from the sound after Play, on the plane's axes"></canvas>
-        <canvas class="stft" title="The result's spectrogram (5 ms window) on a log-frequency axis, with the bands"></canvas>
       </div>
       <aside class="side">
         <fieldset class="blob-fields"><legend>Blob</legend>
@@ -616,7 +619,7 @@ export function createBlobsTab(root, { commit }) {
     context.textAlign = "left";
     context.fillStyle = "rgba(255, 255, 255, 0.85)";
     context.fillText(
-      !picture ? "Heard: play to measure the result" : (state.bands ?? []).length ? "Heard: measured from the result, within the bands" : "Heard: measured from the result",
+      !picture ? "Modulation spectrum: play to measure the result" : (state.bands ?? []).length ? "Modulation spectrum, measured within the bands" : "Modulation spectrum, measured",
       g.x0 + 6, y0 + 4,
     );
   }

@@ -84,8 +84,13 @@ canvas.stft {
 }
 .blobs-body canvas.stft { height: 220px; touch-action: none; }
 .blobs-body canvas.plane { height: min(46vh, 360px); }
+.panel-group {
+  margin: 0 0 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted);
+}
+.panel-group span { font-weight: 400; letter-spacing: 0; text-transform: none; margin-left: 6px; }
+.panel-group.result-group { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
 canvas.measured {
-  display: block; width: 100%; height: 170px; margin-top: 8px;
+  display: block; width: 100%; height: 170px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
 }
 .side .f0-field[hidden], .side .blob-edit[hidden], .side .use-depth[hidden], .side .coarse[hidden],
