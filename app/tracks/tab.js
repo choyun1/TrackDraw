@@ -87,6 +87,7 @@ export function createTracksTab(root, { commit }) {
     button.type = "button";
     button.textContent = name;
     button.style.setProperty("--track", TRACKS[name].color);
+    button.style.setProperty("--track-bright", TRACKS[name].bright ?? TRACKS[name].color);
     button.addEventListener("click", () => select(name));
     trackGroup.appendChild(button);
     trackButtons[name] = button;
@@ -167,7 +168,7 @@ export function createTracksTab(root, { commit }) {
       const pts = points(doc, name);
       const isSelected = name === selected;
       const ends = [[0, pts[0][1]], ...pts, [doc.duration, pts[pts.length - 1][1]]];
-      const group = element("g", { class: `track${isSelected ? " selected" : ""}`, style: `--track: ${TRACKS[name].color}` }, svg);
+      const group = element("g", { class: `track${isSelected ? " selected" : ""}`, style: `--track: ${TRACKS[name].color}; --track-bright: ${TRACKS[name].bright ?? TRACKS[name].color}` }, svg);
       element("polyline", { points: ends.map(([t, v]) => `${g.x(t)},${g.y(v)}`).join(" ") }, group);
       if (names.length > 1) {
         const label = element("text", { x: g.x1 - 4, y: g.y(pts[pts.length - 1][1]) - 5, class: "track-label" }, group);

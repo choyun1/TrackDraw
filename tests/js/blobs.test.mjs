@@ -10,6 +10,7 @@ import {
   depthThatFits,
   grid,
   newBand,
+  strokeOnto,
   power,
   rateToUnit,
   unitToRate,
@@ -109,4 +110,10 @@ test("stretching the page stretches the bands with it", () => {
   const longer = stretchPage(page, 1.2);
   assert.deepEqual(longer.blobs.bands[0].points, [[0, 500], [0.6, 800], [1.2, 500]]);
   assert.deepEqual(longer.blobs.items, page.blobs.items);
+});
+
+test("a stroke replaces a band's track over its span, simplified in octaves", () => {
+  const points = strokeOnto([[0, 500], [1, 500]], [[0.2, 1000], [0.3, 1100], [0.4, 1200], [0.6, 700]]);
+  assert.deepEqual(points, [[0, 500], [0.2, 1000], [0.4, 1200], [0.6, 700], [1, 500]]);
+  assert.deepEqual(strokeOnto(null, [[0.5, 800]]), [[0.5, 800]]);
 });

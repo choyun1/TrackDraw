@@ -9,6 +9,8 @@
 //
 // No DOM here, so this file runs under `node --test`.
 
+import { replaceSpan, simplify } from "../tracks/model.js";
+
 export const FORMAT = 1;
 export const CARRIERS = ["tones", "harmonic", "noise"];
 export const MAX_BLOBS = 8;
@@ -150,6 +152,22 @@ export const clampBandLevel = (l) => Math.min(0, Math.max(BAND_LEVEL_MIN, l));
 // Times to the millisecond, centres to the hertz, as saved.
 export const tidyTime = (t) => Math.round(t * 1000) / 1000;
 export const tidyHz = (f) => Math.round(f);
+
+// A Line or Freehand stroke [[t, Hz], ...] laid onto a band's points (or
+// onto none, for a new band): the stroke, simplified in octaves, replaces
+// the points within its span, as the Speech tab's tools do.
+export const STROKE_TOLERANCE_OCT = 0.04;
+export function strokeOnto(points, stroke) {
+  const inOctaves = stroke.map(([t, f]) => [tidyTime(t), Math.log2(f)]);
+  const span = simplify(inOctaves, STROKE_TOLERANCE_OCT).map(([t, o]) => [t, tidyHz(2 ** o)]);
+  const merged = points?.length ? replaceSpan(points, span) : span;
+  const tidied = [];
+  for (const point of merged) {
+    if (tidied.length && point[0] <= tidied[tidied.length - 1][0]) tidied[tidied.length - 1] = point;
+    else tidied.push(point);
+  }
+  return tidied;
+}
 
 // Every band's times scaled to a new duration (the page's length changed).
 export function stretchBands(bands, from, to) {
