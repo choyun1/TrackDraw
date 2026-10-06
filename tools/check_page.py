@@ -338,8 +338,15 @@ def main() -> None:
             page.keyboard.press("Control+z")
             assert len(blobs_now()) == 3
             expect(status).to_contain_text("Made", timeout=60_000)
+            page.locator("#tab-blobs .iterations").fill("2")
+            page.locator("#tab-blobs .iterations").press("Enter")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page_document_in(page)["blobs"]["iterations"] == 2
+            print("modulation: 2 iterations set and heard")
             page.select_option("#tab-blobs .carrier", "harmonic")
             expect(page.locator("#tab-blobs .f0-field")).to_be_visible()
+            expect(page.locator("#tab-blobs .iterations-field")).to_be_hidden()
+            assert page_document_in(page)["blobs"]["iterations"] == 0  # the harmonic carrier takes none
             page.locator("#tab-blobs .f0").fill("150")
             page.locator("#tab-blobs .f0").press("Enter")
             expect(status).to_contain_text("Made", timeout=60_000)
