@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>sonore sketch</title>
+  <title>sonore-sketch</title>
   <meta name="description" content="Draw on a picture of sound and hear the result, with sonore.">
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="app/style.css">
@@ -11,7 +11,7 @@
 </head>
 <body>
   <header class="bar">
-    <h1>sonore sketch</h1>
+    <h1>sonore-sketch</h1>
     <nav class="tabs" role="tablist">
       <button role="tab" class="active" aria-selected="true" data-tab="tracks"
         data-caption="Draw formant, pitch and loudness tracks over time, and hear the speech Klatt's synthesizer makes from them (after TrackDraw; Assmann et al., 1994)."
@@ -26,8 +26,8 @@
         data-caption="Place blobs on a modulation spectrum, how fast loudness changes in time (rate) and across frequency (density), and hear a sound with that modulation."
         title="Gaussian blobs on rate × density, heard through sonore's ModulationSpectrum.from_blobs">Modulation</button>
       <button role="tab" aria-selected="false" data-tab="edit"
-        data-caption="Paint out parts of a sound's modulation spectrum and hear what is left: cut every rate above 4 Hz from speech and it blurs into a murmur that keeps its rhythm."
-        title="Cuts painted on a sound's modulation spectrum, heard through sonore's ModulationSpectrum.with_gain and to_sound">Edit modulation</button>
+        data-caption="Paint out parts of a sound's modulation spectrum and hear what is left: erase every rate above 4 Hz from speech and it blurs into a murmur that keeps its rhythm."
+        title="Parts of a sound's modulation spectrum painted out, heard through sonore's ModulationSpectrum.with_gain and to_sound">Edit modulation</button>
     </nav>
     <div class="controls">
       <button type="button" id="play" class="primary" title="Play or stop (Space)" disabled>▶ Play</button>

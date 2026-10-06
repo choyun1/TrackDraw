@@ -39,7 +39,7 @@ def upgrade(document: Mapping[str, Any]) -> dict[str, Any]:
             "tracks": {"mode": document.get("mode", "klatt"), "params": dict(document.get("params", {}))},
         }
     if document.get("app") != APP or document.get("version") != VERSION:
-        raise ValueError(f"not a sonore sketch document of version {VERSION}, or a TrackDraw document of format {tracks.FORMAT}")
+        raise ValueError(f"not a sonore-sketch document of version {VERSION}, or a TrackDraw document of format {tracks.FORMAT}")
     return dict(document)
 
 

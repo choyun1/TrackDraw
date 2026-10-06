@@ -1,4 +1,4 @@
-# sonore sketch
+# sonore-sketch
 
 Draw on a picture of sound and hear the result.
 
@@ -287,7 +287,7 @@ and the decisions Cho made.
 
 ## Credits
 
-sonore sketch grew out of TrackDraw (2016), by Adrian Y. Cho and Daniel R
+sonore-sketch grew out of TrackDraw (2016), by Adrian Y. Cho and Daniel R
 Guest, whose history this repository keeps. The Speech tab is after:
 
 Assmann, P., Ballard, W., Bornstein, L., & Paschall, D. (1994). Track-Draw:

@@ -15,7 +15,7 @@
 
 import { magma } from "../colormap.js";
 import { drawWaveform, fitCanvas, niceStep } from "../plot.js";
-import { applyStroke, dab, dabsAlong, decodeLevels, encodeLevels } from "../painted/model.js";
+import { applyCut, brushWeight, decodeLevels, encodeLevels, typedNumber } from "../painted/model.js";
 import {
   CARRIERS,
   COARSE_BELOW_S,
@@ -46,10 +46,11 @@ const CARRIER_LABELS = { source: "the source's own", tones: "tones", noise: "noi
 const STFT_MARGIN = { left: 52, right: 10, top: 6, bottom: 20 };
 const FREQUENCY_TICKS = [100, 200, 500, 1000, 2000, 5000];
 
-export function createEditTab(root, { commit, openRecording, log }) {
+export function createEditTab(root, { commit, openRecording, hasRecording, log }) {
   let state = null;
   let bytes = null; // the mask shown: state's levels, decoded
   let stroke = null; // {weights, last, target, preview} while painting
+  let resultMask = null; // the mask the result shown was made with: what its outline shows
   let pointer = null;
   let mode = "paint";
   let sound = null;
@@ -61,9 +62,9 @@ export function createEditTab(root, { commit, openRecording, log }) {
     <div class="edit-body">
       <div class="paint-area">
         <section class="panel-box design-box">
-          <h3 class="panel-group" title="What you paint: cuts on the source's modulation spectrum">Design</h3>
+          <h3 class="panel-group" title="What you paint: what to erase from the source's modulation spectrum">Design</h3>
           <div class="panel-stack">
-            <canvas class="mask-plane" title="The source's modulation spectrum; what you paint is cut from it"></canvas>
+            <canvas class="mask-plane" title="The source's modulation spectrum; what you paint is erased from it"></canvas>
             <p class="hint clip-note" hidden></p>
           </div>
         </section>
@@ -95,11 +96,11 @@ export function createEditTab(root, { commit, openRecording, log }) {
         </fieldset>
         <fieldset><legend>Presets</legend>
           <div class="preset-row">
-            <button type="button" class="keep-below" title="Cut every rate faster than this, on both sides">Keep below</button>
+            <button type="button" class="keep-below" title="Erase every rate faster than this, on both sides">Keep below</button>
             <input type="number" class="keep-rate" min="1" max="64" step="1" value="4"> Hz
           </div>
-          <button type="button" class="no-down" title="Cut the right side above density 0: the sweeps whose frequency falls">No ↓ sweeps</button>
-          <button type="button" class="no-up" title="Cut the left side above density 0: the sweeps whose frequency rises">No ↑ sweeps</button>
+          <button type="button" class="no-down" title="Erase the right side above density 0: the sweeps whose frequency falls">No ↓ sweeps</button>
+          <button type="button" class="no-up" title="Erase the left side above density 0: the sweeps whose frequency rises">No ↑ sweeps</button>
         </fieldset>
         <fieldset><legend>Sound</legend>
           <label class="field" title="What carries the edited modulation: the source's own fine structure (keeps its voice), log-spaced tones (shows an edit most clearly), or noise">Carrier
@@ -174,7 +175,8 @@ export function createEditTab(root, { commit, openRecording, log }) {
   }
 
   ui.source.addEventListener("change", () => {
-    if (ui.source.value === "file" && !state.recording) {
+    // the page may hold a recording while another source is chosen
+    if (ui.source.value === "file" && !hasRecording()) {
       showSettings(); // the source changes when a recording opens
       return ui.audioFile.click();
     }
@@ -182,7 +184,7 @@ export function createEditTab(root, { commit, openRecording, log }) {
   });
   ui.carrier.addEventListener("change", () => commit({ ...state, carrier: ui.carrier.value }));
   ui.iterations.addEventListener("change", () => {
-    const n = Math.round(Number(ui.iterations.value));
+    const n = Math.round(typedNumber(ui.iterations.value, NaN));
     if (n >= 0 && n <= MAX_ITERATIONS && n !== state.iterations) commit({ ...state, iterations: n });
     else ui.iterations.value = state.iterations;
   });
@@ -402,7 +404,7 @@ export function createEditTab(root, { commit, openRecording, log }) {
     context.textAlign = "left";
     context.textBaseline = "top";
     context.fillStyle = "rgba(255, 255, 255, 0.85)";
-    const title = source ? "The source's modulation spectrum; cuts are darkened and outlined" : "The source's modulation spectrum: Play to analyse it";
+    const title = source ? "The source's modulation spectrum; what is erased is darkened and outlined" : "The source's modulation spectrum: Play to analyse it";
     context.fillText(title, g.x0 + 6, g.y0 + 4);
 
     if (pointer) {
@@ -432,7 +434,7 @@ export function createEditTab(root, { commit, openRecording, log }) {
     context.imageSmoothingEnabled = false;
     context.drawImage(picture(g, shown, null, measuredImage), g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0);
     axes(context, target, g, [0, 2, 4, 6], false);
-    const mask = stroke?.preview ?? bytes;
+    const mask = resultMask;
     if (mask && shown) {
       context.strokeStyle = "rgba(255, 255, 255, 0.6)";
       context.setLineDash([3, 3]);
@@ -442,14 +444,14 @@ export function createEditTab(root, { commit, openRecording, log }) {
     context.textAlign = "left";
     context.textBaseline = "top";
     context.fillStyle = "rgba(255, 255, 255, 0.85)";
-    context.fillText(shown ? "The result's modulation spectrum, measured; the cuts are outlined" : "The result's modulation spectrum: Play to measure it", g.x0 + 6, g.y0 + 4);
+    context.fillText(shown ? "The result's modulation spectrum, measured; what was erased is outlined" : "The result's modulation spectrum: Play to measure it", g.x0 + 6, g.y0 + 4);
   }
 
   // E9: sonore clips envelopes an edit pushes below zero; say how much, not as an error.
   function showClipping() {
     const clipped = sound?.clipped ?? 0;
     ui.clipNote.hidden = !(clipped > 0);
-    ui.clipNote.textContent = `${Math.round(100 * clipped)}% of the envelopes were clipped: the result differs from what is painted. A softer brush edge clips less.`;
+    ui.clipNote.textContent = `${+(100 * clipped).toFixed(clipped < 0.01 ? 1 : 0)}% of the envelopes were clipped: the result differs from what is painted. A softer brush edge clips less.`;
   }
 
   // --- painting --------------------------------------------------------------------
@@ -459,19 +461,37 @@ export function createEditTab(root, { commit, openRecording, log }) {
     return [event.clientX - box.left, event.clientY - box.top];
   }
 
-  // The brush's radius in cells: rows are even; columns are even on each side (the strip is one wide column).
-  function brush(g) {
-    const radius = Number(ui.size.value) / 2;
-    return {
-      rRow: Math.max(0.5, (radius / (g.y1 - g.y0)) * ROWS),
-      rColumn: Math.max(0.5, (radius / g.half) * SIDE),
-      softness: Number(ui.softness.value),
-    };
+  // A dab of the brush at pixel `at`, weighed by distance on screen, so the
+  // wide centre strip is cut only where the circle drawn on it reaches (a
+  // radius in cells would be in side columns, about 6 times narrower).
+  function dabAt(at) {
+    const g = geometry();
+    const radius = Math.max(1, Number(ui.size.value) / 2);
+    const softness = Number(ui.softness.value);
+    const side = g.half / SIDE; // a side column's width, px
+    const rowHeight = (g.y1 - g.y0) / ROWS;
+    const r0 = Math.max(0, Math.floor((g.y1 - at[1] - radius) / rowHeight));
+    const r1 = Math.min(ROWS - 1, Math.floor((g.y1 - at[1] + radius) / rowHeight));
+    for (let c = 0; c < COLUMNS; c++) {
+      const left = g.columnX(c);
+      const right = c === COLUMNS - 1 ? g.x1 : g.columnX(c + 1);
+      // distance to the column: from its centre, less any width beyond a side column's
+      const dx = Math.max(0, Math.abs(at[0] - (left + right) / 2) - Math.max(0, (right - left - side) / 2));
+      if (dx > radius) continue;
+      for (let r = r0; r <= r1; r++) {
+        const dy = at[1] - (g.y1 - (r + 0.5) * rowHeight);
+        const w = brushWeight(Math.hypot(dx, dy) / radius, softness);
+        const i = r * COLUMNS + c;
+        if (w > stroke.weights[i]) stroke.weights[i] = w;
+      }
+    }
   }
 
-  function dabAt(at) {
-    const { rRow, rColumn, softness } = brush(geometry());
-    dab(stroke.weights, ROWS, COLUMNS, at[0], at[1], rRow, rColumn, softness);
+  // Dab centres from a to b (px), a quarter of the brush's radius apart, not including a.
+  function dabsAlongPx(a, b) {
+    const step = Math.max(1, Number(ui.size.value) / 8);
+    const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / step));
+    return Array.from({ length: n }, (_, k) => [a[0] + ((k + 1) / n) * (b[0] - a[0]), a[1] + ((k + 1) / n) * (b[1] - a[1])]);
   }
 
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -480,24 +500,23 @@ export function createEditTab(root, { commit, openRecording, log }) {
     event.preventDefault();
     canvas.setPointerCapture(event.pointerId);
     const erase = mode === "erase" || event.button === 2;
-    const cut = Math.min(-1, Math.max(FLOOR_DB, Number(ui.cut.value) || FLOOR_DB));
-    const at = geometry().cell(...local(event));
+    const cut = Math.min(-1, Math.max(FLOOR_DB, typedNumber(ui.cut.value, FLOOR_DB)));
+    const at = local(event);
     stroke = { weights: new Float32Array(bytes.length), last: at, target: erase ? 0 : -cut, preview: null };
     dabAt(at);
-    stroke.preview = applyStroke(bytes, stroke.weights, stroke.target);
+    stroke.preview = applyCut(bytes, stroke.weights, stroke.target);
     render();
   });
   canvas.addEventListener("pointermove", (event) => {
     pointer = local(event);
     if (stroke) {
-      const { rRow, rColumn } = brush(geometry());
       const moves = event.getCoalescedEvents?.() ?? [event];
       for (const move of moves.length ? moves : [event]) {
-        const at = geometry().cell(...local(move));
-        for (const centre of dabsAlong(stroke.last, at, rRow, rColumn)) dabAt(centre);
+        const at = local(move);
+        for (const centre of dabsAlongPx(stroke.last, at)) dabAt(centre);
         stroke.last = at;
       }
-      stroke.preview = applyStroke(bytes, stroke.weights, stroke.target);
+      stroke.preview = applyCut(bytes, stroke.weights, stroke.target);
     }
     render();
   });
@@ -613,6 +632,8 @@ export function createEditTab(root, { commit, openRecording, log }) {
     },
     setResult(next) {
       sound = next ?? null;
+      // made from the drawing shown now, so from this mask; later strokes are not in it yet
+      resultMask = sound ? bytes : null;
       if (sound?.sourceModulation) source = { key: sourceKey(state), picture: sound.sourceModulation };
       if (sound?.clipped > 0) log?.info(`${Math.round(100 * sound.clipped)}% of the envelopes were clipped (sonore's warning)`);
       showClipping();

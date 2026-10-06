@@ -43,7 +43,13 @@ class PyodideEngine {
       else if (data.type === "dropped") resolve(null);
       else reject(Object.assign(new Error(data.message), { detail: data.detail }));
     };
-    this.worker.onerror = (event) => onFailed(event.message ?? "the synthesis worker failed");
+    this.worker.onerror = (event) => {
+      const message = event.message ?? "the synthesis worker failed";
+      onFailed(message);
+      // nothing more will come back for the requests under way
+      for (const { reject } of this.waiting.values()) reject(new Error(message));
+      this.waiting.clear();
+    };
   }
 
   // A newer request stops this one at its next step (it resolves to null),

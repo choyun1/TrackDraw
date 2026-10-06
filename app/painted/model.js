@@ -122,6 +122,21 @@ export function applyStroke(bytes, weights, target) {
   return out;
 }
 
+// The number typed in a field, or `fallback` when it holds none (so 0 stays 0).
+export function typedNumber(text, fallback) {
+  const n = String(text).trim() === "" ? NaN : Number(text);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+// A stroke on a mask of cuts (dB below 0, as bytes): cutting (target above 0)
+// only ever deepens a cell, so a shallower Depth leaves deeper cuts alone;
+// restoring (target 0) brings cells back toward 0 dB.
+export function applyCut(bytes, weights, target) {
+  const out = applyStroke(bytes, weights, target);
+  if (target > 0) for (let i = 0; i < out.length; i++) out[i] = Math.max(out[i], bytes[i]);
+  return out;
+}
+
 // The painting on a new frequency range: each new row takes the level at its
 // centre frequency on the old grid (linear in dB between old row centres);
 // rows outside the old range are silent.

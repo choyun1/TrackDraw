@@ -144,7 +144,7 @@ export function bandCentre(points, t) {
 export function newBand(bands, duration) {
   const inside = (f) => bands.some((b) => [0, duration / 2, duration].some((t) => Math.abs(Math.log2(f / bandCentre(b.points, t))) <= b.width / 2));
   const centre = NEW_BAND_CENTRES.find((f) => !inside(f)) ?? 1000;
-  return { points: [[0, centre], [tidyTime(duration), centre]], width: 1, level: 0 };
+  return { points: [[0, centre], [Math.min(duration, tidyTime(duration)), centre]], width: 1, level: 0 };
 }
 
 export const clampBandWidth = (w) => Math.min(BAND_WIDTH_MAX, Math.max(BAND_WIDTH_MIN, w));
@@ -175,7 +175,7 @@ export function stretchBands(bands, from, to) {
   return bands.map((b) => {
     const points = [];
     for (const [t, f] of b.points) {
-      const next = tidyTime((t / from) * to);
+      const next = Math.min(to, tidyTime((t / from) * to));
       if (!points.length || next > points[points.length - 1][0]) points.push([next, f]);
     }
     return { ...b, points };

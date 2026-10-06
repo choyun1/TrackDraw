@@ -30,7 +30,8 @@ export class Player {
     source.buffer = buffer;
     source.connect(this.context.destination);
     source.onended = () => {
-      if (this.source === source) this.source = null;
+      if (this.source !== source) return; // stopped: stop() has said so
+      this.source = null;
       this.onended?.();
     };
     source.start();
@@ -43,6 +44,7 @@ export class Player {
       const source = this.source;
       this.source = null;
       source.stop();
+      this.onended?.();
     }
   }
 

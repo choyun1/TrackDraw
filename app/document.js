@@ -54,7 +54,7 @@ export function upgrade(doc) {
     };
   }
   if (doc?.app !== APP || doc.version !== VERSION) {
-    throw new Error(`not a sonore sketch document of version ${VERSION}, or a TrackDraw document of format ${tracks.FORMAT}`);
+    throw new Error(`not a sonore-sketch document of version ${VERSION}, or a TrackDraw document of format ${tracks.FORMAT}`);
   }
   // A tab added since the document was saved starts from its default.
   return {
@@ -122,7 +122,7 @@ export function forLink(page) {
 // which sets the duration to its own (up to the page's limit; F6),
 // stretching what the other tabs have drawn.
 export function withRecording(page, recording, seconds, tab = "edit") {
-  const duration = Math.round(Math.min(edit.MAX_RECORDING_S, seconds) * 1000) / 1000;
+  const duration = tracks.clampDuration(Math.round(Math.min(edit.MAX_RECORDING_S, seconds) * 1000) / 1000);
   const stretched = stretchPage(page, duration);
   return { ...stretched, recording, [tab]: { ...stretched[tab], source: "file" } };
 }

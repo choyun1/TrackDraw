@@ -27,7 +27,7 @@ test("a tab's state goes back into the page without touching the rest", () => {
 });
 
 test("opening refuses what is not a document, and tidies what is", () => {
-  assert.throws(() => openDocument({ hello: 1 }), /not a sonore sketch document/);
+  assert.throws(() => openDocument({ hello: 1 }), /not a sonore-sketch document/);
   assert.throws(() => openDocument({ ...defaultPage(), fs: 0 }), /fs must be/);
   const page = defaultPage();
   const repeated = withTabState(page, "tracks", { mode: "klatt", params: { F0: [[0, 0.3, 0.3, 0.6], [125, 100, 140, 95]] } });

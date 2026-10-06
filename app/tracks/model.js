@@ -296,7 +296,8 @@ export function stretch(doc, duration) {
 // link; the Python side checks the same (sonore_sketch.tracks.check).
 export function check(doc) {
   if (!doc || doc.trackdraw !== FORMAT) throw new Error(`not a TrackDraw document of format ${FORMAT}`);
-  if (!(doc.duration > 0 && doc.duration <= MAX_DURATION)) throw new Error(`duration must be in (0, ${MAX_DURATION}] s`);
+  if (!(typeof doc.duration === "number" && doc.duration >= MIN_DURATION && doc.duration <= MAX_DURATION))
+    throw new Error(`duration must be from ${MIN_DURATION} to ${MAX_DURATION} s`);
   if (!(doc.fs > 0)) throw new Error("fs must be a positive sampling rate");
   if ((doc.mode ?? "klatt") !== "klatt") throw new Error(`mode ${doc.mode} is not supported yet`);
   for (const [name, value] of Object.entries(doc.params ?? {})) {

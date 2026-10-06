@@ -90,6 +90,7 @@ try {
   log.error(`ignored the drawing in the link: ${error.message}`);
 }
 const history = new History(initial);
+const hasRecording = () => Boolean(history.present.recording);
 const commitFrom = (id) => (state) => change(withTabState(history.present, id, state));
 const tabs = {
   tracks: createTracksTab($("tab-tracks"), { commit: commitFrom("tracks") }),
@@ -97,6 +98,7 @@ const tabs = {
   mask: createMaskTab($("tab-mask"), {
     commit: commitFrom("mask"),
     openRecording: (recording, seconds) => change(withRecording(history.present, recording, seconds, "mask")),
+    hasRecording,
     log,
   }),
   blobs: createBlobsTab($("tab-blobs"), { commit: commitFrom("blobs") }),
@@ -104,6 +106,7 @@ const tabs = {
     commit: commitFrom("edit"),
     // a recording belongs to the page, and sets its duration (edit.md, E1)
     openRecording: (recording, seconds) => change(withRecording(history.present, recording, seconds)),
+    hasRecording,
     log,
   }),
 };
@@ -171,7 +174,7 @@ const progress = document.createElement("div");
 progress.className = "synth-progress";
 progress.innerHTML = `<div class="bar"></div><span class="label"></span>`;
 let requests = 0; // counts synthesize() calls: only the newest shows its progress
-let running = null; // {play} while a synthesis is under way
+let running = null; // {play, key, made} while a synthesis is under way
 
 // fraction from 0 to 1, undefined while it is not known yet, null to hide
 function showProgress(fraction) {
@@ -191,6 +194,11 @@ async function synthesize({ play }) {
   const asked = tab;
   const state = tabState(doc, tab.id);
   const key = `${tab.id} ${JSON.stringify(state)}`;
+  if (running?.key === key) {
+    // this drawing is already being made: hear it when it comes, rather than start over
+    running.play ||= play;
+    return running.made.catch(() => null);
+  }
   const mine = ++requests;
   if (result?.key === key) {
     running = null;
@@ -208,11 +216,12 @@ async function synthesize({ play }) {
     return null;
   }
   status(doc.duration > 1 ? `Synthesizing ${doc.duration} s…` : "Synthesizing…");
-  running = { play };
+  const made = engine.synthesize({ tab: tab.id, state }, (fraction) => mine === requests && showProgress(fraction));
+  const asking = (running = { play, key, made });
   showProgress(undefined);
   let sound;
   try {
-    sound = await engine.synthesize({ tab: tab.id, state }, (fraction) => mine === requests && showProgress(fraction));
+    sound = await made;
   } catch (error) {
     if (mine !== requests) return null; // a newer drawing is being made; this one's failure no longer matters
     running = null;
@@ -234,7 +243,7 @@ async function synthesize({ play }) {
   showResult();
   status(`Made ${doc.duration} s in ${sound.synthesisSeconds.toFixed(2)} s.`);
   log.info(`made ${doc.duration} s in ${sound.synthesisSeconds.toFixed(2)} s`);
-  if (play && history.present === doc) start(sound);
+  if (asking.play && history.present === doc) start(sound);
   return sound;
 }
 
@@ -247,13 +256,18 @@ function showResult() {
   ui.wav.disabled = !sound;
 }
 
+let ticking = false; // one playhead loop, however often a sound is restarted
+
 function start(sound) {
   player.play(sound.samples, sound.fs);
   ui.play.textContent = "■ Stop";
+  if (ticking) return;
+  ticking = true;
   const tick = () => {
     const t = player.position;
     tab.setPlayhead(t);
     if (t !== null) requestAnimationFrame(tick);
+    else ticking = false;
   };
   requestAnimationFrame(tick);
 }
@@ -274,7 +288,9 @@ async function togglePlay() {
 ui.play.addEventListener("click", togglePlay);
 
 ui.duration.addEventListener("change", () => {
-  const duration = clampDuration(Number(ui.duration.value) || history.present.duration);
+  const typed = ui.duration.value.trim() === "" ? NaN : Number(ui.duration.value);
+  // to the millisecond, as times on the tabs are
+  const duration = clampDuration(Math.round((Number.isFinite(typed) ? typed : history.present.duration) * 1000) / 1000);
   if (duration === history.present.duration) return (ui.duration.value = duration);
   change(stretchPage(history.present, duration));
 });
@@ -311,8 +327,10 @@ ui.save.addEventListener("click", () => {
   const text = JSON.stringify(saved(), null, 1);
   download(new Blob([text], { type: "application/json" }), "sketch.json");
 });
-ui.wav.addEventListener("click", () => {
-  if (result) download(wavBlob(result.sound.samples, result.sound.fs), "sketch.wav");
+// The sound of the drawing shown: made first if the last one is of an older drawing.
+ui.wav.addEventListener("click", async () => {
+  const sound = result?.doc === history.present ? result.sound : await synthesize({ play: false });
+  if (sound) download(wavBlob(sound.samples, sound.fs), "sketch.wav");
 });
 ui.open.addEventListener("click", () => ui.file.click());
 ui.file.addEventListener("change", async () => {
@@ -320,12 +338,30 @@ ui.file.addEventListener("change", async () => {
   ui.file.value = "";
   if (!file) return;
   try {
-    change(openDocument(JSON.parse(await file.text())));
+    const doc = openDocument(JSON.parse(await file.text()));
+    change(doc);
+    switchTab(doc.tab); // as a link does, the drawing opens on the tab it was saved on
     status(`Opened ${file.name}.`);
     log.info(`opened ${file.name}`);
   } catch (error) {
     status(`Could not open ${file.name}: ${error.message}`, true);
     log.error(`could not open ${file.name}: ${error.message}`);
+  }
+});
+// A link pasted into the address bar of the open page changes only the hash,
+// which does not reload it: open the drawing it holds, as a load would.
+// (The page's own replaceState does not fire this.)
+window.addEventListener("hashchange", () => {
+  try {
+    const linkedDoc = stateFromHash(location.hash);
+    if (!linkedDoc) return;
+    const doc = openDocument(linkedDoc);
+    change(doc);
+    switchTab(doc.tab);
+    status("Opened the drawing in the link.");
+  } catch (error) {
+    status(`Could not open the drawing in the link: ${error.message}`, true);
+    log.error(`could not open the drawing in the link: ${error.message}`);
   }
 });
 ui.link.addEventListener("click", async () => {
@@ -345,7 +381,7 @@ ui.logToggle.addEventListener("click", () => {
 ui.logClear.addEventListener("click", () => log.clear());
 ui.logCopy.addEventListener("click", async () => {
   const report = [
-    `sonore sketch log, ${new Date().toISOString()}`,
+    `sonore-sketch log, ${new Date().toISOString()}`,
     `versions: ${ui.versions.textContent || "(not loaded)"}`,
     `engine: ${engineKind}`,
     `browser: ${navigator.userAgent}`,
@@ -364,7 +400,8 @@ ui.logCopy.addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.target.matches?.("input[type=number], input[type=text]")) return;
+  // keys typed into a field, a list or a slider are theirs (radios and checkboxes leave Space to Play)
+  if (event.target.closest?.("select, textarea, input:not([type=radio]):not([type=checkbox])")) return;
   const mod = event.ctrlKey || event.metaKey;
   if (mod && event.key.toLowerCase() === "z") {
     event.preventDefault();
@@ -377,7 +414,7 @@ document.addEventListener("keydown", (event) => {
   if (mod || event.altKey) return;
   if (event.key === " ") {
     event.preventDefault();
-    return togglePlay();
+    return event.repeat ? undefined : togglePlay();
   }
   if (tab.key(event)) event.preventDefault();
 });

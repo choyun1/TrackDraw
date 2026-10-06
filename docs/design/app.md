@@ -178,7 +178,7 @@ Options:
 (a) keep **TrackDraw** for the whole app, for its history and the link to
 Assmann et al. (1994), with "Tracks" as one tab;
 (b) a name that ties it to sonore, such as **sonore-sketch** (import
-`sonore_sketch`, page "sonore sketch"): it says it is the drawing front end
+`sonore_sketch`, page "sonore-sketch"): it says it is the drawing front end
 of sonore;
 (c) a name of its own, such as **Soundsketch** or **Drawn Sound**.
 For the repository: rename `choyun1/TrackDraw`, which keeps the 2016 history
