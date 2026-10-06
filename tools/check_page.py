@@ -136,6 +136,15 @@ def main() -> None:
             f0 = document_in(page)["params"]["F0"]
             assert 3 <= len(f0[0]) <= 12 and max(f0[1]) > 150, f"freehand F0 not simplified as expected: {f0}"
             print(f"freehand: F0 has {len(f0[0])} breakpoints, peak {max(f0[1]):.0f} Hz")
+            # The F0 axis can be switched to linear and back; the drawing stays.
+            log_top = page.locator(".panel-F0 .tick").last.text_content()
+            page.locator('input[name="tracks-f0-scale"][value="linear"]').check()
+            ticks = page.locator(".panel-F0 .tick").all_text_contents()
+            assert ticks == ["0", "200", "400", "600", "800"] and log_top == "800", ticks
+            assert document_in(page)["params"]["F0"] == f0, "switching the F0 axis changed the drawing"
+            page.locator('input[name="tracks-f0-scale"][value="log"]').check()
+            assert page.locator(".panel-F0 .tick").first.text_content() == "25"
+            print("F0 axis: switched to linear and back to log")
             expect(status).to_contain_text("Made", timeout=60_000)
 
             # Bandwidths: the strip shows the selected formant's, here B1.

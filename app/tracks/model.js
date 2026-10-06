@@ -31,8 +31,12 @@ export const TRACKS = {
   // voicing turns into separate clicks and the rest of the sound goes odd
   // (Cho, 2026-10-05); 800 Hz leaves room above children's voices (about
   // 250-500 Hz) and sung or shrieked pitch. A log track's `tolerance` is in
-  // octaves: 0.02 is about 1.5 Hz at 100 Hz.
-  F0: { panel: "F0", min: 20, max: 800, floor: 20, scale: "log", unit: "Hz", tolerance: 0.02, color: "#444" },
+  // octaves: 0.02 is about 1.5 Hz at 100 Hz. The strip can also be shown
+  // linear, 0-800 Hz, with `linear` in place of the log settings.
+  F0: {
+    panel: "F0", min: 20, max: 800, floor: 20, scale: "log", unit: "Hz", tolerance: 0.02, color: "#444",
+    linear: { min: 0, tolerance: 1.5 },
+  },
   AV: { panel: "AV", min: 0, max: 80, unit: "dB", tolerance: 1, color: "#444" },
   ...Object.fromEntries(
     [1, 2, 3, 4, 5].map((k, i) => [
@@ -124,25 +128,35 @@ export function clampValue(name, v) {
   return Math.min(max, Math.max(floor, v));
 }
 
+// A track's settings as its panel shows it: `scale` "log" or "linear", or
+// the track's own when not given. Only a track with `linear` settings can be
+// shown linear.
+export function trackSpec(name, scale = TRACKS[name].scale) {
+  const track = TRACKS[name];
+  return scale === "linear" && track.linear ? { ...track, ...track.linear, scale: "linear" } : track;
+}
+
 // A track's values as its panel spaces them: octaves (log2 Hz) for a log
-// track, the value itself otherwise.
-export const toScale = (name, v) => (TRACKS[name].scale === "log" ? Math.log2(v) : v);
-export const fromScale = (name, u) => (TRACKS[name].scale === "log" ? 2 ** u : u);
+// scale, the value itself otherwise.
+export const toScale = (name, v, scale) => (trackSpec(name, scale).scale === "log" ? Math.log2(v) : v);
+export const fromScale = (name, u, scale) => (trackSpec(name, scale).scale === "log" ? 2 ** u : u);
 
 // A freehand stroke simplified within the track's tolerance, measured as the
-// panel spaces values, so a log track keeps the same detail in every octave.
-export function simplifyStroke(name, stroke) {
-  const scaled = stroke.map(([t, v]) => [t, toScale(name, v)]);
-  return simplify(scaled, TRACKS[name].tolerance).map(([t, u]) => [t, fromScale(name, u)]);
+// panel spaces values, so on a log scale the same detail is kept in every
+// octave.
+export function simplifyStroke(name, stroke, scale) {
+  const scaled = stroke.map(([t, v]) => [t, toScale(name, v, scale)]);
+  return simplify(scaled, trackSpec(name, scale).tolerance).map(([t, u]) => [t, fromScale(name, u, scale)]);
 }
 
 // The breakpoints of a Line from a to b (sorted by time). sonore goes in a
-// straight line in Hz between breakpoints, so on a log track the line is
+// straight line in Hz between breakpoints, so on a log scale the line is
 // laid as enough breakpoints to stay within the tolerance of a straight
 // line in octaves, which is what was drawn.
-export function lineSpan(name, a, b) {
+export function lineSpan(name, a, b, scale) {
   const [p, q] = [a, b].sort((x, y) => x[0] - y[0]);
-  if (TRACKS[name].scale !== "log" || p[0] === q[0] || p[1] === q[1]) return [p, q];
+  const { scale: kind, tolerance } = trackSpec(name, scale);
+  if (kind !== "log" || p[0] === q[0] || p[1] === q[1]) return [p, q];
   // Each of n equal pieces spans ratio r; the straight-in-Hz chord across it
   // strays furthest from the octave line somewhere inside, found by sampling.
   const octaves = Math.log2(q[1] / p[1]);
@@ -153,16 +167,16 @@ export function lineSpan(name, a, b) {
     return worst;
   };
   let n = 1;
-  while (stray(n) > TRACKS[name].tolerance) n++;
+  while (stray(n) > tolerance) n++;
   return Array.from({ length: n + 1 }, (_, i) =>
     i === 0 ? p : i === n ? q : [p[0] + ((q[0] - p[0]) * i) / n, p[1] * 2 ** ((octaves * i) / n)],
   );
 }
 
-// Points to draw a track through: its breakpoints, and on a log track the
+// Points to draw a track through: its breakpoints, and on a log scale the
 // curve sonore takes between them (straight in Hz is bent in octaves).
-export function drawnPoints(name, pts) {
-  if (TRACKS[name].scale !== "log") return pts;
+export function drawnPoints(name, pts, scale) {
+  if (trackSpec(name, scale).scale !== "log") return pts;
   const out = [pts[0]];
   for (let i = 1; i < pts.length; i++) {
     const [t0, v0] = pts[i - 1];

@@ -8,6 +8,7 @@ import {
   drawnPoints,
   lineSpan,
   simplifyStroke,
+  trackSpec,
   clampDuration,
   clampValue,
   defaultDocument,
@@ -184,4 +185,14 @@ test("a log track is drawn along the curve sonore takes between breakpoints", ()
 test("F0 is clamped to 20-800 Hz", () => {
   assert.equal(clampValue("F0", 5), 20);
   assert.equal(clampValue("F0", 2000), 800);
+});
+
+test("F0 can be shown linear: 0-800 Hz, strokes simplified in Hz, Lines kept to two ends", () => {
+  assert.equal(trackSpec("F0").scale, "log");
+  const linear = trackSpec("F0", "linear");
+  assert.deepEqual([linear.scale, linear.min, linear.max, linear.tolerance], ["linear", 0, 800, 1.5]);
+  assert.deepEqual(lineSpan("F0", [0, 100], [0.5, 400], "linear"), [[0, 100], [0.5, 400]]);
+  assert.deepEqual(drawnPoints("F0", [[0, 100], [0.5, 400]], "linear"), [[0, 100], [0.5, 400]]);
+  // Tracks with no linear settings stay as they are.
+  assert.equal(trackSpec("F1", "log").scale, undefined);
 });
