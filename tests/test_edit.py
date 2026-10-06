@@ -100,11 +100,27 @@ def test_a_page_document_gives_the_edit_state_its_source():
     assert state["recording"]["name"] == "x" and "speech" not in state
 
 
-def test_the_page_result_holds_the_sources_spectrum_on_the_plane():
+def test_the_page_result_holds_the_source_and_result_spectra_and_the_clipping():
     result = page.handle({"tab": "edit", "state": {**STATE, "iterations": 0}})
-    picture = result["source_modulation"]
-    assert len(picture["data"]) == picture["n_densities"] * picture["n_rates"]
-    assert picture["rate_first"] == pytest.approx(-64, abs=1.01) and picture["density_step"] > 0
+    for key in ("source_modulation", "modulation"):
+        picture = result[key]
+        assert len(picture["data"]) == picture["n_densities"] * picture["n_rates"]
+        assert picture["rate_first"] == pytest.approx(-64, abs=1.01) and picture["density_step"] > 0
+    # a hard cut at 4 Hz needs envelopes below zero (edit.md, E-M5: 15-31%)
+    assert 0.05 < result["clipped"] < 0.5
+    unedited = page.handle({"tab": "edit", "state": {**STATE, "iterations": 0, "levels": edit.encode(np.zeros((edit.ROWS, edit.COLUMNS)))}})
+    assert unedited["clipped"] == 0
+
+
+def test_the_clipping_warning_is_read_and_others_pass_on():
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        warnings.warn("12.5% of the rebuilt envelope values were below zero and were clipped")
+        warnings.warn("something else")
+    with pytest.warns(UserWarning, match="something else"):
+        assert edit.clipped_fraction(caught) == 0.125
 
 
 @pytest.mark.parametrize(
@@ -125,4 +141,4 @@ def _run(state):
             fractions.append(next(work))
         except StopIteration as done:
             assert fractions == sorted(fractions) and fractions[-1] == 1
-            return done.value
+            return done.value[:2]

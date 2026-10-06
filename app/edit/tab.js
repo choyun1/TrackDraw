@@ -64,11 +64,13 @@ export function createEditTab(root, { commit, openRecording, log }) {
           <h3 class="panel-group" title="What you paint: cuts on the source's modulation spectrum">Design</h3>
           <div class="panel-stack">
             <canvas class="mask-plane" title="The source's modulation spectrum; what you paint is cut from it"></canvas>
+            <p class="hint clip-note" hidden></p>
           </div>
         </section>
         <section class="panel-box result-box">
           <h3 class="panel-group" title="What came out">Result</h3>
           <div class="panel-stack">
+            <canvas class="measured-plane" title="The result's own modulation spectrum, measured from the sound, on the plane's axes"></canvas>
             <canvas class="result-stft" title="The result's spectrogram (5 ms window) on a log-frequency axis"></canvas>
             <canvas class="wave" title="The result's waveform"></canvas>
           </div>
@@ -115,6 +117,7 @@ export function createEditTab(root, { commit, openRecording, log }) {
     size: $(".size"), softness: $(".softness"), cut: $(".cut"), clear: $(".clear"),
     keepBelow: $(".keep-below"), keepRate: $(".keep-rate"), noDown: $(".no-down"), noUp: $(".no-up"),
     carrier: $(".carrier"), iterations: $(".iterations"), coarse: $(".coarse"), stft: $("canvas.result-stft"), wave: $("canvas.wave"),
+    measured: $("canvas.measured-plane"), clipNote: $(".clip-note"),
   };
   for (const input of root.querySelectorAll('input[name="edit-mode"]')) input.addEventListener("change", () => (mode = input.value));
   function setMode(next) {
@@ -150,6 +153,7 @@ export function createEditTab(root, { commit, openRecording, log }) {
     if (state === next) {
       bytes = decoded;
       render();
+      renderMeasured();
     }
   }
 
@@ -212,13 +216,14 @@ export function createEditTab(root, { commit, openRecording, log }) {
 
   // --- the plane -------------------------------------------------------------------
 
-  function geometry() {
-    const width = canvas.clientWidth || 600;
-    const height = canvas.clientHeight || 300;
-    const x0 = MARGIN.left;
-    const x1 = width - MARGIN.right;
-    const y0 = MARGIN.top;
-    const y1 = height - MARGIN.bottom;
+  // The plane's axes on `target` (the design plane, or the measured one below).
+  function geometry(target = canvas, margin = MARGIN) {
+    const width = target.clientWidth || 600;
+    const height = target.clientHeight || 300;
+    const x0 = margin.left;
+    const x1 = width - margin.right;
+    const y0 = margin.top;
+    const y1 = height - margin.bottom;
     const xc = (x0 + x1) / 2;
     const half = xc - STRIP - x0;
     const span = Math.log2(RATE_MAX / RATE_MIN);
@@ -250,18 +255,19 @@ export function createEditTab(root, { commit, openRecording, log }) {
   }
 
   const image = document.createElement("canvas");
+  const measuredImage = document.createElement("canvas");
 
-  // The source's spectrum, darkened where the mask cuts, one pixel per CSS
-  // pixel of the plot: each pixel shows the analysis cell it falls in (the
-  // strip, the loudest cell under 1 Hz) and the mask cell it falls in.
-  function picture(g, mask) {
+  // A spectrum on the plane (`shown`, a modulation picture), darkened where
+  // `mask` cuts, into `image`, one pixel per CSS pixel of the plot: each
+  // pixel shows the analysis cell it falls in (the strip, the loudest cell
+  // under 1 Hz) and the mask cell it falls in.
+  function picture(g, shown, mask, image) {
     const width = Math.max(1, Math.round(g.x1 - g.x0));
     const height = Math.max(1, Math.round(g.y1 - g.y0));
     image.width = width;
     image.height = height;
     const context = image.getContext("2d");
     const pixels = context.createImageData(width, height);
-    const shown = source?.picture ?? null;
     const floor = magma(0);
     const rowOf = Int32Array.from({ length: height }, (_, py) => Math.min(ROWS - 1, Math.max(0, Math.floor(g.cell(0, g.y0 + py + 0.5)[0]))));
     const densityCell = Int32Array.from({ length: height }, (_, py) => (shown ? Math.round(g.density(g.y0 + py + 0.5) / shown.densityStep) : -1));
@@ -323,21 +329,12 @@ export function createEditTab(root, { commit, openRecording, log }) {
     context.stroke();
   }
 
-  function render() {
-    if (!state) return;
-    const context = fitCanvas(canvas);
-    const ratio = canvas.width / (canvas.clientWidth || 1);
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    const g = geometry();
-    const style = getComputedStyle(canvas);
+  // The plane's frame, gridlines and labels, as on the Modulation tab
+  // (`densities`: the ones labelled; `words`: the rate axis's name and directions).
+  function axes(context, target, g, densities, words) {
+    const style = getComputedStyle(target);
     const muted = style.getPropertyValue("--muted").trim() || "#6b7280";
     const line = style.getPropertyValue("--line").trim() || "#d5d9e0";
-    context.clearRect(0, 0, g.width, g.height);
-    const mask = stroke?.preview ?? bytes;
-    context.imageSmoothingEnabled = false;
-    context.drawImage(picture(g, mask), g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0);
-
-    // axes and gridlines, as on the Modulation tab
     context.lineWidth = 1;
     context.font = "11px system-ui, sans-serif";
     context.fillStyle = muted;
@@ -345,7 +342,7 @@ export function createEditTab(root, { commit, openRecording, log }) {
     context.strokeRect(g.x0 + 0.5, g.y0 + 0.5, g.x1 - g.x0 - 1, g.y1 - g.y0 - 1);
     context.textAlign = "right";
     context.textBaseline = "middle";
-    for (let d = 0; d <= DENSITY_MAX; d++) {
+    for (const d of densities) {
       const y = Math.round(g.y(d)) + 0.5;
       context.strokeStyle = "rgba(255, 255, 255, 0.15)";
       context.beginPath();
@@ -354,12 +351,14 @@ export function createEditTab(root, { commit, openRecording, log }) {
       context.stroke();
       context.fillText(`${d}`, g.x0 - 6, Math.min(Math.max(y, g.y0 + 5), g.y1 - 5));
     }
-    context.save();
-    context.translate(12, (g.y0 + g.y1) / 2);
-    context.rotate(-Math.PI / 2);
-    context.textAlign = "center";
-    context.fillText("cyc/oct", 0, 0);
-    context.restore();
+    if (words) {
+      context.save();
+      context.translate(12, (g.y0 + g.y1) / 2);
+      context.rotate(-Math.PI / 2);
+      context.textAlign = "center";
+      context.fillText("cyc/oct", 0, 0);
+      context.restore();
+    }
     context.textAlign = "center";
     context.textBaseline = "top";
     for (const sign of [-1, 1]) {
@@ -374,12 +373,26 @@ export function createEditTab(root, { commit, openRecording, log }) {
       }
     }
     context.fillText("0", g.xc, g.y1 + 4); // the strip: |rate| under 1 Hz
+    if (!words) return;
     context.textAlign = "left";
     context.fillText("← sweeps up", g.x0, g.y1 + 19);
     context.textAlign = "center";
     context.fillText("rate, Hz", g.xc, g.y1 + 19);
     context.textAlign = "right";
     context.fillText("sweeps down →", g.x1, g.y1 + 19);
+  }
+
+  function render() {
+    if (!state) return;
+    const context = fitCanvas(canvas);
+    const ratio = canvas.width / (canvas.clientWidth || 1);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const g = geometry();
+    context.clearRect(0, 0, g.width, g.height);
+    const mask = stroke?.preview ?? bytes;
+    context.imageSmoothingEnabled = false;
+    context.drawImage(picture(g, source?.picture ?? null, mask, image), g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0);
+    axes(context, canvas, g, [0, 1, 2, 3, 4, 5, 6], true);
 
     if (mask) {
       context.strokeStyle = "rgba(255, 255, 255, 0.85)";
@@ -400,6 +413,43 @@ export function createEditTab(root, { commit, openRecording, log }) {
       context.stroke();
       context.setLineDash([]);
     }
+  }
+
+  // What came out: the result's own modulation spectrum, measured from the
+  // sound on the plane's axes, with the mask's outline over it, so what was
+  // painted and what was heard compare by eye (E7; E-M3: an edit comes out
+  // weaker than painted).
+  const MEASURED_MARGIN = { left: MARGIN.left, right: MARGIN.right, top: 6, bottom: 22 };
+  function renderMeasured() {
+    const target = ui.measured;
+    const context = fitCanvas(target);
+    const ratio = target.width / (target.clientWidth || 1);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const g = geometry(target, MEASURED_MARGIN);
+    context.clearRect(0, 0, g.width, g.height);
+    if (!state) return;
+    const shown = sound?.modulation ?? null;
+    context.imageSmoothingEnabled = false;
+    context.drawImage(picture(g, shown, null, measuredImage), g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0);
+    axes(context, target, g, [0, 2, 4, 6], false);
+    const mask = stroke?.preview ?? bytes;
+    if (mask && shown) {
+      context.strokeStyle = "rgba(255, 255, 255, 0.6)";
+      context.setLineDash([3, 3]);
+      outline(context, g, mask);
+      context.setLineDash([]);
+    }
+    context.textAlign = "left";
+    context.textBaseline = "top";
+    context.fillStyle = "rgba(255, 255, 255, 0.85)";
+    context.fillText(shown ? "The result's modulation spectrum, measured; the cuts are outlined" : "The result's modulation spectrum: Play to measure it", g.x0 + 6, g.y0 + 4);
+  }
+
+  // E9: sonore clips envelopes an edit pushes below zero; say how much, not as an error.
+  function showClipping() {
+    const clipped = sound?.clipped ?? 0;
+    ui.clipNote.hidden = !(clipped > 0);
+    ui.clipNote.textContent = `${Math.round(100 * clipped)}% of the envelopes were clipped: the result differs from what is painted. A softer brush edge clips less.`;
   }
 
   // --- painting --------------------------------------------------------------------
@@ -462,6 +512,7 @@ export function createEditTab(root, { commit, openRecording, log }) {
     if (event.type === "pointercancel" || next.every((b, i) => b === bytes[i])) return render();
     bytes = next;
     render();
+    renderMeasured();
     commitBytes(next);
   }
   canvas.addEventListener("pointerup", finish);
@@ -539,6 +590,7 @@ export function createEditTab(root, { commit, openRecording, log }) {
 
   new ResizeObserver(render).observe(canvas);
   new ResizeObserver(renderStft).observe(ui.stft);
+  new ResizeObserver(renderMeasured).observe(ui.measured);
   new ResizeObserver(renderWave).observe(ui.wave);
 
   return {
@@ -554,6 +606,7 @@ export function createEditTab(root, { commit, openRecording, log }) {
       if (decoded) {
         bytes = decoded;
         render();
+        renderMeasured();
       } else {
         load(next);
       }
@@ -561,7 +614,10 @@ export function createEditTab(root, { commit, openRecording, log }) {
     setResult(next) {
       sound = next ?? null;
       if (sound?.sourceModulation) source = { key: sourceKey(state), picture: sound.sourceModulation };
+      if (sound?.clipped > 0) log?.info(`${Math.round(100 * sound.clipped)}% of the envelopes were clipped (sonore's warning)`);
+      showClipping();
       render();
+      renderMeasured();
       renderStft();
       renderWave();
     },

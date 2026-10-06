@@ -494,6 +494,15 @@ def main() -> None:
                     const s = new Set(); for (let i = 0; i < d.length; i += 4) s.add(d[i] << 16 | d[i + 1] << 8 | d[i + 2]); return s.size; }"""
             )
             assert colours > 100, f"the source's spectrum is not drawn on the plane ({colours} colours)"
+            measured = page.evaluate(
+                """() => { const c = document.querySelector('#tab-edit canvas.measured-plane');
+                    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+                    const s = new Set(); for (let i = 0; i < d.length; i += 4) s.add(d[i] << 16 | d[i + 1] << 8 | d[i + 2]); return s.size; }"""
+            )
+            assert measured > 100, f"the result's measured spectrum is not drawn ({measured} colours)"
+            # a hard cut clips envelopes, which a note says (E9)
+            expect(page.locator("#tab-edit .clip-note")).to_contain_text("% of the envelopes were clipped")
+            print(f"edit: the source's spectrum ({colours} colours), the result's ({measured}) and the clipping note are shown")
             plane = page.locator("#tab-edit canvas.mask-plane").bounding_box()
             p_left, p_right = plane["x"] + 52, plane["x"] + plane["width"] - 10
             p_top, p_bottom = plane["y"] + 8, plane["y"] + plane["height"] - 36
@@ -528,6 +537,7 @@ def main() -> None:
             page.wait_for_function("h => location.hash !== h", arg=before)
             expect(status).to_contain_text("Made", timeout=120_000)
             assert not edit_tab.cuts(page_document_in(page)["edit"]).any()
+            expect(page.locator("#tab-edit .clip-note")).to_be_hidden()  # nothing cut, nothing clipped
             page.locator("#tab-edit .iterations").fill("0")
             page.locator("#tab-edit .iterations").press("Enter")
             page.select_option("#tab-edit .carrier", "tones")

@@ -116,6 +116,7 @@ function convert(result) {
       },
       modulation: modulationPicture(result, "modulation"),
       sourceModulation: modulationPicture(result, "source_modulation"),
+      clipped: result.has("clipped") ? result.get("clipped") : null,
     };
   } finally {
     picture.destroy();

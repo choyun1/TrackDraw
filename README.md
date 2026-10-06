@@ -75,8 +75,11 @@ centre strip for rates under 1 Hz. Paint on it to cut that modulation
 below some Hz, or remove the downward or upward sweeps. The **carrier** is
 the source's own fine structure, tones or noise; **Iterations** search for
 a sound whose own modulation comes closer to the edit, which the source's
-own fine structure needs to be heard well. A recording is kept in saved
-files but never in links.
+own fine structure needs to be heard well. The **Result** panels show the
+sound that came out: its own modulation spectrum, measured, with the cuts
+outlined over it, its spectrogram and its waveform. When an edit needs
+envelopes below zero, sonore clips them and a note under the plane says how
+much. A recording is kept in saved files but never in links.
 
 ## The same sound in Python
 

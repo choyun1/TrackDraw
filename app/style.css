@@ -89,6 +89,12 @@ canvas.stft {
   background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
   cursor: crosshair; touch-action: none;
 }
+.edit-body canvas.measured-plane {
+  display: block; width: 100%; height: 170px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+}
+.edit-body .clip-note { margin: 0 10px 0 52px; }
+.edit-body .clip-note[hidden] { display: none; }
 .edit-body canvas.result-stft {
   display: block; width: 100%; height: 220px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 6px;

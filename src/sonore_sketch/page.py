@@ -103,8 +103,8 @@ def handle(request: Mapping[str, Any]) -> dict[str, Any]:
     (sonore's level: RMS 1), a spectrogram (:func:`spectrogram`), and the
     seconds synthesis took; on the Modulation tab also the result's measured
     modulation spectrum (``blobs.measured_picture``), and on the Edit
-    modulation tab the source's (``edit.plane_picture``), which the mask is
-    painted over.
+    modulation tab the source's and the result's (``edit.plane_picture``)
+    and the fraction of envelope values sonore clipped.
     """
     work = handle_steps(request)
     while True:
@@ -137,7 +137,7 @@ def handle_steps(request: Mapping[str, Any]) -> Iterator[float]:
             try:
                 yield 0.9 * next(work)
             except StopIteration as done:
-                sound, original = done.value
+                sound, original, clipped = done.value
                 break
     else:
         sound = TABS[tab](request["state"])
@@ -151,6 +151,8 @@ def handle_steps(request: Mapping[str, Any]) -> Iterator[float]:
     }
     if tab == "blobs":  # the result's measured modulation spectrum, for under the plane (blobs.md, B7)
         result["modulation"] = blobs.measured_picture(blobs.measured(sound, request["state"]))
-    if tab == "edit":  # the source's modulation spectrum, on the plane (edit.md, E7)
+    if tab == "edit":  # the source's modulation spectrum and the result's, on the plane (edit.md, E7, E9)
         result["source_modulation"] = edit.plane_picture(original)
+        result["modulation"] = edit.plane_picture(edit.analyse(sound, request["state"]))
+        result["clipped"] = clipped
     return result

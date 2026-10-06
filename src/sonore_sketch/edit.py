@@ -26,6 +26,8 @@ from __future__ import annotations
 import base64
 import binascii
 import math
+import re
+import warnings
 import zlib
 from collections.abc import Iterator, Mapping
 from fractions import Fraction
@@ -242,7 +244,10 @@ def analyse(sound: so.Sound, state: Mapping[str, Any]) -> so.ModulationSpectrum:
 def steps(state: Mapping[str, Any]) -> Iterator[float]:
     """``synthesize`` one step at a time: yields the fraction done after the
     source, its analysis, the first synthesis and each iteration, and returns
-    ``(sound, the source's modulation spectrum)``."""
+    ``(sound, the source's modulation spectrum, the fraction of envelope
+    values sonore clipped)``. An edit that would need envelopes below zero
+    is clipped, and sonore warns (E9); the page shows the fraction as a
+    note, not an error."""
     check(state)
     iterations = int(state["iterations"])
     total = iterations + 3
@@ -252,15 +257,32 @@ def steps(state: Mapping[str, Any]) -> Iterator[float]:
     yield 2 / total
     edited = spectrum.with_gain(gain(state))
     carrier = state["carrier"]
-    if carrier == "source":
-        sound = edited.to_sound(carrier=original)
-    else:
-        sound = edited.to_sound(carrier=carrier, fs=float(state["fs"]), rng=int(state.get("seed", 1)))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        if carrier == "source":
+            sound = edited.to_sound(carrier=original)
+        else:
+            sound = edited.to_sound(carrier=carrier, fs=float(state["fs"]), rng=int(state.get("seed", 1)))
+    clipped = clipped_fraction(caught)
     yield 3 / total
     for i in range(iterations):  # to_sound's own iterations, one at a time (as blobs._toward_drawn)
         sound = _toward(sound, edited)
         yield (i + 4) / total
-    return (sound.normalize() if sound.rms > 0 else sound), spectrum
+    return (sound.normalize() if sound.rms > 0 else sound), spectrum, clipped
+
+
+def clipped_fraction(caught) -> float:
+    """The fraction of envelope values sonore says it clipped, from its
+    warning ("12.3% of the rebuilt envelope values were below zero ..."),
+    or 0; other warnings are passed on."""
+    clipped = 0.0
+    for warning in caught:
+        match = re.match(r"([0-9.]+)% of the rebuilt envelope values", str(warning.message))
+        if match:
+            clipped = max(clipped, float(match.group(1)) / 100)
+        else:
+            warnings.warn_explicit(warning.message, warning.category, warning.filename, warning.lineno)
+    return clipped
 
 
 def _toward(sound: so.Sound, target: so.ModulationSpectrum) -> so.Sound:

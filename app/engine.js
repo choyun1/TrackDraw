@@ -4,8 +4,9 @@
 //
 // Both resolve a request {tab, state} to
 // {fs, samples: Float32Array, synthesisSeconds, spectrogram: {...}}, on the
-// Modulation tab modulation: {...} and on the Edit modulation tab
-// sourceModulation: {...} (modulationPicture).
+// Modulation tab modulation: {...}, and on the Edit modulation tab
+// modulation, sourceModulation: {...} (modulationPicture) and clipped (a
+// fraction).
 
 function bytesFromBase64(text) {
   const binary = atob(text);
@@ -86,6 +87,7 @@ class LocalEngine {
       },
       modulation: body.modulation && modulationPicture(body.modulation, bytesFromBase64(body.modulation.data)),
       sourceModulation: body.source_modulation && modulationPicture(body.source_modulation, bytesFromBase64(body.source_modulation.data)),
+      clipped: body.clipped ?? null,
     };
   }
 }

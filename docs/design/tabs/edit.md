@@ -259,8 +259,8 @@ After the decisions, each a PR for Cho:
    mask, presets, `edit.py` and its tests, playback, and the page check.
 3. The measured result spectrum below the plane, and the clipping note.
 
-Steps 1 and 2 were built together (2026-10-06), since a source has nothing
-to show it until the tab does. As built: the recording is kept on the page
+All three steps were built in one PR (2026-10-06), since a source has
+nothing to show it until the tab does and the measured result is small. As built: the recording is kept on the page
 document as 16-bit samples in base64 (`recording`), and opened from the
 tab's Source box rather than the shell's Open button, which stays for
 saved drawings.
