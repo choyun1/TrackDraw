@@ -7,11 +7,9 @@ reuses the Paint primitive of `painted.md`, with a cell meaning a gain on the
 recording rather than a level of a new sound, and it uses the recordings the
 Edit modulation tab already opens (`edit.md`, E1, built in PR #33).
 
-Status: proposed 2026-10-05, parked, revised 2026-10-06 for Cho to decide.
-Since it was parked, the Edit modulation tab has built recordings (open a
-file, keep it in saved files and not in links, let it set the duration), so
-F1, F3 and F6 are settled and this tab reuses that code. Three decisions
-are open: F2, F4 and F5. No code until they are answered.
+Status: decided 2026-10-06. Cho accepted every recommendation (F2 (b),
+F4 (a), F5 (a)); F1, F3 and F6 were settled by the Edit modulation tab,
+which built recordings in PR #33. Built in one PR.
 
 This project is AI-assisted: the document and `tools/measure_mask.py` were
 drafted by Claude (Claude Code), for Cho to review.
