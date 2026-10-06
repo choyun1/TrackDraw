@@ -47,6 +47,17 @@ const TOOLS = [
   { id: "freehand", label: "Freehand", key: "f", title: "Draw a stroke; it becomes the fewest breakpoints that follow it (F)" },
 ];
 
+// Keys that select a track, matched by physical key (event.code) so they
+// sit in the same place whatever the layout: on AZERTY the digits need no
+// Shift this way. F0 has 0 and also the key left of 1 (` on US layouts).
+const TRACK_KEYS = {
+  ...Object.fromEntries([1, 2, 3, 4, 5].flatMap((k) => [[`Digit${k}`, `F${k}`], [`Numpad${k}`, `F${k}`]])),
+  Digit0: "F0", Numpad0: "F0", Backquote: "F0",
+};
+// The key shown on each track's button, and the fuller list in its tooltip.
+const TRACK_KEY_LABELS = { F1: "1", F2: "2", F3: "3", F4: "4", F5: "5", F0: "0" };
+const TRACK_KEY_TITLES = { ...TRACK_KEY_LABELS, F0: "0 or `" };
+
 function element(name, attributes = {}, parent = null) {
   const node = document.createElementNS(SVG, name);
   for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
@@ -80,7 +91,7 @@ export function createTracksTab(root, { commit }) {
           <label class="choice"><input type="radio" name="tracks-f0-scale" value="log"> Log (octaves)</label>
           <label class="choice"><input type="radio" name="tracks-f0-scale" value="linear"> Linear</label>
         </fieldset>
-        <p class="hint">Space plays. 1–5 select F1–F5. Ctrl+Z undoes.</p>
+        <p class="hint">Space plays. 1–5 select F1–F5, 0 or \` selects F0. Ctrl+Z undoes.</p>
       </aside>
     </div>`;
   const panelsNode = root.querySelector(".panels");
@@ -112,8 +123,16 @@ export function createTracksTab(root, { commit }) {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = name;
+    if (TRACK_KEY_LABELS[name]) {
+      const kbd = document.createElement("kbd");
+      kbd.textContent = TRACK_KEY_LABELS[name];
+      button.append(" ", kbd);
+      button.title = `Select ${name} (${TRACK_KEY_TITLES[name]})`;
+    }
     button.style.setProperty("--track", TRACKS[name].color);
     button.style.setProperty("--track-bright", TRACKS[name].bright ?? TRACKS[name].color);
+    // The selected button is dark, so its label needs a light colour: F0 and AV have none of their own.
+    button.style.setProperty("--track-active", TRACKS[name].bright ?? "#fff");
     button.addEventListener("click", () => select(name));
     trackGroup.appendChild(button);
     trackButtons[name] = button;
@@ -412,8 +431,8 @@ export function createTracksTab(root, { commit }) {
         toolGroup.querySelector(`input[value="${tool}"]`).checked = true;
         return true;
       }
-      if (/^[1-5]$/.test(event.key)) {
-        select(`F${event.key}`);
+      if (TRACK_KEYS[event.code]) {
+        select(TRACK_KEYS[event.code]);
         return true;
       }
       return false;
