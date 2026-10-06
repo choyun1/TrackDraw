@@ -9,10 +9,11 @@
 //    "painted": {"f_lo": 100, "f_hi": 6400, ..., "levels": "..."},
 //    "blobs": {"carrier": "tones", ..., "items": [{"rate": 4, ...}]},
 //    "edit": {"source": "syllables", ..., "levels": "..."},
+//    "mask": {"source": "syllables", ..., "levels": "..."},
 //    "recording": {"name": "talk.wav", "fs": 16000, "pcm16": "..."}}
 //
-// A recording opened on the Edit modulation tab belongs to the page, so a
-// tab that edits a recording can use it; it is kept in saved files but never
+// A recording opened on the Edit modulation or Filter recording tab belongs
+// to the page, so either tab can use it; it is kept in saved files but never
 // in links (docs/design/tabs/edit.md, E1), which would be far too long.
 //
 // A tab works on its own state, the shape its Python function takes
@@ -24,18 +25,20 @@
 
 import * as blobs from "./blobs/model.js";
 import * as edit from "./edit/model.js";
+import * as mask from "./mask/model.js";
 import * as painted from "./painted/model.js";
 import * as tracks from "./tracks/model.js";
 
 export const APP = "sonore-sketch";
 export const VERSION = 2;
-export const TABS = ["tracks", "painted", "blobs", "edit"];
+export const TABS = ["tracks", "painted", "mask", "blobs", "edit"];
 
 export function defaultPage() {
   const { sonore, duration, fs, mode, params } = tracks.defaultDocument();
   return {
     app: APP, version: VERSION, sonore, duration, fs, tab: "tracks",
     tracks: { mode, params }, painted: painted.defaultSection(), blobs: blobs.defaultSection(), edit: edit.defaultSection(),
+    mask: mask.defaultSection(),
   };
 }
 
@@ -47,6 +50,7 @@ export function upgrade(doc) {
     return {
       app: APP, version: VERSION, sonore, duration, fs, tab: "tracks",
       tracks: { mode, params }, painted: painted.defaultSection(), blobs: blobs.defaultSection(), edit: edit.defaultSection(),
+      mask: mask.defaultSection(),
     };
   }
   if (doc?.app !== APP || doc.version !== VERSION) {
@@ -58,6 +62,7 @@ export function upgrade(doc) {
     painted: doc.painted ?? painted.defaultSection(),
     blobs: doc.blobs ?? blobs.defaultSection(),
     edit: doc.edit ?? edit.defaultSection(),
+    mask: doc.mask ?? mask.defaultSection(),
   };
 }
 
@@ -75,10 +80,10 @@ export function tabState(page, tab) {
     const { sonore, duration, fs } = page;
     return { blobs: blobs.FORMAT, sonore, duration, fs, ...page.blobs };
   }
-  if (tab === "edit") {
+  if (tab === "edit" || tab === "mask") {
     // the source's own drawing goes with the state, so a change to it is heard
     const { sonore, duration, fs } = page;
-    const state = { edit: edit.FORMAT, sonore, duration, fs, ...page.edit };
+    const state = { [tab]: tab === "edit" ? edit.FORMAT : mask.FORMAT, sonore, duration, fs, ...page[tab] };
     if (state.source === "speech") state.speech = page.tracks;
     if (state.source === "file" && page.recording) state.recording = page.recording;
     return state;
@@ -100,9 +105,9 @@ export function withTabState(page, tab, state) {
     const { blobs: _format, sonore: _sonore, duration: _duration, fs: _fs, ...section } = state;
     return { ...page, blobs: section };
   }
-  if (tab === "edit") {
-    const { edit: _format, sonore: _sonore, duration: _duration, fs: _fs, speech: _speech, recording: _recording, ...section } = state;
-    return { ...page, edit: section };
+  if (tab === "edit" || tab === "mask") {
+    const { [tab]: _format, sonore: _sonore, duration: _duration, fs: _fs, speech: _speech, recording: _recording, ...section } = state;
+    return { ...page, [tab]: section };
   }
   throw new Error(`unknown tab ${tab}`);
 }
@@ -113,12 +118,13 @@ export function forLink(page) {
   return rest;
 }
 
-// A recording opened in the page, which sets the duration to its own (up to
-// the page's limit; F6), stretching what the other tabs have drawn.
-export function withRecording(page, recording, seconds) {
+// A recording opened in the page on `tab` (which takes it as its source),
+// which sets the duration to its own (up to the page's limit; F6),
+// stretching what the other tabs have drawn.
+export function withRecording(page, recording, seconds, tab = "edit") {
   const duration = Math.round(Math.min(edit.MAX_RECORDING_S, seconds) * 1000) / 1000;
   const stretched = stretchPage(page, duration);
-  return { ...stretched, recording, edit: { ...stretched.edit, source: "file" } };
+  return { ...stretched, recording, [tab]: { ...stretched[tab], source: "file" } };
 }
 
 // Check and tidy a document from a file or a link (upgrading it if old).
@@ -128,6 +134,7 @@ export function openDocument(doc) {
   painted.check(tabState(page, "painted"));
   blobs.check(tabState(page, "blobs"));
   edit.check(tabState(page, "edit"));
+  mask.check(tabState(page, "mask"));
   if (page.recording !== undefined) edit.checkRecording(page.recording);
   return withTabState({ ...page, tab: TABS.includes(page.tab) ? page.tab : "tracks" }, "tracks", state);
 }

@@ -60,8 +60,7 @@ class Handler(SimpleHTTPRequestHandler):
             detail = "".join(traceback.format_exception(error)).strip()
             return self.send_json(400, {"error": f"{type(error).__name__}: {error}", "detail": detail})
         result["samples"] = base64.b64encode(result["samples"]).decode()
-        result["spectrogram"]["data"] = base64.b64encode(result["spectrogram"]["data"]).decode()
-        for key in ("modulation", "source_modulation"):
+        for key in ("spectrogram", "modulation", "source_modulation", "source_stft", "result_stft"):
             if key in result:
                 result[key]["data"] = base64.b64encode(result[key]["data"]).decode()
         return self.send_json(200, result)

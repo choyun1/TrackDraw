@@ -16,9 +16,12 @@ from typing import Any
 import numpy as np
 import sonore as so
 
-from . import blobs, edit, painted, tracks
+from . import blobs, edit, mask, painted, tracks
 
-TABS = {"tracks": tracks.synthesize, "painted": painted.synthesize, "blobs": blobs.synthesize, "edit": edit.synthesize}
+TABS = {
+    "tracks": tracks.synthesize, "painted": painted.synthesize, "mask": mask.synthesize,
+    "blobs": blobs.synthesize, "edit": edit.synthesize,
+}
 
 # The page's document (docs/design/tabs/painted.md, "Data model"), as
 # app/document.js writes it: duration and fs for the page, a section per tab.
@@ -51,9 +54,10 @@ def tab_state(document: Mapping[str, Any], tab: str | None = None) -> dict[str, 
         return {"painted": painted.FORMAT, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page["painted"]}
     if tab == "blobs" and "blobs" in page:
         return {"blobs": blobs.FORMAT, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page["blobs"]}
-    if tab == "edit" and "edit" in page:
+    if tab in ("edit", "mask") and tab in page:
         # the source's own drawing goes with the state: the Speech tab's, or the page's recording
-        state = {"edit": edit.FORMAT, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page["edit"]}
+        form = edit.FORMAT if tab == "edit" else mask.FORMAT
+        state = {tab: form, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page[tab]}
         if state.get("source") == "speech":
             state["speech"] = page["tracks"]
         if state.get("source") == "file" and "recording" in page:
@@ -104,7 +108,9 @@ def handle(request: Mapping[str, Any]) -> dict[str, Any]:
     seconds synthesis took; on the Modulation tab also the result's measured
     modulation spectrum (``blobs.measured_picture``), and on the Edit
     modulation tab the source's and the result's (``edit.plane_picture``)
-    and the fraction of envelope values sonore clipped.
+    and the fraction of envelope values sonore clipped; on the Filter
+    recording tab the source's and the result's spectrograms in the mask's
+    own STFT (``mask.pictures``).
     """
     work = handle_steps(request)
     while True:
@@ -131,6 +137,14 @@ def handle_steps(request: Mapping[str, Any]) -> Iterator[float]:
             except StopIteration as done:
                 sound = done.value
                 break
+    elif tab == "mask":
+        work = mask.steps(request["state"])
+        while True:
+            try:
+                yield 0.9 * next(work)
+            except StopIteration as done:
+                sound, source_stft, result_stft = done.value
+                break
     elif tab == "edit":
         work = edit.steps(request["state"])
         while True:
@@ -155,4 +169,6 @@ def handle_steps(request: Mapping[str, Any]) -> Iterator[float]:
         result["source_modulation"] = edit.plane_picture(original)
         result["modulation"] = edit.plane_picture(edit.analyse(sound, request["state"]))
         result["clipped"] = clipped
+    if tab == "mask":  # the source's and the result's spectrograms in the mask's own STFT (mask.md)
+        result["source_stft"], result["result_stft"] = mask.pictures(source_stft, result_stft)
     return result

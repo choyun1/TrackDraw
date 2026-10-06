@@ -190,8 +190,12 @@ together.
 (c) a choice between the two in the tab.
 *Recommended:* (a). F-M2 and F-M3: with 5 ms a removed band comes back at
 −32 dB and a removed harmonic at −3.8 dB, so the tab would not do what it
-shows. The result spectrogram below stays wideband (5 ms), as on the
-other tabs.
+shows.
+
+*As built:* the result's spectrogram is shown in the same 32 ms STFT as
+the source's, on the same scale, rather than wideband (5 ms) as first
+written here: at 5 ms an erased harmonic cannot be seen at all, so the
+two pictures would not compare.
 
 ## Order of work
 

@@ -12,7 +12,7 @@
 
 const PYODIDE_VERSION = "314.0.7"; // what Cho measured on 2026-10-03 (tracks.md, M6)
 const SONORE_VERSION = "0.5.0"; // keep in step with pyproject.toml (app.md, D5)
-const PYTHON_FILES = ["__init__.py", "blobs.py", "edit.py", "page.py", "painted.py", "tracks.py"]; // every file in src/sonore_sketch (tests/test_page.py checks)
+const PYTHON_FILES = ["__init__.py", "blobs.py", "edit.py", "mask.py", "page.py", "painted.py", "tracks.py"]; // every file in src/sonore_sketch (tests/test_page.py checks)
 
 let steps = null;
 let latest = -1; // the newest request's id: an older one stops at its next step
@@ -99,27 +99,38 @@ function modulationPicture(result, key) {
   }
 }
 
+// A spectrogram picture (page.spectrogram, mask.pictures), or null.
+function spectrogramPicture(result, key) {
+  if (!result.has(key)) return null;
+  const picture = result.get(key);
+  try {
+    return {
+      data: toBytes(picture.get("data")),
+      nFreqs: picture.get("n_freqs"),
+      nFrames: picture.get("n_frames"),
+      fMax: picture.get("f_max"),
+      tStart: picture.get("t_start"),
+      tStep: picture.get("t_step"),
+    };
+  } finally {
+    picture.destroy();
+  }
+}
+
 function convert(result) {
-  const picture = result.get("spectrogram");
   try {
     return {
       fs: result.get("fs"),
       samples: new Float32Array(toBytes(result.get("samples")).buffer),
       synthesisSeconds: result.get("synthesis_s"),
-      spectrogram: {
-        data: toBytes(picture.get("data")),
-        nFreqs: picture.get("n_freqs"),
-        nFrames: picture.get("n_frames"),
-        fMax: picture.get("f_max"),
-        tStart: picture.get("t_start"),
-        tStep: picture.get("t_step"),
-      },
+      spectrogram: spectrogramPicture(result, "spectrogram"),
+      sourceStft: spectrogramPicture(result, "source_stft"),
+      resultStft: spectrogramPicture(result, "result_stft"),
       modulation: modulationPicture(result, "modulation"),
       sourceModulation: modulationPicture(result, "source_modulation"),
       clipped: result.has("clipped") ? result.get("clipped") : null,
     };
   } finally {
-    picture.destroy();
     result.destroy();
   }
 }
@@ -152,7 +163,7 @@ onmessage = async ({ data: { id, request } }) => {
       if (id !== latest) return postMessage({ id, type: "dropped" });
     }
     const transfer = [result.samples.buffer, result.spectrogram.data.buffer];
-    for (const picture of [result.modulation, result.sourceModulation]) if (picture) transfer.push(picture.data.buffer);
+    for (const picture of [result.modulation, result.sourceModulation, result.sourceStft, result.resultStft]) if (picture) transfer.push(picture.data.buffer);
     postMessage({ id, type: "result", result }, transfer);
   } catch (error) {
     // A PythonError's message is the traceback, ending with the exception's

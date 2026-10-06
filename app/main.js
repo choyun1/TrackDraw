@@ -12,6 +12,7 @@ import { encodeState, stateFromHash } from "./share.js";
 import { defaultPage, forLink, openDocument, resetTab, stretchPage, tabState, withRecording, withTabState } from "./document.js";
 import { createBlobsTab } from "./blobs/tab.js";
 import { createEditTab } from "./edit/tab.js";
+import { createMaskTab } from "./mask/tab.js";
 import { createPaintedTab } from "./painted/tab.js";
 import { clampDuration } from "./tracks/model.js";
 import { createTracksTab } from "./tracks/tab.js";
@@ -93,6 +94,11 @@ const commitFrom = (id) => (state) => change(withTabState(history.present, id, s
 const tabs = {
   tracks: createTracksTab($("tab-tracks"), { commit: commitFrom("tracks") }),
   painted: createPaintedTab($("tab-painted"), { commit: commitFrom("painted"), log }),
+  mask: createMaskTab($("tab-mask"), {
+    commit: commitFrom("mask"),
+    openRecording: (recording, seconds) => change(withRecording(history.present, recording, seconds, "mask")),
+    log,
+  }),
   blobs: createBlobsTab($("tab-blobs"), { commit: commitFrom("blobs") }),
   edit: createEditTab($("tab-edit"), {
     commit: commitFrom("edit"),

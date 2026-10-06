@@ -577,6 +577,66 @@ def main() -> None:
             page.keyboard.press("Control+z")
             assert page_document_in(page)["duration"] == 0.6 and page_document_in(page)["edit"]["source"] == "speech"
             print("edit: Undo takes the recording away again")
+
+            # The Filter recording tab (mask.md): it starts on the syllable
+            # train with nothing erased, and draws the source's spectrogram
+            # once heard; an Erase stroke along 2 kHz and a Restore stroke
+            # change the mask and are heard; a recording opened here is this
+            # tab's source only.
+            page.click(".tabs [data-tab=mask]")
+            expect(page.locator("#tab-mask")).to_be_visible()
+            expect(status).to_contain_text("Made", timeout=120_000)
+            section = page_document_in(page)["mask"]
+            from sonore_sketch import mask as mask_tab
+
+            assert section["source"] == "syllables" and not mask_tab.cuts(section).any(), section["source"]
+            assert page.locator("main > .result").is_hidden(), "the page's own waveform strip shows on the Filter recording tab"
+            for name in ("filter-plane", "filter-result"):
+                colours = page.evaluate(
+                    """name => { const c = document.querySelector('#tab-mask canvas.' + name);
+                        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+                        const s = new Set(); for (let i = 0; i < d.length; i += 4) s.add(d[i] << 16 | d[i + 1] << 8 | d[i + 2]); return s.size; }""",
+                    name,
+                )
+                assert colours > 100, f"the {name} spectrogram is not drawn ({colours} colours)"
+            plane = page.locator("#tab-mask canvas.filter-plane").bounding_box()
+            m_left, m_right = plane["x"] + 52, plane["x"] + plane["width"] - 10
+            m_top, m_bottom = plane["y"] + 8, plane["y"] + plane["height"] - 22
+            y_2k = m_bottom - (2000 / 8000) * (m_bottom - m_top)
+            before = page.evaluate("location.hash")
+            page.mouse.move(m_left + 0.1 * (m_right - m_left), y_2k)
+            page.mouse.down()
+            page.mouse.move(m_left + 0.9 * (m_right - m_left), y_2k, steps=12)
+            page.mouse.up()
+            page.wait_for_function("h => location.hash !== h", arg=before)
+            expect(status).to_contain_text("Made", timeout=120_000)
+            cut = mask_tab.cuts(page_document_in(page)["mask"])
+            assert cut[64, 128] == 60 and cut[64, 5] == 0 and cut[20, 128] == 0, (cut[64, 128], cut[64, 5], cut[20, 128])
+            print("mask: an Erase stroke along 2 kHz removed it there and was heard")
+            page.keyboard.press("r")
+            before = page.evaluate("location.hash")
+            page.mouse.move(m_left + 0.45 * (m_right - m_left), y_2k)
+            page.mouse.down()
+            page.mouse.move(m_left + 0.55 * (m_right - m_left), y_2k, steps=4)
+            page.mouse.up()
+            page.wait_for_function("h => location.hash !== h", arg=before)
+            restored = mask_tab.cuts(page_document_in(page)["mask"])
+            assert restored[64, 128] == 0 and restored[64, 40] == 60, (restored[64, 128], restored[64, 40])
+            page.keyboard.press("Control+z")
+            assert (mask_tab.cuts(page_document_in(page)["mask"]) == cut).all(), "Undo did not bring the erasing back"
+            before = page.evaluate("location.hash")
+            page.click("#tab-mask .clear")
+            page.wait_for_function("h => location.hash !== h", arg=before)
+            assert not mask_tab.cuts(page_document_in(page)["mask"]).any()
+            print("mask: Restore (R), Undo and Clear work")
+            before = page.evaluate("location.hash")
+            page.locator("#tab-mask .audio-file").set_input_files(files=[{"name": "pulse.wav", "mimeType": "audio/wav", "buffer": buffer.getvalue()}])
+            page.wait_for_function("h => location.hash !== h", arg=before)
+            expect(status).to_contain_text("Made", timeout=120_000)
+            linked = page_document_in(page)
+            assert linked["duration"] == 1.5 and linked["mask"]["source"] == "file" and linked["edit"]["source"] == "speech", (linked["mask"], linked["edit"]["source"])
+            expect(page.locator("#tab-mask .recording-note")).to_contain_text("pulse.wav: 1.50 s")
+            print("mask: a WAV file opened here is this tab's source, set the duration and was heard")
             if args.screenshot:
                 page.screenshot(path=args.screenshot)
             browser.close()
