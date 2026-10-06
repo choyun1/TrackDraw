@@ -13,6 +13,8 @@ Built: steps 1 and 2 of the order of work below together, so the tab arrived
 audible; step 3 (the measured result and iterations) is next. The Filter
 recording design (`mask.md`, PR #14) is parked, so nothing here depends on
 a loaded recording: a recording as carrier waits for that tab.
+Band-limiting the sound with drawn bands is designed in `bands.md`; the
+measured result (B7) is built with it, under the plane.
 
 This project is AI-assisted: the document and `tools/measure_blobs.py` were
 drafted by Claude (Claude Code), for Cho to review.
@@ -281,6 +283,10 @@ being asked.
 (8 Hz, 1 cyc/oct, −3 dB), so Play works at once; Reset returns to them and
 Clear removes all blobs. The frequency range is 100–6400 Hz at 12 bands
 per octave, as on the Spectrogram tab, and not a setting in v1.
+*Changed (2026-10-06, Cho):* the tab starts from one blob near the origin
+in the upper-right quadrant, (2 Hz, 0.5 cyc/oct, 0 dB); it fits the default
+depth on every carrier and seed 1–3. The measurements here and in
+`bands.md` keep B9's two blobs (`sonore_sketch.blobs.B9_ITEMS`).
 
 ## Order of work
 

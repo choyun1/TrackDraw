@@ -9,6 +9,8 @@
 //
 // No DOM here, so this file runs under `node --test`.
 
+import { replaceSpan, simplify } from "../tracks/model.js";
+
 export const FORMAT = 1;
 export const CARRIERS = ["tones", "harmonic", "noise"];
 export const MAX_BLOBS = 8;
@@ -20,10 +22,10 @@ export const DEFAULTS = {
 };
 // A new blob's widths and level (B2).
 export const NEW_BLOB = { rate_width: 0.5, density_width: 0.25, level: 0 };
-// sonore_sketch.blobs.EXAMPLE_ITEMS (B9); tests/test_blobs.py checks the two agree.
+// sonore_sketch.blobs.EXAMPLE_ITEMS: one blob near the origin, rate and
+// density both positive; tests/test_blobs.py checks the two agree.
 export const EXAMPLE_ITEMS = [
-  { rate: 4, density: 0, rate_width: 0.5, density_width: 0.25, level: 0 },
-  { rate: 8, density: 1, rate_width: 0.5, density_width: 0.25, level: -3 },
+  { rate: 2, density: 0.5, rate_width: 0.5, density_width: 0.25, level: 0 },
 ];
 
 // The plane shown (B1): rate on a signed log axis from 1 to 64 Hz each side,
@@ -36,7 +38,7 @@ export const WIDTH_MAX = 3;
 export const COARSE_BELOW_S = 2; // B8: a note on this tab below this duration
 
 export function defaultSection() {
-  return { ...DEFAULTS, items: EXAMPLE_ITEMS.map((item) => ({ ...item })) };
+  return { ...DEFAULTS, items: EXAMPLE_ITEMS.map((item) => ({ ...item })), bands: [] };
 }
 
 // --- the grid the drawing is heard on --------------------------------------------
@@ -113,6 +115,73 @@ export function depthThatFits(message) {
   return match ? Number(match[1]) : null;
 }
 
+// --- bands (docs/design/tabs/bands.md) ---------------------------------------------
+
+// A band confines the sound to a region of the spectrogram: a centre track
+// of [time s, Hz] points (interpolated in log frequency, held past its ends),
+// a width in octaves and a level in dB. sonore_sketch.blobs.band_gain is the
+// filter itself; the page only draws where the bands are.
+export const MAX_BANDS = 5;
+export const BAND_WIDTH_MIN = 1 / 6;
+export const BAND_WIDTH_MAX = 4;
+export const BAND_LEVEL_MIN = -40;
+export const BAND_SKIRT = 1 / 6; // octaves of raised-cosine edge on each side
+// Where "Add band" puts a new, flat band: the first of these not already inside one.
+const NEW_BAND_CENTRES = [500, 2000, 1000, 4000, 250, 3000, 700, 1400];
+
+export function bandCentre(points, t) {
+  if (t <= points[0][0]) return points[0][1];
+  for (let i = 1; i < points.length; i++) {
+    const [t1, f1] = points[i];
+    if (t <= t1) {
+      const [t0, f0] = points[i - 1];
+      return 2 ** (Math.log2(f0) + ((t - t0) / (t1 - t0)) * (Math.log2(f1) - Math.log2(f0)));
+    }
+  }
+  return points[points.length - 1][1];
+}
+
+export function newBand(bands, duration) {
+  const inside = (f) => bands.some((b) => [0, duration / 2, duration].some((t) => Math.abs(Math.log2(f / bandCentre(b.points, t))) <= b.width / 2));
+  const centre = NEW_BAND_CENTRES.find((f) => !inside(f)) ?? 1000;
+  return { points: [[0, centre], [tidyTime(duration), centre]], width: 1, level: 0 };
+}
+
+export const clampBandWidth = (w) => Math.min(BAND_WIDTH_MAX, Math.max(BAND_WIDTH_MIN, w));
+export const clampBandLevel = (l) => Math.min(0, Math.max(BAND_LEVEL_MIN, l));
+// Times to the millisecond, centres to the hertz, as saved.
+export const tidyTime = (t) => Math.round(t * 1000) / 1000;
+export const tidyHz = (f) => Math.round(f);
+
+// A Line or Freehand stroke [[t, Hz], ...] laid onto a band's points (or
+// onto none, for a new band): the stroke, simplified in octaves, replaces
+// the points within its span, as the Speech tab's tools do.
+export const STROKE_TOLERANCE_OCT = 0.04;
+export function strokeOnto(points, stroke) {
+  const inOctaves = stroke.map(([t, f]) => [tidyTime(t), Math.log2(f)]);
+  const span = simplify(inOctaves, STROKE_TOLERANCE_OCT).map(([t, o]) => [t, tidyHz(2 ** o)]);
+  const merged = points?.length ? replaceSpan(points, span) : span;
+  const tidied = [];
+  for (const point of merged) {
+    if (tidied.length && point[0] <= tidied[tidied.length - 1][0]) tidied[tidied.length - 1] = point;
+    else tidied.push(point);
+  }
+  return tidied;
+}
+
+// Every band's times scaled to a new duration (the page's length changed).
+export function stretchBands(bands, from, to) {
+  if (!bands?.length || !(from > 0)) return bands;
+  return bands.map((b) => {
+    const points = [];
+    for (const [t, f] of b.points) {
+      const next = tidyTime((t / from) * to);
+      if (!points.length || next > points[points.length - 1][0]) points.push([next, f]);
+    }
+    return { ...b, points };
+  });
+}
+
 // --- checking --------------------------------------------------------------------
 
 const ITEM_KEYS = ["rate", "density", "rate_width", "density_width", "level"];
@@ -132,6 +201,20 @@ export function check(state) {
   items.forEach((item, i) => {
     if (!ITEM_KEYS.every((key) => Number.isFinite(item?.[key]))) throw new Error(`blob ${i + 1} must give a number for each of ${ITEM_KEYS.join(", ")}`);
     if (item.rate === 0 || item.rate_width <= 0 || item.density_width <= 0) throw new Error(`blob ${i + 1} needs a nonzero rate and positive widths`);
+  });
+  const { bands = [], duration } = state;
+  if (!Array.isArray(bands) || bands.length > MAX_BANDS) throw new Error(`bands must be a list of at most ${MAX_BANDS} bands`);
+  bands.forEach((band, i) => {
+    const { points, width, level = 0 } = band ?? {};
+    if (!(width >= BAND_WIDTH_MIN - 1e-9 && width <= BAND_WIDTH_MAX)) throw new Error(`band ${i + 1}'s width must be from 1/6 to ${BAND_WIDTH_MAX} octaves`);
+    if (!(level >= BAND_LEVEL_MIN && level <= 0)) throw new Error(`band ${i + 1}'s level must be from ${BAND_LEVEL_MIN} to 0 dB`);
+    if (!Array.isArray(points) || !points.length || !points.every((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite))) {
+      throw new Error(`band ${i + 1} needs a list of [time, Hz] points`);
+    }
+    if (points.some(([t], k) => t < 0 || (duration !== undefined && t > duration + 1e-9) || (k > 0 && t <= points[k - 1][0]))) {
+      throw new Error(`band ${i + 1}'s times must increase, within the duration`);
+    }
+    if (points.some(([, f]) => f < f_lo || f > f_hi)) throw new Error(`band ${i + 1}'s centre must stay within ${f_lo}-${f_hi} Hz`);
   });
   return state;
 }

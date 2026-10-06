@@ -16,14 +16,27 @@ export const MIN_DURATION = 0.05;
 // is the freehand simplification tolerance in the track's own unit (D10: a
 // default to be tuned by trying it).
 const FORMANT_COLORS = ["#d1495b", "#2e86ab", "#3c9d5d", "#9a6fb0", "#c07a1e"];
+// The same tracks over the magma spectrogram, whose black-purple-red-orange-
+// yellow leaves the cool and pale hues free: cyan, lime, white, sky blue,
+// lavender, each drawn on a dark casing (style.css, .on-spectrogram).
+const FORMANT_BRIGHT = ["#00e5ff", "#a6ff4d", "#ffffff", "#5aa9ff", "#d9b3ff"];
 export const TRACKS = {
   ...Object.fromEntries(
     [1, 2, 3, 4, 5].map((k, i) => [
       `F${k}`,
-      { panel: "formants", min: 0, max: 5000, unit: "Hz", tolerance: 15, color: FORMANT_COLORS[i] },
+      { panel: "formants", min: 0, max: 5000, unit: "Hz", tolerance: 15, color: FORMANT_COLORS[i], bright: FORMANT_BRIGHT[i] },
     ]),
   ),
-  F0: { panel: "F0", min: 0, max: 300, unit: "Hz", tolerance: 1.5, color: "#444" },
+  // F0 is drawn in octaves (`scale: "log"`) from 20 to 800 Hz. Below 20 Hz the
+  // voicing turns into separate clicks and the rest of the sound goes odd
+  // (Cho, 2026-10-05); 800 Hz leaves room above children's voices (about
+  // 250-500 Hz) and sung or shrieked pitch. A log track's `tolerance` is in
+  // octaves: 0.02 is about 1.5 Hz at 100 Hz. The strip can also be shown
+  // linear, 0-800 Hz, with `linear` in place of the log settings.
+  F0: {
+    panel: "F0", min: 20, max: 800, floor: 20, scale: "log", unit: "Hz", tolerance: 0.02, color: "#444",
+    linear: { min: 0, tolerance: 1.5 },
+  },
   AV: { panel: "AV", min: 0, max: 80, unit: "dB", tolerance: 1, color: "#444" },
   ...Object.fromEntries(
     [1, 2, 3, 4, 5].map((k, i) => [
@@ -101,8 +114,9 @@ export function withPoints(doc, name, pts) {
 export function tidyDocument(doc) {
   const params = Object.fromEntries(
     Object.entries(doc.params ?? {}).map(([name, value]) => {
-      if (typeof value === "number") return [name, value];
-      const tidy = tidyPoints(value[0].map((t, i) => [t, value[1][i]]));
+      const floor = TRACKS[name]?.floor ?? -Infinity;
+      if (typeof value === "number") return [name, Math.max(floor, value)];
+      const tidy = tidyPoints(value[0].map((t, i) => [t, Math.max(floor, value[1][i])]));
       return [name, [tidy.map(([t]) => t), tidy.map(([, v]) => v)]];
     }),
   );
@@ -110,8 +124,67 @@ export function tidyDocument(doc) {
 }
 
 export function clampValue(name, v) {
-  const { min, max } = TRACKS[name];
-  return Math.min(max, Math.max(min, v));
+  const { min, max, floor = min } = TRACKS[name];
+  return Math.min(max, Math.max(floor, v));
+}
+
+// A track's settings as its panel shows it: `scale` "log" or "linear", or
+// the track's own when not given. Only a track with `linear` settings can be
+// shown linear.
+export function trackSpec(name, scale = TRACKS[name].scale) {
+  const track = TRACKS[name];
+  return scale === "linear" && track.linear ? { ...track, ...track.linear, scale: "linear" } : track;
+}
+
+// A track's values as its panel spaces them: octaves (log2 Hz) for a log
+// scale, the value itself otherwise.
+export const toScale = (name, v, scale) => (trackSpec(name, scale).scale === "log" ? Math.log2(v) : v);
+export const fromScale = (name, u, scale) => (trackSpec(name, scale).scale === "log" ? 2 ** u : u);
+
+// A freehand stroke simplified within the track's tolerance, measured as the
+// panel spaces values, so on a log scale the same detail is kept in every
+// octave.
+export function simplifyStroke(name, stroke, scale) {
+  const scaled = stroke.map(([t, v]) => [t, toScale(name, v, scale)]);
+  return simplify(scaled, trackSpec(name, scale).tolerance).map(([t, u]) => [t, fromScale(name, u, scale)]);
+}
+
+// The breakpoints of a Line from a to b (sorted by time). sonore goes in a
+// straight line in Hz between breakpoints, so on a log scale the line is
+// laid as enough breakpoints to stay within the tolerance of a straight
+// line in octaves, which is what was drawn.
+export function lineSpan(name, a, b, scale) {
+  const [p, q] = [a, b].sort((x, y) => x[0] - y[0]);
+  const { scale: kind, tolerance } = trackSpec(name, scale);
+  if (kind !== "log" || p[0] === q[0] || p[1] === q[1]) return [p, q];
+  // Each of n equal pieces spans ratio r; the straight-in-Hz chord across it
+  // strays furthest from the octave line somewhere inside, found by sampling.
+  const octaves = Math.log2(q[1] / p[1]);
+  const stray = (n) => {
+    const r = 2 ** (octaves / n);
+    let worst = 0;
+    for (let s = 0.05; s < 1; s += 0.05) worst = Math.max(worst, Math.abs(Math.log2(1 + (r - 1) * s) - s * Math.log2(r)));
+    return worst;
+  };
+  let n = 1;
+  while (stray(n) > tolerance) n++;
+  return Array.from({ length: n + 1 }, (_, i) =>
+    i === 0 ? p : i === n ? q : [p[0] + ((q[0] - p[0]) * i) / n, p[1] * 2 ** ((octaves * i) / n)],
+  );
+}
+
+// Points to draw a track through: its breakpoints, and on a log scale the
+// curve sonore takes between them (straight in Hz is bent in octaves).
+export function drawnPoints(name, pts, scale) {
+  if (trackSpec(name, scale).scale !== "log") return pts;
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const [t0, v0] = pts[i - 1];
+    const [t1, v1] = pts[i];
+    const n = v0 === v1 || t0 === t1 ? 1 : 16;
+    for (let k = 1; k <= n; k++) out.push([t0 + ((t1 - t0) * k) / n, v0 + ((v1 - v0) * k) / n]);
+  }
+  return out;
 }
 
 // The track's value at time t: linear between breakpoints, held beyond the

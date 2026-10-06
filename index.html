@@ -30,7 +30,7 @@
       <label class="duration" title="Length of the sound, up to 10 s. Changing it stretches what is drawn.">
         <input type="number" id="duration" min="0.05" max="10" step="0.05" value="0.6"> s
       </label>
-      <label class="check" title="Hear each change as soon as it is drawn (sounds up to 3 s)"><input type="checkbox" id="autoplay" checked> Auto-play</label>
+      <label class="check" title="Hear each change as soon as it is drawn (sounds up to 3 s)"><input type="checkbox" id="autoplay"> Auto-play</label>
       <button type="button" id="reset" title="Start this tab again from its default drawing, at the default duration (Undo brings yours back)">Reset</button>
       <button type="button" id="undo" title="Undo (Ctrl+Z)">↶</button>
       <button type="button" id="redo" title="Redo (Ctrl+Shift+Z)">↷</button>
@@ -51,10 +51,6 @@
       <div class="result-row">
         <span class="result-label">Result</span>
         <canvas id="waveform"></canvas>
-      </div>
-      <div class="result-row">
-        <span class="result-label">0–8 kHz</span>
-        <canvas id="spectrogram"></canvas>
       </div>
     </section>
     <section class="log" id="log" hidden>

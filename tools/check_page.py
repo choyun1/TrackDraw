@@ -20,6 +20,7 @@ import argparse
 import base64
 import json
 import math
+import re
 import socket
 import subprocess
 import sys
@@ -123,7 +124,8 @@ def main() -> None:
             # Freehand on the F0 strip: a rise and fall becomes a few breakpoints.
             strip = page.locator(".panel-F0 svg").bounding_box()
             sx = lambda t: strip["x"] + 52 + t / doc["duration"] * (strip["width"] - 62)  # noqa: E731
-            sy = lambda hz: strip["y"] + strip["height"] - 8 - hz / 300 * (strip["height"] - 16)  # noqa: E731
+            # The F0 strip is in octaves from 20 to 800 Hz.
+            sy = lambda hz: strip["y"] + strip["height"] - 8 - math.log2(hz / 20) / math.log2(40) * (strip["height"] - 16)  # noqa: E731
             page.keyboard.press("f")
             page.mouse.move(sx(0.05), sy(110))
             page.mouse.down()
@@ -134,12 +136,22 @@ def main() -> None:
             f0 = document_in(page)["params"]["F0"]
             assert 3 <= len(f0[0]) <= 12 and max(f0[1]) > 150, f"freehand F0 not simplified as expected: {f0}"
             print(f"freehand: F0 has {len(f0[0])} breakpoints, peak {max(f0[1]):.0f} Hz")
+            # The F0 axis can be switched to linear and back; the drawing stays.
+            log_top = page.locator(".panel-F0 .tick").last.text_content()
+            page.locator('input[name="tracks-f0-scale"][value="linear"]').check()
+            ticks = page.locator(".panel-F0 .tick").all_text_contents()
+            assert ticks == ["0", "200", "400", "600", "800"] and log_top == "800", ticks
+            assert document_in(page)["params"]["F0"] == f0, "switching the F0 axis changed the drawing"
+            page.locator('input[name="tracks-f0-scale"][value="log"]').check()
+            assert page.locator(".panel-F0 .tick").first.text_content() == "25"
+            print("F0 axis: switched to linear and back to log")
             expect(status).to_contain_text("Made", timeout=60_000)
 
             # Bandwidths: the strip shows the selected formant's, here B1.
             page.check(".show-bandwidths")
             page.keyboard.press("1")
             page.keyboard.press("l")
+            page.locator(".panel-bandwidths svg").scroll_into_view_if_needed()
             bw = page.locator(".panel-bandwidths svg").bounding_box()
             bx = lambda t: bw["x"] + 52 + t / doc["duration"] * (bw["width"] - 62)  # noqa: E731
             by = lambda hz: bw["y"] + bw["height"] - 8 - hz / 600 * (bw["height"] - 16)  # noqa: E731
@@ -173,15 +185,20 @@ def main() -> None:
             expect(page.locator("#play")).to_have_text("▶ Play", timeout=10_000)
             print("play: played and ended")
 
+            # The waveform is the only result picture; the spectrogram is drawn
+            # in magma under the formants, which then sit on a pale halo.
+            expect(page.locator("#spectrogram")).to_have_count(0)
+            expect(page.locator(".panel-formants")).to_have_class(re.compile(r"\bon-spectrogram\b"))
             drawn = page.evaluate(
-                """() => ['waveform', 'spectrogram'].map((id) => {
-                    const c = document.getElementById(id);
+                """() => ['#waveform', '.panel-formants canvas.background'].map((selector) => {
+                    const c = document.querySelector(selector);
                     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-                    let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
-                    return n; })"""
+                    const colours = new Set(); let n = 0;
+                    for (let i = 0; i < d.length; i += 4) if (d[i + 3]) { n++; colours.add(d[i] << 16 | d[i + 1] << 8 | d[i + 2]); }
+                    return [n, colours.size]; })"""
             )
-            assert all(drawn), f"result pictures are empty: {drawn}"
-            print(f"result pictures drawn ({drawn[0]} and {drawn[1]} pixels)")
+            assert drawn[0][0] and drawn[1][1] > 50, f"result pictures are empty or not in colour: {drawn}"
+            print(f"waveform drawn ({drawn[0][0]} pixels); spectrogram under the formants in {drawn[1][1]} colours")
 
             # A link from before breakpoint times were kept increasing (two F0
             # points at 0.3 s) is tidied on opening, and synthesizes.
@@ -267,6 +284,8 @@ def main() -> None:
             expect(status).to_contain_text("Made", timeout=60_000)
             assert page_document_in(page)["tab"] == "blobs"
             example = page_document_in(page)["blobs"]
+            start = example["items"]
+            assert len(start) == 1 and start[0]["rate"] > 0 and start[0]["density"] > 0, start  # one blob, upper right
             expect(page.locator("#tab-blobs .coarse")).to_be_visible()  # 0.6 s is under 2 s
             plane = page.locator("canvas.plane").bounding_box()
             left, right = plane["x"] + 52, plane["x"] + plane["width"] - 10
@@ -292,10 +311,18 @@ def main() -> None:
                 page.mouse.up()
                 page.wait_for_function("(before) => location.hash !== before", arg=before, timeout=10_000)
 
+            page.evaluate(
+                """() => { window.progressSeen = false;
+                    new MutationObserver(() => { if (document.querySelector('#tab-blobs .synth-progress')) window.progressSeen = true; })
+                        .observe(document.querySelector('#tab-blobs'), { childList: true, subtree: true }); }"""
+            )
             gesture([(bx(-16), by(3))])
             added = blobs_now()[-1]
-            assert len(blobs_now()) == 3 and abs(math.log2(-added["rate"] / 16)) < 0.1 and abs(added["density"] - 3) < 0.1, added
+            assert len(blobs_now()) == 2 and abs(math.log2(-added["rate"] / 16)) < 0.1 and abs(added["density"] - 3) < 0.1, added
             expect(status).to_contain_text("Made", timeout=60_000)
+            assert page.evaluate("window.progressSeen"), "no progress shown over the plane while synthesizing"
+            expect(page.locator("#tab-blobs .synth-progress")).to_have_count(0)
+            print("modulation: progress shown over the plane while synthesizing, gone when made")
             gesture([(bx(added["rate"]), by(added["density"])), (bx(16), by(2))])
             moved = blobs_now()[-1]
             assert moved["rate"] > 0 and abs(math.log2(moved["rate"] / 16)) < 0.1 and abs(moved["density"] - 2) < 0.1, moved
@@ -325,15 +352,22 @@ def main() -> None:
 
             page.mouse.move(centre, plane["y"] - 30)  # off the plane, so keys go to the page
             page.keyboard.press("Delete")
-            assert len(blobs_now()) == 2
+            assert len(blobs_now()) == 1
             page.click("#tab-blobs .clear")
             expect(status).to_contain_text("No blobs yet", timeout=10_000)
             page.keyboard.press("Control+z")
             page.keyboard.press("Control+z")
-            assert len(blobs_now()) == 3
+            assert len(blobs_now()) == 2
             expect(status).to_contain_text("Made", timeout=60_000)
+            page.locator("#tab-blobs .iterations").fill("2")
+            page.locator("#tab-blobs .iterations").press("Enter")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page_document_in(page)["blobs"]["iterations"] == 2
+            print("modulation: 2 iterations set and heard")
             page.select_option("#tab-blobs .carrier", "harmonic")
             expect(page.locator("#tab-blobs .f0-field")).to_be_visible()
+            expect(page.locator("#tab-blobs .iterations-field")).to_be_hidden()
+            assert page_document_in(page)["blobs"]["iterations"] == 0  # the harmonic carrier takes none
             page.locator("#tab-blobs .f0").fill("150")
             page.locator("#tab-blobs .f0").press("Enter")
             expect(status).to_contain_text("Made", timeout=60_000)
@@ -346,7 +380,80 @@ def main() -> None:
                     return seen.size; }"""
             )
             assert colours > 50, f"the spectrogram under the plane looks empty ({colours} colours)"
+            measured_colours = page.evaluate(
+                """() => { const c = document.querySelector('canvas.measured');
+                    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+                    const seen = new Set(); for (let i = 0; i < d.length; i += 4) seen.add(d[i] * 65536 + d[i + 1] * 256 + d[i + 2]);
+                    return seen.size; }"""
+            )
+            assert measured_colours > 30, f"the measured plane looks empty ({measured_colours} colours)"
+            print(f"modulation: the measured modulation spectrum is drawn under the plane ({measured_colours} colours)")
             print(f"modulation: the harmonic carrier on 150 Hz plays, and the spectrogram under the plane is drawn ({colours} colours)")
+
+            # Bands (bands.md): Add band puts a flat band at 500 Hz; dragging
+            # its last breakpoint bends it up; a click on its line adds a
+            # breakpoint, Delete removes it, Delete band removes the band.
+            def bands_now():
+                return page_document_in(page)["blobs"].get("bands", [])
+
+            # On the harmonic carrier, Iterations is offered only with bands (bands.md, K-M5b).
+            iterations_field = page.locator("#tab-blobs .iterations-field")
+            page.click("#tab-blobs .add-band")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            expect(iterations_field).to_be_visible()
+            page.locator("#tab-blobs .iterations").fill("1")
+            page.locator("#tab-blobs .iterations").press("Enter")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page_document_in(page)["blobs"]["iterations"] == 1
+            page.click("#tab-blobs .delete-band")
+            expect(iterations_field).to_be_hidden()
+            assert page_document_in(page)["blobs"]["iterations"] == 0 and bands_now() == []
+            expect(status).to_contain_text("Made", timeout=60_000)
+            print("modulation: on the harmonic carrier, Iterations shows with a band and goes with it")
+            page.select_option("#tab-blobs .carrier", "tones")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            page.click("#tab-blobs .add-band")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert bands_now() == [{"points": [[0, 500], [0.6, 500]], "width": 1, "level": 0}], bands_now()
+            stft = page.locator("#tab-blobs canvas.stft").bounding_box()
+            s_left, s_right = stft["x"] + 52, stft["x"] + stft["width"] - 10
+            s_top, s_bottom = stft["y"] + 6, stft["y"] + stft["height"] - 20
+
+            def sx(t):
+                return s_left + t / 0.6 * (s_right - s_left)
+
+            def sy(hz):
+                return s_bottom - math.log2(hz / 100) / 6 * (s_bottom - s_top)
+
+            gesture([(sx(0.6), sy(500)), (sx(0.6), sy(2000))])
+            end = bands_now()[0]["points"][-1]
+            assert end[0] == 0.6 and abs(math.log2(end[1] / 2000)) < 0.1, bands_now()
+            expect(page.locator("#tab-blobs .band-motion")).to_be_visible()
+            expect(status).to_contain_text("Made", timeout=60_000)
+            gesture([(sx(0.3), sy(1000))])
+            assert len(bands_now()[0]["points"]) == 3, bands_now()
+            expect(status).to_contain_text("Made", timeout=60_000)
+            page.mouse.move(sx(0.3), stft["y"] - 30)
+            page.keyboard.press("Delete")
+            assert len(bands_now()[0]["points"]) == 2, bands_now()
+            expect(status).to_contain_text("Made", timeout=60_000)
+            page.click("#tab-blobs .delete-band")
+            assert bands_now() == []
+            expect(status).to_contain_text("Made", timeout=60_000)
+            # Freehand: a stroke outside every band draws a new band along it.
+            page.check("#tab-blobs input[name=band-tool][value=freehand]")
+            gesture([(sx(0.1), sy(300)), (sx(0.3), sy(600)), (sx(0.5), sy(1200))])
+            drawn = bands_now()
+            assert len(drawn) == 1 and len(drawn[0]["points"]) >= 2, drawn
+            assert abs(math.log2(drawn[0]["points"][0][1] / 300)) < 0.15 and abs(math.log2(drawn[0]["points"][-1][1] / 1200)) < 0.15, drawn
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page.locator("main > .result").is_hidden(), "the page's own waveform strip shows on the Modulation tab"
+            print(f"modulation: a freehand stroke drew a new band {drawn[0]['points']}")
+            page.mouse.move(sx(0.3), stft["y"] - 30)
+            page.keyboard.press("p")
+            page.keyboard.press("Control+z")
+            assert bands_now() == []
+            print(f"modulation: added a band, bent it up to {end[1]} Hz, added and removed a breakpoint, removed the band")
             page.click("#reset")
             expect(status).to_contain_text("Made", timeout=60_000)
             assert page_document_in(page)["blobs"] == example, "Reset did not restore the example blobs"

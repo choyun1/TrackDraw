@@ -328,6 +328,7 @@ export function createPaintedTab(root, { commit, log }) {
 
   return {
     id: "painted",
+    figure: canvas.parentElement, // where the shell shows synthesis progress
     setDocument(next) {
       stroke = null;
       state = next;
