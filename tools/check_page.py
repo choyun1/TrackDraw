@@ -124,7 +124,8 @@ def main() -> None:
             # Freehand on the F0 strip: a rise and fall becomes a few breakpoints.
             strip = page.locator(".panel-F0 svg").bounding_box()
             sx = lambda t: strip["x"] + 52 + t / doc["duration"] * (strip["width"] - 62)  # noqa: E731
-            sy = lambda hz: strip["y"] + strip["height"] - 8 - hz / 300 * (strip["height"] - 16)  # noqa: E731
+            # The F0 strip is in octaves from 20 to 800 Hz.
+            sy = lambda hz: strip["y"] + strip["height"] - 8 - math.log2(hz / 20) / math.log2(40) * (strip["height"] - 16)  # noqa: E731
             page.keyboard.press("f")
             page.mouse.move(sx(0.05), sy(110))
             page.mouse.down()

@@ -11,13 +11,17 @@ import { drawSpectrogram } from "../plot.js";
 import {
   TRACKS,
   clampValue,
+  drawnPoints,
+  fromScale,
   insertPoint,
+  lineSpan,
   movePoint,
   nearestPoint,
   points,
   removePoint,
   replaceSpan,
-  simplify,
+  simplifyStroke,
+  toScale,
   valueAt,
   withPoints,
 } from "./model.js";
@@ -31,7 +35,7 @@ const SELECT_PX = 7; // a press this close to another track's line selects it
 
 const PANELS = [
   { id: "formants", label: "Formants", tracks: ["F1", "F2", "F3", "F4", "F5"], ticks: [0, 1000, 2000, 3000, 4000, 5000], format: (v) => `${v / 1000}k` },
-  { id: "F0", label: "F0 (Hz)", tracks: ["F0"], ticks: [0, 100, 200, 300] },
+  { id: "F0", label: "F0 (Hz)", tracks: ["F0"], ticks: [25, 50, 100, 200, 400, 800] },
   { id: "AV", label: "AV (dB)", tracks: ["AV"], ticks: [0, 20, 40, 60, 80] },
   { id: "bandwidths", label: "Bandwidth (Hz)", tracks: [], ticks: [0, 200, 400, 600] },
 ];
@@ -129,7 +133,10 @@ export function createTracksTab(root, { commit }) {
   function geometry(panel) {
     const width = panel.svg.clientWidth || 600;
     const height = panel.svg.clientHeight || 100;
-    const { min, max } = TRACKS[trackList(panel)[0]];
+    const name = trackList(panel)[0];
+    const { min, max } = TRACKS[name];
+    // Positions go by the track's scale: octaves on a log track.
+    const [lo, hi] = [toScale(name, min), toScale(name, max)];
     const x0 = MARGIN.left;
     const x1 = width - MARGIN.right;
     const y0 = MARGIN.top;
@@ -137,9 +144,9 @@ export function createTracksTab(root, { commit }) {
     return {
       width, height, x0, x1, y0, y1, min, max,
       x: (t) => x0 + (t / doc.duration) * (x1 - x0),
-      y: (v) => y1 - ((v - min) / (max - min)) * (y1 - y0),
+      y: (v) => y1 - ((toScale(name, v) - lo) / (hi - lo)) * (y1 - y0),
       t: (x) => Math.min(doc.duration, Math.max(0, ((x - x0) / (x1 - x0)) * doc.duration)),
-      v: (y) => min + ((y1 - y) / (y1 - y0)) * (max - min),
+      v: (y) => fromScale(name, lo + ((y1 - y) / (y1 - y0)) * (hi - lo)),
     };
   }
 
@@ -169,7 +176,7 @@ export function createTracksTab(root, { commit }) {
       const isSelected = name === selected;
       const ends = [[0, pts[0][1]], ...pts, [doc.duration, pts[pts.length - 1][1]]];
       const group = element("g", { class: `track${isSelected ? " selected" : ""}`, style: `--track: ${TRACKS[name].color}; --track-bright: ${TRACKS[name].bright ?? TRACKS[name].color}` }, svg);
-      element("polyline", { points: ends.map(([t, v]) => `${g.x(t)},${g.y(v)}`).join(" ") }, group);
+      element("polyline", { points: drawnPoints(name, ends).map(([t, v]) => `${g.x(t)},${g.y(v)}`).join(" ") }, group);
       if (names.length > 1) {
         const label = element("text", { x: g.x1 - 4, y: g.y(pts[pts.length - 1][1]) - 5, class: "track-label" }, group);
         label.textContent = name;
@@ -323,10 +330,10 @@ export function createTracksTab(root, { commit }) {
       const pts = points(doc, name);
       if (kind === "line") {
         const [a, b] = gesture.preview;
-        const span = Math.abs(geometry(panel).x(b[0]) - geometry(panel).x(a[0])) < 3 && Math.abs(a[1] - b[1]) < 1e-9 ? [a] : [a, b].sort((p, q) => p[0] - q[0]);
+        const span = Math.abs(geometry(panel).x(b[0]) - geometry(panel).x(a[0])) < 3 && Math.abs(a[1] - b[1]) < 1e-9 ? [a] : lineSpan(name, a, b);
         doc = withPoints(doc, name, span.length === 1 ? insertPoint(pts, ...span[0]).pts : replaceSpan(pts, span));
       } else if (kind === "freehand") {
-        const simplified = simplify(gesture.stroke, TRACKS[name].tolerance);
+        const simplified = simplifyStroke(name, gesture.stroke);
         doc = withPoints(doc, name, simplified.length === 1 ? insertPoint(pts, ...simplified[0]).pts : replaceSpan(pts, simplified));
       }
       gesture = null;
