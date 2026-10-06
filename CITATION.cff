@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use sonore-sketch, please cite it as below."
+title: "sonore-sketch: draw on a picture of sound and hear the result"
+type: software
+authors:
+  - family-names: Cho
+    given-names: Adrian Y.
+  - family-names: Guest
+    given-names: Daniel R.
+license: MIT
+repository-code: "https://github.com/choyun1/sonore-sketch"
+url: "https://choyun1.github.io/sonore-sketch/"
+keywords:
+  - auditory perception
+  - psychoacoustics
+  - sound synthesis
+  - speech synthesis
+  - spectrogram
+  - modulation spectrum
+references:
+  - type: article
+    title: "Track-Draw: A graphical interface for controlling the parameters of a speech synthesizer"
+    authors:
+      - family-names: Assmann
+        given-names: Peter F.
+      - family-names: Ballard
+        given-names: William J.
+      - family-names: Bornstein
+        given-names: Laurie
+      - family-names: Paschall
+        given-names: D. Dwayne
+    journal: "Behavior Research Methods, Instruments, & Computers"
+    volume: 26
+    issue: 4
+    start: 431
+    end: 436
+    year: 1994
+    doi: 10.3758/BF03204661

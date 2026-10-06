@@ -56,7 +56,7 @@ the keys 1–5 for F1–F5 and 0 (or `` ` ``) for F0. The tools have keys too:
 P, L and F. **Point** adds a breakpoint or drags one;
 double-click removes it. **Line** replaces a span with a straight line.
 **Freehand** draws a stroke, kept as the fewest breakpoints within a small
-tolerance. With any tool, dragging a breakpoint's circle up or down moves
+tolerance (Douglas & Peucker, 1973). With any tool, dragging a breakpoint's circle up or down moves
 it; with Line or Freehand, dragging from a circle along time draws from it
 instead. **Bandwidths** shows a strip for the selected formant's bandwidth, and the **F0 axis** can be
 spaced in octaves (Log, from 20 to 800 Hz) or in Hz (Linear).
@@ -118,11 +118,11 @@ each choice; this section is the method in one place.
 ### The common picture: envelopes and their modulation spectrum
 
 The Draw modulation and Erase modulation tabs share one description of a sound.
-A cosine filterbank splits it into bands 1/12 octave wide from 100 to
-6400 Hz. Each band is a slow **envelope** (its loudness over time, sampled
+A cosine filterbank (McDermott & Simoncelli, 2011) splits it into bands
+1/12 octave wide from 100 to 6400 Hz. Each band is a slow **envelope** (its loudness over time, sampled
 at 1 kHz) times a fast **fine structure** (what is under the envelope).
 The envelopes form an array, band by time, and its 2-D Fourier transform
-is the **modulation spectrum**: **rate** (Hz) along time and **density**
+is the **modulation spectrum** (Chi et al., 1999; Singh & Theunissen, 2003): **rate** (Hz) along time and **density**
 (cycles/octave) along frequency. A positive rate with a positive density
 is a downward sweep, a negative rate an upward one, and density 0 is
 modulation shared by every band.
@@ -150,7 +150,8 @@ synthesizer, given as breakpoints and interpolated in time
 ### Paint spectrogram
 
 The painting is read as an amplitude envelope over time and octaves,
-bilinearly between cells, and `so.ripple_sound` puts it on a carrier: 20
+bilinearly between cells, and `so.ripple_sound` puts it on a carrier, as
+moving ripples are made (Kowalski et al., 1996), but with any envelope: 20
 log-spaced tones per octave, the harmonics of F0 (weighted 1/√k for equal
 energy per octave), or noise through a 1/24-octave filterbank. Each
 component is multiplied by the envelope at its own frequency. A harmonic
@@ -306,22 +307,54 @@ and the decisions Cho made.
 ## Credits
 
 sonore-sketch grew out of TrackDraw (2016), by Adrian Y. Cho and Daniel R
-Guest, whose history this repository keeps. The Draw speech tab is after:
-
-Assmann, P., Ballard, W., Bornstein, L., & Paschall, D. (1994). Track-Draw:
-A graphical interface for controlling the parameters of a speech
-synthesizer. *Behavior Research Methods, Instruments, & Computers*, 26(4),
-431–436. doi:10.3758/BF03204661.
-
-Klatt, D. H. (1980). Software for a cascade/parallel formant synthesizer.
-*Journal of the Acoustical Society of America*, 67(3), 971–995.
-doi:10.1121/1.383940.
-
-The iterations follow:
-
-Griffin, D. W., & Lim, J. S. (1984). Signal estimation from modified
-short-time Fourier transform. *IEEE Transactions on Acoustics, Speech, and
-Signal Processing*, 32(2), 236–243. doi:10.1109/TASSP.1984.1164317.
+Guest, whose history this repository keeps; the Draw speech tab is after
+Assmann et al.'s (1994) Track-Draw. Every sound is made by
+[sonore](https://github.com/choyun1/sonore), by Adrian Y. Cho, running in
+the browser under Pyodide (The Pyodide development team, 2021).
 
 This project is AI-assisted: much of the code and documentation was drafted
 by Claude (Claude Code) for Cho to review. MIT licence (`LICENSE.txt`).
+To cite sonore-sketch itself, use GitHub's "Cite this repository"
+(`CITATION.cff`).
+
+## References
+
+Assmann, P. F., Ballard, W. J., Bornstein, L., & Paschall, D. D. (1994).
+Track-Draw: A graphical interface for controlling the parameters of a
+speech synthesizer. *Behavior Research Methods, Instruments, & Computers*,
+*26*(4), 431–436. https://doi.org/10.3758/BF03204661
+
+Chi, T., Gao, Y., Guyton, M. C., Ru, P., & Shamma, S. (1999).
+Spectro-temporal modulation transfer functions and speech intelligibility.
+*The Journal of the Acoustical Society of America*, *106*(5), 2719–2732.
+https://doi.org/10.1121/1.428100
+
+Douglas, D. H., & Peucker, T. K. (1973). Algorithms for the reduction of
+the number of points required to represent a digitized line or its
+caricature. *Cartographica*, *10*(2), 112–122.
+https://doi.org/10.3138/FM57-6770-U75U-7727
+
+Griffin, D. W., & Lim, J. S. (1984). Signal estimation from modified
+short-time Fourier transform. *IEEE Transactions on Acoustics, Speech, and
+Signal Processing*, *32*(2), 236–243. https://doi.org/10.1109/TASSP.1984.1164317
+
+Klatt, D. H. (1980). Software for a cascade/parallel formant synthesizer.
+*The Journal of the Acoustical Society of America*, *67*(3), 971–995.
+https://doi.org/10.1121/1.383940
+
+Kowalski, N., Depireux, D. A., & Shamma, S. A. (1996). Analysis of dynamic
+spectra in ferret primary auditory cortex. I. Characteristics of
+single-unit responses to moving ripple spectra. *Journal of
+Neurophysiology*, *76*(5), 3503–3523. https://doi.org/10.1152/jn.1996.76.5.3503
+
+McDermott, J. H., & Simoncelli, E. P. (2011). Sound texture perception via
+statistics of the auditory periphery: Evidence from sound synthesis.
+*Neuron*, *71*(5), 926–940. https://doi.org/10.1016/j.neuron.2011.06.032
+
+The Pyodide development team. (2021). *pyodide/pyodide* [Computer
+software]. Zenodo. https://doi.org/10.5281/zenodo.5156931
+
+Singh, N. C., & Theunissen, F. E. (2003). Modulation spectra of natural
+sounds and ethological theories of auditory processing. *The Journal of the
+Acoustical Society of America*, *114*(6), 3394–3411.
+https://doi.org/10.1121/1.1624067
