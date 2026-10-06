@@ -6,13 +6,16 @@
 // Messages in:  {id, request: {tab, state}}
 // Messages out: {type: "progress", text} while loading,
 //               {type: "ready", versions},
-//               {id, type: "result", result} or {id, type: "error", message, detail}.
+//               {id, type: "step", fraction} as synthesis goes (page.handle_steps),
+//               {id, type: "result", result} or {id, type: "error", message, detail},
+//               or {id, type: "dropped"} when a newer request arrived first.
 
 const PYODIDE_VERSION = "314.0.7"; // what Cho measured on 2026-10-03 (tracks.md, M6)
 const SONORE_VERSION = "0.5.0"; // keep in step with pyproject.toml (app.md, D5)
 const PYTHON_FILES = ["__init__.py", "blobs.py", "page.py", "painted.py", "tracks.py"]; // every file in src/sonore_sketch (tests/test_page.py checks)
 
-let handle = null;
+let steps = null;
+let latest = -1; // the newest request's id: an older one stops at its next step
 
 function progress(text) {
   postMessage({ type: "progress", text });
@@ -68,11 +71,11 @@ async function load() {
     pyodide.FS.writeFile(`${folder}/${name}`, await response.text());
   }
   progress(`Importing sonore… (${seconds()} s)`);
-  handle = pyodide.runPython(`
+  steps = pyodide.runPython(`
 import json, sys
 sys.path.insert(0, "/home/pyodide")
-from sonore_sketch.page import handle
-lambda text: handle(json.loads(text))
+from sonore_sketch.page import handle_steps
+lambda text: handle_steps(json.loads(text))
 `);
   const versions = pyodide.runPython("import sonore, sys; f'sonore {sonore.__version__}, Python {sys.version.split()[0]}'");
   postMessage({ type: "ready", versions: `${versions}, Pyodide ${pyodide.version}`, seconds: Number(seconds()) });
@@ -115,10 +118,28 @@ const loading = load().catch((error) => {
   throw error;
 });
 
+// Python runs one step at a time, and between steps the worker lets other
+// messages in, so a newer drawing stops this one instead of waiting for it.
+const between = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 onmessage = async ({ data: { id, request } }) => {
+  latest = id;
+  let work = null;
   try {
     await loading;
-    const result = convert(handle(JSON.stringify(request)));
+    if (id !== latest) return postMessage({ id, type: "dropped" });
+    work = steps(JSON.stringify(request));
+    let result;
+    for (;;) {
+      const step = work.next();
+      if (step.done) {
+        result = convert(step.value); // destroys the Python result
+        break;
+      }
+      postMessage({ id, type: "step", fraction: step.value });
+      await between();
+      if (id !== latest) return postMessage({ id, type: "dropped" });
+    }
     const transfer = [result.samples.buffer, result.spectrogram.data.buffer];
     if (result.modulation) transfer.push(result.modulation.data.buffer);
     postMessage({ id, type: "result", result }, transfer);
@@ -128,5 +149,7 @@ onmessage = async ({ data: { id, request } }) => {
     const full = String(error?.message ?? error).trim();
     const lines = full.split("\n");
     postMessage({ id, type: "error", message: lines[lines.length - 1], detail: full });
+  } finally {
+    work?.destroy();
   }
 };

@@ -273,6 +273,8 @@ def main() -> None:
             expect(status).to_contain_text("Made", timeout=60_000)
             assert page_document_in(page)["tab"] == "blobs"
             example = page_document_in(page)["blobs"]
+            start = example["items"]
+            assert len(start) == 1 and start[0]["rate"] > 0 and start[0]["density"] > 0, start  # one blob, upper right
             expect(page.locator("#tab-blobs .coarse")).to_be_visible()  # 0.6 s is under 2 s
             plane = page.locator("canvas.plane").bounding_box()
             left, right = plane["x"] + 52, plane["x"] + plane["width"] - 10
@@ -298,10 +300,18 @@ def main() -> None:
                 page.mouse.up()
                 page.wait_for_function("(before) => location.hash !== before", arg=before, timeout=10_000)
 
+            page.evaluate(
+                """() => { window.progressSeen = false;
+                    new MutationObserver(() => { if (document.querySelector('#tab-blobs .synth-progress')) window.progressSeen = true; })
+                        .observe(document.querySelector('#tab-blobs'), { childList: true, subtree: true }); }"""
+            )
             gesture([(bx(-16), by(3))])
             added = blobs_now()[-1]
-            assert len(blobs_now()) == 3 and abs(math.log2(-added["rate"] / 16)) < 0.1 and abs(added["density"] - 3) < 0.1, added
+            assert len(blobs_now()) == 2 and abs(math.log2(-added["rate"] / 16)) < 0.1 and abs(added["density"] - 3) < 0.1, added
             expect(status).to_contain_text("Made", timeout=60_000)
+            assert page.evaluate("window.progressSeen"), "no progress shown over the plane while synthesizing"
+            expect(page.locator("#tab-blobs .synth-progress")).to_have_count(0)
+            print("modulation: progress shown over the plane while synthesizing, gone when made")
             gesture([(bx(added["rate"]), by(added["density"])), (bx(16), by(2))])
             moved = blobs_now()[-1]
             assert moved["rate"] > 0 and abs(math.log2(moved["rate"] / 16)) < 0.1 and abs(moved["density"] - 2) < 0.1, moved
@@ -331,12 +341,12 @@ def main() -> None:
 
             page.mouse.move(centre, plane["y"] - 30)  # off the plane, so keys go to the page
             page.keyboard.press("Delete")
-            assert len(blobs_now()) == 2
+            assert len(blobs_now()) == 1
             page.click("#tab-blobs .clear")
             expect(status).to_contain_text("No blobs yet", timeout=10_000)
             page.keyboard.press("Control+z")
             page.keyboard.press("Control+z")
-            assert len(blobs_now()) == 3
+            assert len(blobs_now()) == 2
             expect(status).to_contain_text("Made", timeout=60_000)
             page.locator("#tab-blobs .iterations").fill("2")
             page.locator("#tab-blobs .iterations").press("Enter")

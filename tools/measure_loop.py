@@ -57,7 +57,7 @@ CASES = {
 def state(bands, carrier="tones", iterations=0):
     return {"blobs": 1, "duration": 3.0, "fs": FS, "f_lo": 100, "f_hi": 6400, "bands_per_octave": 12,
             "carrier": carrier, "iterations": iterations, "rms_depth": 0.2, "seed": 1,
-            "items": tab.EXAMPLE_ITEMS, "bands": bands}
+            "items": tab.B9_ITEMS, "bands": bands}
 
 
 def step_whole(sound, drawn):

@@ -10,7 +10,7 @@ in typed arrays without copying element by element.
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 import numpy as np
@@ -96,11 +96,34 @@ def handle(request: Mapping[str, Any]) -> dict[str, Any]:
     seconds synthesis took; on the Modulation tab also the result's measured
     modulation spectrum (``blobs.measured_picture``).
     """
+    work = handle_steps(request)
+    while True:
+        try:
+            next(work)
+        except StopIteration as done:
+            return done.value
+
+
+def handle_steps(request: Mapping[str, Any]) -> Iterator[float]:
+    """``handle`` one step at a time: yields the fraction done (synthesis
+    takes most of it, the pictures the rest) and returns ``handle``'s
+    result. The Pyodide worker runs it between messages, so the page can
+    show progress and drop a request the drawing has outgrown."""
     tab = request.get("tab")
     if tab not in TABS:
         raise ValueError(f"unknown tab {tab!r}; known: {sorted(TABS)}")
     start = time.perf_counter()
-    sound = TABS[tab](request["state"])
+    if tab == "blobs":
+        work = blobs.steps(request["state"])
+        while True:
+            try:
+                yield 0.9 * next(work)
+            except StopIteration as done:
+                sound = done.value
+                break
+    else:
+        sound = TABS[tab](request["state"])
+        yield 0.9
     elapsed = time.perf_counter() - start
     result = {
         "fs": float(sound.fs),

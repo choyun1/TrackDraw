@@ -22,10 +22,10 @@ export const DEFAULTS = {
 };
 // A new blob's widths and level (B2).
 export const NEW_BLOB = { rate_width: 0.5, density_width: 0.25, level: 0 };
-// sonore_sketch.blobs.EXAMPLE_ITEMS (B9); tests/test_blobs.py checks the two agree.
+// sonore_sketch.blobs.EXAMPLE_ITEMS: one blob near the origin, rate and
+// density both positive; tests/test_blobs.py checks the two agree.
 export const EXAMPLE_ITEMS = [
-  { rate: 4, density: 0, rate_width: 0.5, density_width: 0.25, level: 0 },
-  { rate: 8, density: 1, rate_width: 0.5, density_width: 0.25, level: -3 },
+  { rate: 2, density: 0.5, rate_width: 0.5, density_width: 0.25, level: 0 },
 ];
 
 // The plane shown (B1): rate on a signed log axis from 1 to 64 Hz each side,
