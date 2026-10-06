@@ -234,6 +234,72 @@ drew. Searching for a sound that meets both whole-sound constraints at
 once (alternating between the bands and the blobs, as Griffin & Lim do)
 was considered and not chosen: it can only partly cancel a band's motion.
 
+## Going back and forth (added 2026-10-05)
+
+Cho asked whether the blobs and the bands could constrain each other in a
+loop. With bands drawn, the Iterations setting now does that: impose the
+blobs on the sound's envelopes *relative to the bands' gain* (as
+`measured` reads them, so the bands' motion is not what the blobs fight),
+give the gain back, put the bands on again, and repeat
+(`sonore_sketch.blobs._toward_blobs`). Without bands, iterations are
+`to_sound`'s, as before; the harmonic carrier still takes none.
+
+**K-M5. The loop gets back most of what the bands cost.** [measure]
+`tools/measure_loop.py`: the B-M4 contrast within the bands, 3 s, the
+starting drawing, at 0 and 10 iterations. "now" is iterations on the whole
+range, then the bands; "naive" alternates without dividing out the gain;
+"within" is what the tab does.
+
+| Band | carrier | 0 | now 10 | naive 10 | within 10 |
+|---|---|---|---|---|---|
+| none | tones | 26.1 | 35.0 | | |
+| 1 oct at 1 kHz | tones | 24.8 | 25.3 | 31.5 | 30.4 |
+| 1 oct gliding 500→4000 Hz | tones | 22.5 | 23.0 | 27.3 | 26.9 |
+| 2 oct gliding 300→2400 Hz | tones | 20.8 | 21.0 | 23.3 | 28.3 |
+| 1/2 oct at 500 Hz and 2 kHz | tones | 20.7 | 21.0 | 25.1 | 23.7 |
+| 1 oct at 1 kHz | noise | 13.7 | 21.2 | 29.6 | 28.7 |
+| 1 oct gliding 500→4000 Hz | noise | 14.9 | 20.1 | 23.9 | 27.0 |
+
+After 10 iterations a static 1-octave band rejects 62.5 dB now, 44.4 dB
+naive and 74.2 dB within: the naive loop lets the band leak, which is why
+it was not chosen. An iteration costs about what one of `to_sound`'s does
+(1.2 s against 1.05 s at 3 s in the cloud container).
+
+**K-M5a. It levels off, at a ceiling set by the bands' width.** [measure]
+The same contrast run to 50 rounds (the loop of `blobs._toward_blobs`;
+columns are rounds 0, 10, 20, 50):
+
+| Band | tones | noise |
+|---|---|---|
+| none (`to_sound`'s iterations) | 26.1, 35.0, 36.7, 38.9 | 14.7, 23.7, 25.5, 27.3 |
+| 1 oct at 1 kHz | 24.8, 30.4, 30.7, 30.7 | 13.7, 28.7, 29.5, 30.2 |
+| 1 oct gliding 500→4000 Hz | 22.5, 26.9, 27.5, 27.9 | 14.9, 27.0, 27.7, 28.2 |
+| 2 oct gliding 300→2400 Hz | 20.8, 28.3, 29.1, 29.7 | 12.8, 27.4, 28.6, 29.6 |
+| 1/2 oct at 500 Hz and 2 kHz | 20.7, 23.7, 23.8, 23.9 | 11.4, 22.6, 23.0, 23.4 |
+
+No case went backwards. With bands, 10 rounds give 85–95% of what 50
+do, and the level reached falls with the bands' width (about 24 dB for
+half-octave bands, 28–31 dB for one or two octaves), as a band *w* octaves
+wide resolves density only in steps of about 1/*w* cyc/oct (K-M2).
+Without bands the search keeps climbing slowly.
+
+**K-M6. Which dominates the whole sound: the blobs, unless the bands move
+fast or the blobs are shallow.** [measure] `tools/measure_dominance.py`:
+the blobs' share of the result's modulation power over the whole range,
+|rate| 1–64 Hz, tones, 3 s (the bands-alone power over the result's,
+taken as the bands' share; a fit of blobs alone plus bands alone agrees
+within about 10 points):
+
+| Band | depth 0.2 | 0.2, 10 iterations | depth 0.05 |
+|---|---|---|---|
+| 1 oct static | 100% | 100% | 100% |
+| 1 oct gliding 1/3 oct/s | 89% | 98% | 33% |
+| 1 oct gliding 1 oct/s | 44% | 80% | 5% |
+| 2 oct gliding 1 oct/s | 60% | 84% | 9% |
+| 1/2 oct up and down 2 oct/s | 4% | 43% | 0% |
+
+A static band's shape lands at rate 0, which the plane leaves out.
+
 ## Order of work
 
 1. Python: the gain, `synthesize` with bands, tests (rejection, no bands

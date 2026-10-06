@@ -22,6 +22,9 @@ the seed.
 regions of the spectrogram: each is a centre-frequency track, a width in
 octaves and a level, applied last as a time-varying filter on a 20 ms STFT
 (``so.Mask``). With no bands the sound is the whole range, as before.
+With bands, ``iterations`` go back and forth between the two: impose the
+blobs on the sound inside the bands, put the bands on again, and repeat,
+so each constrains the other (``_toward_blobs``; tools/measure_loop.py).
 """
 
 from __future__ import annotations
@@ -176,21 +179,57 @@ def synthesize(state: Mapping[str, Any]) -> so.Sound:
     check(state)
     if not state["items"]:
         raise ValueError("no blobs yet: add a blob to hear something")
+    if state.get("carrier") == "harmonic" and state.get("iterations", 0):
+        raise ValueError("iterations work on the tones and noise carriers only")
+    bands = state.get("bands")
+    carried = {**state, "iterations": 0} if bands else state  # with bands, iterations alternate (below)
     try:
-        sound = _carried(state)
+        sound = _carried(carried)
     except ValueError as refusal:
         depth, fits = float(state.get("rms_depth", 0.2)), depth_that_fits(str(refusal))
         if fits is None or fits < NEAR_MISS * depth:
             raise
         for factor in (0.995, 0.98, 0.95, 0.92):  # sonore's figure is rounded to 3 digits
             try:
-                sound = _carried({**state, "rms_depth": min(fits, depth) * factor})
+                carried = {**carried, "rms_depth": min(fits, depth) * factor}
+                sound = _carried(carried)
                 break
             except ValueError:
                 continue
         else:
             raise refusal from None
-    return band_limit(sound, state["bands"]) if state.get("bands") else sound
+    if not bands:
+        return sound
+    sound = band_limit(sound, bands)
+    iterations = int(state.get("iterations", 0))
+    drawn = target(carried) if iterations else None
+    for _ in range(iterations):
+        sound = band_limit(_toward_blobs(sound, drawn, bands), bands)
+    return sound
+
+
+def _toward_blobs(sound: so.Sound, drawn: so.ModulationSpectrum, bands: list) -> so.Sound:
+    """One step of the search between the blobs and the bands: ``to_sound``'s
+    iteration (keep the fine structure and the modulation phase, impose the
+    drawn magnitudes) taken on the envelopes relative to the bands' gain, as
+    ``measured`` reads them, then given the gain back. The bands' own shape
+    and motion stay out of what the blobs are imposed on, so the two
+    constraints pull on different things (tools/measure_loop.py, ``within``).
+    It reads the drawn magnitudes and mean from sonore 0.5's private fields
+    and its filterbank, which ``to_sound`` uses for its own iterations."""
+    bank = drawn._analysis.filterbank
+    subbands = bank.analyze(sound)
+    env = subbands.envelopes(fs=ENV_FS).data.mean(axis=2)[:, 1:-1]  # (time, band), edges dropped
+    gain = band_gain(bands, bank.cfs[1:-1], np.arange(env.shape[0]) / ENV_FS)
+    weight = gain / gain.max()
+    relative = env / np.maximum(gain, 10 ** (BAND_FLOOR_DB / 20))
+    relative = relative / (np.sum(weight * relative) / np.sum(weight))  # mean 1 within the bands
+    phase = np.angle(np.fft.fft2((weight * (relative - 1)).T))
+    rebuilt = drawn._mean + np.real(np.fft.ifft2(drawn._magnitude * np.exp(1j * phase)))
+    values = np.zeros((env.shape[0], bank.n_filters))
+    values[:, 1:-1] = gain * np.maximum(rebuilt.T, 0)
+    out = (so.Envelopes(values, ENV_FS, bank) * subbands.tfs()).to_sound()
+    return so.Sound(out.data[: sound.n_samples], sound.fs)
 
 
 def depth_that_fits(message: str) -> float | None:
