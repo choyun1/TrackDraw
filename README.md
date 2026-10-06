@@ -36,7 +36,8 @@ each change is heard as soon as you finish drawing it.
 - In **Spectrogram**, drag to paint at the brush's level (0 dB is the loudest),
   and right-drag or **Erase** to paint silence. **Clear** erases everything.
   The carrier is what the painting shapes: tones, harmonics of an F0, or
-  noise.
+  noise. The harmonic carrier sounds only at multiples of F0, which show as
+  faint dashed lines; paint between them is silent.
 - The duration (up to 10 s) stretches everything drawn.
 - **Save** writes the drawing as JSON, **Open** reads it back, **Link**
   copies an address that opens it, and **WAV** saves the sound.
