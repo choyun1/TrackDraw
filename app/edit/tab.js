@@ -668,7 +668,7 @@ function paintLogSpectrogram(target, picture, w, h, f_lo, span, duration) {
 
 // A sound file as mono samples at `fs` (the browser decodes and resamples
 // it), at most MAX_RECORDING_S long, and its own length in seconds.
-async function decodeAudio(file, fs) {
+export async function decodeAudio(file, fs) {
   const context = new OfflineAudioContext(1, 1, fs);
   let audio;
   try {

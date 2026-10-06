@@ -270,7 +270,8 @@ speech upstream, drawing interaction) are in `tabs/tracks.md`.
 The Painted tab's and the Paint primitive's decisions are in
 `tabs/painted.md`.
 The Modulation tab's and the Blobs primitive's decisions are in
-`tabs/blobs.md`, and the Edit modulation tab's in `tabs/edit.md`.
+`tabs/blobs.md`, the Edit modulation tab's in `tabs/edit.md`, and the
+Filter recording (Mask) tab's in `tabs/mask.md`.
 
 ## Order of work
 

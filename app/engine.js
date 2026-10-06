@@ -6,7 +6,8 @@
 // {fs, samples: Float32Array, synthesisSeconds, spectrogram: {...}}, on the
 // Modulation tab modulation: {...}, and on the Edit modulation tab
 // modulation, sourceModulation: {...} (modulationPicture) and clipped (a
-// fraction).
+// fraction), and on the Filter recording tab sourceStft, resultStft: {...}
+// (spectrogramPicture).
 
 function bytesFromBase64(text) {
   const binary = atob(text);
@@ -77,19 +78,26 @@ class LocalEngine {
       fs: body.fs,
       samples: new Float32Array(bytesFromBase64(body.samples).buffer),
       synthesisSeconds: body.synthesis_s,
-      spectrogram: {
-        data: bytesFromBase64(body.spectrogram.data),
-        nFreqs: body.spectrogram.n_freqs,
-        nFrames: body.spectrogram.n_frames,
-        fMax: body.spectrogram.f_max,
-        tStart: body.spectrogram.t_start,
-        tStep: body.spectrogram.t_step,
-      },
+      spectrogram: spectrogramPicture(body.spectrogram),
+      sourceStft: body.source_stft && spectrogramPicture(body.source_stft),
+      resultStft: body.result_stft && spectrogramPicture(body.result_stft),
       modulation: body.modulation && modulationPicture(body.modulation, bytesFromBase64(body.modulation.data)),
       sourceModulation: body.source_modulation && modulationPicture(body.source_modulation, bytesFromBase64(body.source_modulation.data)),
       clipped: body.clipped ?? null,
     };
   }
+}
+
+// A spectrogram picture (sonore_sketch.page.spectrogram, mask.pictures) from the local server.
+function spectrogramPicture(picture) {
+  return {
+    data: bytesFromBase64(picture.data),
+    nFreqs: picture.n_freqs,
+    nFrames: picture.n_frames,
+    fMax: picture.f_max,
+    tStart: picture.t_start,
+    tStep: picture.t_step,
+  };
 }
 
 // A modulation spectrum on the plane: the Modulation tab's measured one

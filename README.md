@@ -15,11 +15,10 @@ There is nothing to install.
 |---|---|---|---|
 | **Speech** | formant (F1–F5), F0, voicing (AV) and bandwidth tracks over time | the speech Klatt's (1980) synthesizer makes from them, after Track-Draw (Assmann et al., 1994) | built |
 | **Spectrogram** | level painted on time × log-frequency | a sound whose spectrogram is the painting (sonore's `ripple_sound`) | built |
-| **Filter recording** | erasures on a recording's spectrogram | what is left of the recording | designed, not built |
+| **Filter recording** | erasures on a sound's spectrogram (a syllable train, the Speech tab's sound, or a recording) | what is left of the sound (sonore's least-squares STFT resynthesis) | built |
 | **Modulation** | blobs on a modulation spectrum (rate × density), and optional frequency bands | a sound with that modulation (sonore's `ModulationSpectrum.from_blobs`), confined to the bands | built |
 | **Edit modulation** | cuts on a sound's modulation spectrum (a syllable train, the Speech tab's sound, or a recording) | the sound with that modulation taken out (sonore's `ModulationSpectrum.with_gain`) | built |
 
-Tabs that are not built yet are greyed out on the page.
 
 ## Using it
 
@@ -64,6 +63,17 @@ Freehand. The **Result** panels are measured from the sound that came out:
 its own modulation spectrum and its waveform, beside what you drew. The
 carrier (tones, harmonic or noise), the modulation depth, and the seed
 (**New draw** hears another random draw with the same spectrum) are below.
+
+**Filter recording.** Choose a **source**, as on Edit modulation: a
+syllable train, the Speech tab's sound, or a recording (**Open audio
+file…**); a recording opened on either tab can be the other's source too.
+The plane shows the source's spectrogram from 0 Hz to half the sampling
+rate, on a linear axis so harmonics are evenly spaced lines. Paint on it to
+erase that part of the sound (right-drag or **Restore** brings it back);
+**Erase**'s **Depth** goes down to -60 dB, which removes it. The
+**Result** panel shows the spectrogram of what came out, in the same
+window and on the same scale, with what you erased outlined, and its
+waveform.
 
 **Edit modulation.** Choose a **source**: a syllable train made at the
 page's duration, the Speech tab's sound, or a recording (**Open audio
@@ -128,6 +138,17 @@ energy per octave), or noise through a 1/24-octave filterbank. Each
 component is multiplied by the envelope at its own frequency. A harmonic
 carrier has components only at multiples of F0, so paint between them is
 silent. There is no iteration.
+
+### Filter recording
+
+The source is analysed with a 32 ms Hann window every 8 ms
+(`so.GaborFrame`). The mask is read at each coefficient, bilinearly in
+amplitude, and multiplies it; `to_sound()` then gives the sound whose own
+STFT is closest to the masked one (least squares; Griffin & Lim, 1984).
+Neighbouring coefficients overlap, so not every picture is a sound's
+spectrogram, and the result panel shows what came back. With a 5 ms window
+an erased band would come back at only −32 dB, which is why the window is
+long (`docs/design/tabs/mask.md`, F-M2). There is no iteration.
 
 ### Modulation
 
@@ -260,10 +281,9 @@ Two things to keep in step:
 Every tab is designed before it is built, in `docs/design/`: `app.md` for
 the page as a whole, and `tabs/` for each tab (`tracks.md` for Speech,
 `painted.md` for Spectrogram, `blobs.md` and `bands.md` for Modulation,
-`edit.md` for Edit modulation).
+`mask.md` for Filter recording, `edit.md` for Edit modulation).
 Each records the measurements behind it, made by the scripts in `tools/`,
-and the decisions Cho made. The design of Filter recording is still in
-review as a pull request.
+and the decisions Cho made.
 
 ## Credits
 
