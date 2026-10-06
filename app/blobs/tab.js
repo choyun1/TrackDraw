@@ -995,6 +995,7 @@ export function createBlobsTab(root, { commit }) {
 
   return {
     id: "blobs",
+    figure: root.querySelector(".design-box .panel-stack"), // where the shell shows synthesis progress, over the plane
     ownWaveform: true, // drawn in the Result box above
     setDocument(next) {
       fits = null; // a refusal is shown again if this drawing is refused again

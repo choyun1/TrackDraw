@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 import numpy as np
@@ -176,13 +176,26 @@ def synthesize(state: Mapping[str, Any]) -> so.Sound:
     """The sound ``state`` describes. A depth one draw cannot reach is
     sonore's ``ValueError``, which names the depth that fits; when that is
     within 10% of the depth asked, the draw is heard at it instead."""
+    work = steps(state)
+    while True:
+        try:
+            next(work)
+        except StopIteration as done:
+            return done.value
+
+
+def steps(state: Mapping[str, Any]) -> Iterator[float]:
+    """``synthesize`` one step at a time: a generator that yields the
+    fraction done after the first synthesis and after each iteration, and
+    returns the sound. The page runs it step by step to show its progress
+    and to drop it between steps when the drawing changes."""
     check(state)
     if not state["items"]:
         raise ValueError("no blobs yet: add a blob to hear something")
     if state.get("carrier") == "harmonic" and state.get("iterations", 0):
         raise ValueError("iterations work on the tones and noise carriers only")
-    bands = state.get("bands")
-    carried = {**state, "iterations": 0} if bands else state  # with bands, iterations alternate (below)
+    iterations = int(state.get("iterations", 0))
+    carried = {**state, "iterations": 0}  # iterations are taken below, one at a time
     try:
         sound = _carried(carried)
     except ValueError as refusal:
@@ -198,14 +211,27 @@ def synthesize(state: Mapping[str, Any]) -> so.Sound:
                 continue
         else:
             raise refusal from None
-    if not bands:
-        return sound
-    sound = band_limit(sound, bands)
-    iterations = int(state.get("iterations", 0))
+    bands = state.get("bands")
+    if bands:
+        sound = band_limit(sound, bands)
+    yield 1 / (iterations + 1)
     drawn = target(carried) if iterations else None
-    for _ in range(iterations):
-        sound = band_limit(_toward_blobs(sound, drawn, bands), bands)
-    return sound
+    for i in range(iterations):
+        # with bands, back and forth between the blobs and the bands; without, to_sound's own iterations
+        sound = band_limit(_toward_blobs(sound, drawn, bands), bands) if bands else _toward_drawn(sound, drawn)
+        yield (i + 2) / (iterations + 1)
+    return sound.normalize() if sound.rms > 0 else sound
+
+
+def _toward_drawn(sound: so.Sound, drawn: so.ModulationSpectrum) -> so.Sound:
+    """One of ``to_sound``'s own iterations (sonore 0.5, ``iterations``):
+    keep the sound's fine structure and modulation phase, impose the drawn
+    magnitudes. Taken here one at a time so the page can show its progress;
+    the result is the same as ``to_sound(iterations=n)``."""
+    subbands = drawn._analysis.filterbank.analyze(sound)
+    envelopes = drawn._rebuild(drawn._modulation_phase(subbands), quiet=True)
+    out = (envelopes * subbands.tfs()).to_sound()
+    return so.Sound(out.data[: sound.n_samples], sound.fs)
 
 
 def _toward_blobs(sound: so.Sound, drawn: so.ModulationSpectrum, bands: list) -> so.Sound:
@@ -319,9 +345,13 @@ def measured_picture(spectrum: so.ModulationSpectrum) -> dict[str, Any]:
     }
 
 
-# The drawing the tab starts from (B9): a syllable-rate flutter, and ripples
-# sweeping down at twice the rate, 3 dB weaker.
+# The drawing the tab starts from: one blob near the origin, slow and broad,
+# rate and density both positive (Cho, 2026-10-06; it was B9's two blobs).
 EXAMPLE_ITEMS = [
+    {"rate": 2.0, "density": 0.5, "rate_width": 0.5, "density_width": 0.25, "level": 0.0},
+]
+# B9's two blobs, which the measurements in tools/ and the design docs use.
+B9_ITEMS = [
     {"rate": 4.0, "density": 0.0, "rate_width": 0.5, "density_width": 0.25, "level": 0.0},
     {"rate": 8.0, "density": 1.0, "rate_width": 0.5, "density_width": 0.25, "level": -3.0},
 ]

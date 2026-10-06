@@ -51,3 +51,20 @@ def test_the_page_colours_levels_with_matplotlibs_magma_as_sonore_does():
     colours = np.array([[int(table[6 * i + k : 6 * i + k + 2], 16) for k in (0, 2, 4)] for i in range(256)])
     expected = np.round(np.array([matplotlib.colormaps["magma"].resampled(256)(i)[:3] for i in range(256)]) * 255)
     np.testing.assert_array_equal(colours, expected)
+
+
+def test_handle_steps_reports_progress_and_returns_handles_result():
+    from sonore_sketch import blobs
+
+    state = {"blobs": 1, "duration": 0.5, "fs": 16000, "f_lo": 100, "f_hi": 6400, "bands_per_octave": 12,
+             "carrier": "tones", "iterations": 2, "rms_depth": 0.2, "seed": 1, "items": blobs.EXAMPLE_ITEMS}
+    work, fractions = page.handle_steps({"tab": "blobs", "state": state}), []
+    while True:
+        try:
+            fractions.append(next(work))
+        except StopIteration as done:
+            result = done.value
+            break
+    assert fractions == sorted(fractions) and 0 < fractions[0] and fractions[-1] < 1
+    expected = page.handle({"tab": "blobs", "state": state})
+    assert result["samples"] == expected["samples"] and "modulation" in result

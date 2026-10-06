@@ -17,14 +17,14 @@ def state(**changes):
         "blobs": 1, "sonore": "0.5.0", "duration": 1.0, "fs": 16000,
         "f_lo": 100, "f_hi": 6400, "bands_per_octave": 12,
         "carrier": "tones", "iterations": 0, "rms_depth": 0.2, "seed": 1,
-        "items": [dict(item) for item in blobs.EXAMPLE_ITEMS],
+        "items": [dict(item) for item in blobs.B9_ITEMS],  # the drawing the measurements use
     } | changes
 
 
 def picture_fixture():
     """What the page's picture must agree with (tests/js/blobs.test.mjs):
     from_blobs's grid, and its level at some cells, in dB below its peak."""
-    drawing = state(items=[*blobs.EXAMPLE_ITEMS, {"rate": -6, "density": 2, "rate_width": 0.3, "density_width": 0.5, "level": -6}])
+    drawing = state(items=[*blobs.B9_ITEMS, {"rate": -6, "density": 2, "rate_width": 0.3, "density_width": 0.5, "level": -6}])
     spectrum = blobs.target(drawing)
     level = spectrum.level - spectrum.level.max()
     points = []
@@ -77,6 +77,26 @@ def test_the_harmonic_carrier_is_a_harmonic_complex_on_f0():
     f = np.fft.rfftfreq(len(data), 1 / 16000)
     on = np.isin(np.round(f), 125 * np.arange(1, 52))  # 1 Hz bins: the harmonics' own
     assert spectrum[on].sum() / spectrum.sum() > 0.5  # mostly at harmonics, though the envelopes widen each
+
+
+@pytest.mark.parametrize("bands", [[], [{"points": [[0, 500], [1, 2000]], "width": 1.0, "level": 0.0}]])
+def test_steps_report_progress_and_give_the_same_sound(bands):
+    drawing = state(iterations=3, bands=bands)
+    work, fractions = blobs.steps(drawing), []
+    while True:
+        try:
+            fractions.append(next(work))
+        except StopIteration as done:
+            sound = done.value
+            break
+    assert fractions == pytest.approx([0.25, 0.5, 0.75, 1.0])
+    assert np.array_equal(sound.data, blobs.synthesize(drawing).data)
+
+
+def test_iterations_without_bands_are_to_sounds_own():
+    drawing = state(carrier="noise", iterations=3)
+    expected = blobs.target(drawing).to_sound(carrier="noise", fs=16000.0, rng=1, iterations=3)
+    assert np.allclose(blobs.synthesize(drawing).data, expected.data, atol=1e-9)
 
 
 def test_iterations_are_refused_on_the_harmonic_carrier():

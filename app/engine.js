@@ -14,6 +14,8 @@ function bytesFromBase64(text) {
 }
 
 class PyodideEngine {
+  supersedes = true; // the worker drops an older request itself
+
   constructor({ onProgress, onReady, onFailed }) {
     const url = new URL("./worker.js", import.meta.url);
     const pyodide = new URLSearchParams(location.search).get("pyodide");
@@ -30,18 +32,23 @@ class PyodideEngine {
         this.waiting.clear();
         return;
       }
-      const { resolve, reject } = this.waiting.get(data.id);
+      const waiting = this.waiting.get(data.id);
+      if (data.type === "step") return waiting.onStep?.(data.fraction);
+      const { resolve, reject } = waiting;
       this.waiting.delete(data.id);
       if (data.type === "result") resolve(data.result);
+      else if (data.type === "dropped") resolve(null);
       else reject(Object.assign(new Error(data.message), { detail: data.detail }));
     };
     this.worker.onerror = (event) => onFailed(event.message ?? "the synthesis worker failed");
   }
 
-  synthesize(request) {
+  // A newer request stops this one at its next step (it resolves to null),
+  // and onStep(fraction) follows its progress.
+  synthesize(request, onStep) {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.waiting.set(id, { resolve, reject });
+      this.waiting.set(id, { resolve, reject, onStep });
       this.worker.postMessage({ id, request });
     });
   }
@@ -98,7 +105,9 @@ export function createEngine(kind, callbacks) {
 }
 
 // Only the newest request matters while one is running: older waiting ones
-// resolve to null instead of being synthesized.
+// resolve to null instead of being synthesized. The Pyodide engine goes
+// further and stops the running one between steps; the local engine (one
+// HTTP request each) finishes it, and gives no steps.
 export class LatestOnly {
   constructor(engine) {
     this.engine = engine;
@@ -106,7 +115,8 @@ export class LatestOnly {
     this.pending = null;
   }
 
-  synthesize(request) {
+  synthesize(request, onStep) {
+    if (this.engine.supersedes) return this.engine.synthesize(request, onStep);
     return new Promise((resolve, reject) => {
       this.pending?.resolve(null);
       this.pending = { request, resolve, reject };

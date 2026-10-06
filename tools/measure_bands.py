@@ -208,7 +208,7 @@ for name, bands in {
     "2 oct gliding 300->2400 Hz": [{"points": [[0, 300], [3, 2400]], "width": 2, "level": 0}],
 }.items():
     state = {"blobs": 1, "duration": 3.0, "fs": FS, "f_lo": F_LO, "f_hi": F_HI, "bands_per_octave": BPO, "carrier": "tones",
-             "iterations": 0, "rms_depth": 0.2, "seed": 1, "items": tab.EXAMPLE_ITEMS, "bands": bands}
+             "iterations": 0, "rms_depth": 0.2, "seed": 1, "items": tab.B9_ITEMS, "bands": bands}
     drawn, sound = tab.target(state), tab.synthesize(state)
     near = ((np.abs(drawn.w_t) <= 32) & (np.abs(drawn.w_t) >= 1))[None, :] & (drawn.w_f <= 4)[:, None]
     inside = near & (drawn.level >= drawn.level[near].max() - 6)

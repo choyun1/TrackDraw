@@ -64,7 +64,7 @@ CASES = {
 def state(bands, depth=0.2):
     return {"blobs": 1, "duration": DURATION, "fs": FS, "f_lo": 100, "f_hi": 6400, "bands_per_octave": 12,
             "carrier": "tones", "iterations": 0, "rms_depth": depth, "seed": 1,
-            "items": tab.EXAMPLE_ITEMS, "bands": bands}
+            "items": tab.B9_ITEMS, "bands": bands}
 
 
 def power(sound, s):
