@@ -54,7 +54,9 @@ const TRACK_KEYS = {
   ...Object.fromEntries([1, 2, 3, 4, 5].flatMap((k) => [[`Digit${k}`, `F${k}`], [`Numpad${k}`, `F${k}`]])),
   Digit0: "F0", Numpad0: "F0", Backquote: "F0",
 };
-const TRACK_KEY_LABELS = { F1: "1", F2: "2", F3: "3", F4: "4", F5: "5", F0: "0 or `" };
+// The key shown on each track's button, and the fuller list in its tooltip.
+const TRACK_KEY_LABELS = { F1: "1", F2: "2", F3: "3", F4: "4", F5: "5", F0: "0" };
+const TRACK_KEY_TITLES = { ...TRACK_KEY_LABELS, F0: "0 or `" };
 
 function element(name, attributes = {}, parent = null) {
   const node = document.createElementNS(SVG, name);
@@ -121,9 +123,16 @@ export function createTracksTab(root, { commit }) {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = name;
-    if (TRACK_KEY_LABELS[name]) button.title = `Select ${name} (${TRACK_KEY_LABELS[name]})`;
+    if (TRACK_KEY_LABELS[name]) {
+      const kbd = document.createElement("kbd");
+      kbd.textContent = TRACK_KEY_LABELS[name];
+      button.append(" ", kbd);
+      button.title = `Select ${name} (${TRACK_KEY_TITLES[name]})`;
+    }
     button.style.setProperty("--track", TRACKS[name].color);
     button.style.setProperty("--track-bright", TRACKS[name].bright ?? TRACKS[name].color);
+    // The selected button is dark, so its label needs a light colour: F0 and AV have none of their own.
+    button.style.setProperty("--track-active", TRACKS[name].bright ?? "#fff");
     button.addEventListener("click", () => select(name));
     trackGroup.appendChild(button);
     trackButtons[name] = button;

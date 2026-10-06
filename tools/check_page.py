@@ -122,7 +122,7 @@ def main() -> None:
             assert document_in(page)["params"]["F3"] == f3
 
             # Track keys go by physical key: 0 and the key left of 1 select F0.
-            active = lambda: page.locator(".track-group button.active").text_content()  # noqa: E731
+            active = lambda: page.locator(".track-group button.active").text_content().split()[0]  # noqa: E731
             page.keyboard.press("0")
             assert active() == "F0", active()
             page.keyboard.press("4")
