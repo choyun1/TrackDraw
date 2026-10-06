@@ -115,6 +115,7 @@ export function createBlobsTab(root, { commit }) {
           <label class="field" title="How deep the modulation is: the envelopes' rms about their mean, relative to it">Depth <input type="number" class="depth" min="0.01" max="1" step="0.01"></label>
           <button type="button" class="use-depth" hidden></button>
           <label class="field" title="Which random draw of the modulation's timing to hear">Seed <input type="number" class="seed" step="1"></label>
+          <label class="field iterations-field" title="How many times to search for a sound whose own modulation comes closer to the blobs (slower). With bands, each time goes back and forth between the blobs and the bands. Not on the harmonic carrier">Iterations <input type="number" class="iterations" min="0" max="10" step="1"></label>
           <button type="button" class="new-draw" title="Hear another draw with the same spectrum">New draw</button>
           <button type="button" class="clear" title="Remove every blob (Undo brings them back)">Clear</button>
         </fieldset>
@@ -127,7 +128,7 @@ export function createBlobsTab(root, { commit }) {
   const ui = {
     count: $(".blob-count"), edit: $(".blob-edit"), rate: $(".rate"), density: $(".density"),
     rateWidth: $(".rate-width"), densityWidth: $(".density-width"), level: $(".level"), remove: $(".delete"),
-    carrier: $(".carrier"), f0: $(".f0"), f0Field: $(".f0-field"), stft: $("canvas.stft"), depth: $(".depth"), useDepth: $(".use-depth"), seed: $(".seed"),
+    carrier: $(".carrier"), f0: $(".f0"), f0Field: $(".f0-field"), stft: $("canvas.stft"), depth: $(".depth"), useDepth: $(".use-depth"), seed: $(".seed"), iterations: $(".iterations"), iterationsField: $(".iterations-field"),
     newDraw: $(".new-draw"), clear: $(".clear"), coarse: $(".coarse"),
     bandCount: $(".band-count"), bandEdit: $(".band-edit"), bandWidth: $(".band-width"), bandLevel: $(".band-level"),
     removeBand: $(".delete-band"), addBand: $(".add-band"), bandMotion: $(".band-motion"), wave: $("canvas.wave"),
@@ -183,6 +184,8 @@ export function createBlobsTab(root, { commit }) {
     ui.f0Field.hidden = state.carrier !== "harmonic";
     ui.depth.value = state.rms_depth;
     ui.seed.value = state.seed;
+    ui.iterations.value = state.iterations ?? 0;
+    ui.iterationsField.hidden = state.carrier === "harmonic";
     ui.useDepth.hidden = fits === null;
     if (fits !== null) ui.useDepth.textContent = `Use depth ${fits}`;
     const bandList = bands();
@@ -264,7 +267,10 @@ export function createBlobsTab(root, { commit }) {
     return true;
   }
 
-  ui.carrier.addEventListener("change", () => commit({ ...state, carrier: ui.carrier.value }));
+  ui.carrier.addEventListener("change", () => {
+    const carrier = ui.carrier.value; // the harmonic carrier takes no iterations
+    commit({ ...state, carrier, iterations: carrier === "harmonic" ? 0 : state.iterations });
+  });
   ui.f0.addEventListener("change", () => {
     const f0 = Math.round(Number(ui.f0.value));
     if (f0 >= 20 && f0 <= Math.min(1000, state.f_hi) && f0 !== state.f0) commit({ ...state, f0 });
@@ -279,6 +285,11 @@ export function createBlobsTab(root, { commit }) {
   ui.seed.addEventListener("change", () => {
     const seed = Math.round(Number(ui.seed.value));
     if (Number.isFinite(seed) && seed !== state.seed) commit({ ...state, seed });
+    else showSettings();
+  });
+  ui.iterations.addEventListener("change", () => {
+    const iterations = Math.round(Number(ui.iterations.value));
+    if (iterations >= 0 && iterations <= 10 && iterations !== state.iterations) commit({ ...state, iterations });
     else showSettings();
   });
   ui.newDraw.addEventListener("click", () => commit({ ...state, seed: state.seed + 1 }));

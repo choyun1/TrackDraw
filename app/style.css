@@ -108,7 +108,7 @@ canvas.measured {
   display: block; width: 100%; height: 170px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
 }
-.side .f0-field[hidden], .side .blob-edit[hidden], .side .use-depth[hidden], .side .coarse[hidden],
+.side .f0-field[hidden], .side .iterations-field[hidden], .side .blob-edit[hidden], .side .use-depth[hidden], .side .coarse[hidden],
 .side .band-edit[hidden], .side .band-motion[hidden] { display: none; }
 .side .blob-count, .side .band-count { margin-bottom: 4px; }
 .side .add-band { margin-top: 4px; }
