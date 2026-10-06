@@ -1,4 +1,4 @@
-// The Filter recording tab: paint over parts of a sound's spectrogram to
+// The Erase spectrogram tab: paint over parts of a sound's spectrogram to
 // turn them down or remove them, and hear what is left
 // (docs/design/tabs/mask.md).
 //
@@ -17,19 +17,19 @@ import { drawWaveform, fitCanvas, niceStep } from "../plot.js";
 import { applyCut, dab, dabsAlong, decodeLevels, encodeLevels, typedNumber } from "../painted/model.js";
 import { MAX_RECORDING_S, encodePcm16, pcm16Length } from "../edit/model.js";
 import { decodeAudio } from "../edit/tab.js";
-import { COLUMNS, FLOOR_DB, ROWS, blank, isBlank } from "./model.js";
+import { COLUMNS, FLOOR_DB, ROWS, blank, isBlank, retime } from "./model.js";
 
 const MARGIN = { left: 52, right: 10, top: 8, bottom: 22 };
 const CACHE = 200; // decoded masks kept, so undo and redo are instant
 const OUTLINE_DB = 30; // the mask's outline runs where the cut crosses this
-const SOURCE_LABELS = { syllables: "Syllable train", speech: "The Speech tab's sound", file: "A recording" };
+const SOURCE_LABELS = { syllables: "Syllable train", speech: "The Draw speech tab's sound", file: "A recording" };
 const FREQUENCY_STEPS = [250, 500, 1000, 2000, 5000];
 
 export function createMaskTab(root, { commit, openRecording, hasRecording, log }) {
   let state = null;
   let bytes = null; // the mask shown: state's levels, decoded
   let stroke = null; // {weights, last, target, preview} while painting
-  let resultMask = null; // the mask the result shown was made with: what its outline shows
+  let resultMask = null; // {bytes, duration}: the mask the result shown was made with, for its outline
   let pointer = null;
   let mode = "paint";
   let sound = null;
@@ -98,7 +98,9 @@ export function createMaskTab(root, { commit, openRecording, hasRecording, log }
   async function commitBytes(next) {
     const levels = await encodeLevels(next);
     remember(levels, next);
-    commit({ ...state, levels });
+    // `bytes` are on the duration's columns (load retimes them), so the span goes
+    const { span: _span, ...rest } = state;
+    commit({ ...rest, levels });
   }
 
   async function load(next) {
@@ -113,7 +115,7 @@ export function createMaskTab(root, { commit, openRecording, hasRecording, log }
       remember(next.levels, decoded);
     }
     if (state === next) {
-      bytes = decoded;
+      bytes = retime(decoded, next.span, next.duration); // erasures kept in seconds (model.js, stretchSection)
       renderAll();
     }
   }
@@ -340,7 +342,8 @@ export function createMaskTab(root, { commit, openRecording, hasRecording, log }
     context.imageSmoothingEnabled = false;
     context.drawImage(cached(g, shown, null, resultImage), g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0);
     axes(context, target, g);
-    const mask = resultMask;
+    // on the duration shown: the result keeps its own seconds, as its spectrogram does
+    const mask = resultMask && retime(resultMask.bytes, resultMask.duration, state.duration);
     if (mask && shown) {
       context.strokeStyle = "rgba(255, 255, 255, 0.6)";
       context.setLineDash([3, 3]);
@@ -439,7 +442,7 @@ export function createMaskTab(root, { commit, openRecording, hasRecording, log }
       showSettings();
       const decoded = cache.get(next.levels);
       if (decoded) {
-        bytes = decoded;
+        bytes = retime(decoded, next.span, next.duration);
         renderAll();
       } else {
         load(next);
@@ -448,7 +451,7 @@ export function createMaskTab(root, { commit, openRecording, hasRecording, log }
     setResult(next) {
       sound = next ?? null;
       // made from the drawing shown now, so from this mask; later strokes are not in it yet
-      resultMask = sound ? bytes : null;
+      resultMask = sound ? { bytes, duration: state.duration } : null;
       if (sound?.sourceStft) source = { key: sourceKey(state), picture: sound.sourceStft };
       renderAll();
       renderWave();

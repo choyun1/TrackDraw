@@ -4,9 +4,9 @@
 //
 // Both resolve a request {tab, state} to
 // {fs, samples: Float32Array, synthesisSeconds, spectrogram: {...}}, on the
-// Modulation tab modulation: {...}, and on the Edit modulation tab
+// Draw modulation tab modulation: {...}, and on the Erase modulation tab
 // modulation, sourceModulation: {...} (modulationPicture) and clipped (a
-// fraction), and on the Filter recording tab sourceStft, resultStft: {...}
+// fraction), and on the Erase spectrogram tab sourceStft, resultStft: {...}
 // (spectrogramPicture).
 
 function bytesFromBase64(text) {
@@ -106,8 +106,8 @@ function spectrogramPicture(picture) {
   };
 }
 
-// A modulation spectrum on the plane: the Modulation tab's measured one
-// (sonore_sketch.blobs.measured_picture), the Edit modulation tab's source
+// A modulation spectrum on the plane: the Draw modulation tab's measured one
+// (sonore_sketch.blobs.measured_picture), the Erase modulation tab's source
 // (sonore_sketch.edit.plane_picture).
 export function modulationPicture(picture, data) {
   return {

@@ -1,8 +1,8 @@
-// The Edit modulation tab's state, its mask and the plane it is painted on
+// The Erase modulation tab's state, its mask and the plane it is painted on
 // (docs/design/tabs/edit.md; sonore_sketch.edit is the Python half).
 //
 // The mask is a grid of cuts in dB, one byte a cell, stored as the
-// Spectrogram tab stores its painting (base64 of deflated bytes, rows from
+// Paint spectrogram tab stores its painting (base64 of deflated bytes, rows from
 // density 0 up): 0 keeps a cell, -floor_db (60) removes it. Its columns are
 // 16 per octave of rate from 1 to 64 Hz on each side of the plane, the
 // negative side first, with one centre column between them for |rate| < 1 Hz.
@@ -22,7 +22,7 @@ export const COLUMNS = 2 * SIDE + 1; // 193
 export const ROWS = 48;
 export const DENSITY_STEP = DENSITY_MAX / ROWS; // 0.125
 export const FLOOR_DB = -60;
-export const COARSE_BELOW_S = 2; // as on the Modulation tab: few rates below this
+export const COARSE_BELOW_S = 2; // as on the Draw modulation tab: few rates below this
 export const MAX_RECORDING_S = 10; // F6: a recording sets the duration, up to the page's limit
 
 // sonore_sketch.edit.EXAMPLE_LEVELS: the "keep rates below 4 Hz" preset the
@@ -84,7 +84,7 @@ export function isBlank(bytes) {
   return bytes.every((b) => b === 0);
 }
 
-// --- recordings (E1, after the Filter recording design's F1, F3, F6) ---------------
+// --- recordings (E1, after the Erase spectrogram design's F1, F3, F6) ---------------
 
 // Mono samples (any range) as 16-bit PCM in base64, scaled so the peak is
 // just under full scale; what a page document keeps of a recording.

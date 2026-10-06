@@ -13,11 +13,11 @@ There is nothing to install.
 
 | Tab | You draw | You hear | State |
 |---|---|---|---|
-| **Speech** | formant (F1–F5), F0, voicing (AV) and bandwidth tracks over time | the speech Klatt's (1980) synthesizer makes from them, after Track-Draw (Assmann et al., 1994) | built |
-| **Spectrogram** | level painted on time × log-frequency | a sound whose spectrogram is the painting (sonore's `ripple_sound`) | built |
-| **Filter recording** | erasures on a sound's spectrogram (a syllable train, the Speech tab's sound, or a recording) | what is left of the sound (sonore's least-squares STFT resynthesis) | built |
-| **Modulation** | blobs on a modulation spectrum (rate × density), and optional frequency bands | a sound with that modulation (sonore's `ModulationSpectrum.from_blobs`), confined to the bands | built |
-| **Edit modulation** | erasures on a sound's modulation spectrum (a syllable train, the Speech tab's sound, or a recording) | the sound with that modulation taken out (sonore's `ModulationSpectrum.with_gain`) | built |
+| **Draw speech** | formant (F1–F5), F0, voicing (AV) and bandwidth tracks over time | the speech Klatt's (1980) synthesizer makes from them, after Track-Draw (Assmann et al., 1994) | built |
+| **Paint spectrogram** | level painted on time × log-frequency | a sound whose spectrogram is the painting (sonore's `ripple_sound`) | built |
+| **Erase spectrogram** | erasures on a sound's spectrogram (a syllable train, the Draw speech tab's sound, or a recording) | what is left of the sound (sonore's least-squares STFT resynthesis) | built |
+| **Draw modulation** | blobs on a modulation spectrum (rate × density), and optional frequency bands | a sound with that modulation (sonore's `ModulationSpectrum.from_blobs`), confined to the bands | built |
+| **Erase modulation** | erasures on a sound's modulation spectrum (a syllable train, the Draw speech tab's sound, or a recording) | the sound with that modulation taken out (sonore's `ModulationSpectrum.with_gain`) | built |
 
 ## Using it
 
@@ -43,7 +43,7 @@ made each time you finish a change.
   Its **Copy** puts the log, the versions and the current drawing on the
   clipboard, for a bug report.
 
-**Speech.** Select a track with its button, by clicking its line, or with
+**Draw speech.** Select a track with its button, by clicking its line, or with
 the keys 1–5 for F1–F5 and 0 (or `` ` ``) for F0. The tools have keys too:
 P, L and F. **Point** adds a breakpoint or drags one;
 double-click removes it. **Line** replaces a span with a straight line.
@@ -53,7 +53,7 @@ it; with Line or Freehand, dragging from a circle along time draws from it
 instead. **Bandwidths** shows a strip for the selected formant's bandwidth, and the **F0 axis** can be
 spaced in octaves (Log, from 20 to 800 Hz) or in Hz (Linear).
 
-**Spectrogram.** Drag to paint at the brush's level (0 dB is the loudest);
+**Paint spectrogram.** Drag to paint at the brush's level (0 dB is the loudest);
 right-drag or **Erase** paints silence (B and E switch between them), and
 **Clear** erases everything. Size and Softness shape the brush. **Range**
 sets the frequencies painted, 100–6400 Hz to start with; changing it keeps
@@ -62,7 +62,7 @@ shapes: log-spaced tones, harmonics of an F0, or noise. The harmonic
 carrier sounds only at multiples of F0, which show as faint dashed lines;
 paint between them is silent.
 
-**Modulation.** The **Design** panels are what you draw: click the plane to
+**Draw modulation.** The **Design** panels are what you draw: click the plane to
 add a blob, drag it to move it, and drag its squares to change its width
 and height (up to 8 blobs). **Add band** confines the sound to a band of
 frequencies that you reshape on the spectrogram with Point, Line or
@@ -71,8 +71,8 @@ its own modulation spectrum and its waveform, beside what you drew. The
 carrier (tones, harmonic or noise), the modulation depth, and the seed
 (**New draw** hears another random draw with the same spectrum) are below.
 
-**Filter recording.** Choose a **source**, as on Edit modulation: a
-syllable train, the Speech tab's sound, or a recording (**Open audio
+**Erase spectrogram.** Choose a **source**, as on Erase modulation: a
+syllable train, the Draw speech tab's sound, or a recording (**Open audio
 file…**); a recording opened on either tab can be the other's source too.
 The plane shows the source's spectrogram from 0 Hz to half the sampling
 rate, on a linear axis so harmonics are evenly spaced lines. Paint on it to
@@ -81,10 +81,12 @@ erase that part of the sound (right-drag or **Restore** brings it back);
 between Erase and Restore; Erase never makes something already erased
 come back). The **Result** panel shows the spectrogram of what came out, in the same
 window and on the same scale, with what you erased outlined, and its
-waveform.
+waveform. When the duration changes, erasures on a recording or the
+syllable train stay at their seconds (those sounds are not stretched),
+while on the Draw speech sound they stretch with it.
 
-**Edit modulation.** Choose a **source**: a syllable train made at the
-page's duration, the Speech tab's sound, or a recording (**Open audio
+**Erase modulation.** Choose a **source**: a syllable train made at the
+page's duration, the Draw speech tab's sound, or a recording (**Open audio
 file…**, which sets the duration to the recording's, up to 10 s). Each
 sound made shows the source's modulation spectrum on the plane, with a
 centre strip for rates under 1 Hz. Paint on it to erase that modulation
@@ -107,7 +109,7 @@ each choice; this section is the method in one place.
 
 ### The common picture: envelopes and their modulation spectrum
 
-The Modulation and Edit modulation tabs share one description of a sound.
+The Draw modulation and Erase modulation tabs share one description of a sound.
 A cosine filterbank splits it into bands 1/12 octave wide from 100 to
 6400 Hz. Each band is a slow **envelope** (its loudness over time, sampled
 at 1 kHz) times a fast **fine structure** (what is under the envelope).
@@ -131,13 +133,13 @@ make envelopes by the inverse 2-D transform; the envelopes multiply each
 band's fine structure; the bands are summed. The result is normalized to
 RMS 1.
 
-### Speech
+### Draw speech
 
 The tracks are parameters of Klatt's (1980) cascade/parallel formant
 synthesizer, given as breakpoints and interpolated in time
 (`so.klatt_synthesize`). There is no iteration.
 
-### Spectrogram
+### Paint spectrogram
 
 The painting is read as an amplitude envelope over time and octaves,
 bilinearly between cells, and `so.ripple_sound` puts it on a carrier: 20
@@ -147,7 +149,7 @@ component is multiplied by the envelope at its own frequency. A harmonic
 carrier has components only at multiples of F0, so paint between them is
 silent. There is no iteration.
 
-### Filter recording
+### Erase spectrogram
 
 The source is analysed with a 32 ms Hann window every 8 ms
 (`so.GaborFrame`). The mask is read at each coefficient, bilinearly in
@@ -158,7 +160,7 @@ spectrogram, and the result panel shows what came back. With a 5 ms window
 an erased band would come back at only −32 dB, which is why the window is
 long (`docs/design/tabs/mask.md`, F-M2). There is no iteration.
 
-### Modulation
+### Draw modulation
 
 1. **Magnitudes from the blobs.** Each blob is a Gaussian patch of power
    over log rate and density; the patches add, are mirrored so that
@@ -181,7 +183,7 @@ long (`docs/design/tabs/mask.md`, F-M2). There is no iteration.
    its centre, a raised-cosine skirt of 1/6 octave on each side, and
    −60 dB outside every band.
 
-### Edit modulation
+### Erase modulation
 
 1. The source is analysed as above, which keeps both the magnitudes and
    the source's own modulation phase.
@@ -214,13 +216,13 @@ round:
 Each round costs one analysis and one synthesis, so the page shows a
 progress bar and drops a search when the drawing changes.
 
-**On Edit modulation** (0–20, default 5) this is sonore's own
+**On Erase modulation** (0–20, default 5) this is sonore's own
 `to_sound(iterations=n)`, taken one round at a time. On the source's own
 fine structure an edit is barely heard without it: removing every rate
 above 4 Hz leaves 2.5 dB less power at 6–40 Hz with no iterations, 11.6 dB
 with 5 and 14.7 dB with 20 (`edit.md`, E-M3).
 
-**On Modulation** (0–10, default 0), without bands it is the same search.
+**On Draw modulation** (0–10, default 0), without bands it is the same search.
 With bands it goes back and forth between the two constraints
 (`blobs._toward_blobs`): each round divides the envelopes by the gain the
 bands gave them, so the bands' own shape and motion are not what the
@@ -287,16 +289,16 @@ Two things to keep in step:
 ## Design documents
 
 Every tab is designed before it is built, in `docs/design/`: `app.md` for
-the page as a whole, and `tabs/` for each tab (`tracks.md` for Speech,
-`painted.md` for Spectrogram, `blobs.md` and `bands.md` for Modulation,
-`mask.md` for Filter recording, `edit.md` for Edit modulation).
+the page as a whole, and `tabs/` for each tab (`tracks.md` for Draw speech,
+`painted.md` for Paint spectrogram, `blobs.md` and `bands.md` for Draw modulation,
+`mask.md` for Erase spectrogram, `edit.md` for Erase modulation).
 Each records the measurements behind it, made by the scripts in `tools/`,
 and the decisions Cho made.
 
 ## Credits
 
 sonore-sketch grew out of TrackDraw (2016), by Adrian Y. Cho and Daniel R
-Guest, whose history this repository keeps. The Speech tab is after:
+Guest, whose history this repository keeps. The Draw speech tab is after:
 
 Assmann, P., Ballard, W., Bornstein, L., & Paschall, D. (1994). Track-Draw:
 A graphical interface for controlling the parameters of a speech

@@ -1,4 +1,4 @@
-"""Measure which dominates the Modulation tab's result: the blobs or the bands.
+"""Measure which dominates the Draw modulation tab's result: the blobs or the bands.
 
 This script runs sonore to measure it; it is not an independent check. With
 bands drawn, the result's modulation spectrum over the whole range holds

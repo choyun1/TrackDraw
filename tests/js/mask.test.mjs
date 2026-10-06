@@ -3,9 +3,9 @@ import { execFileSync } from "node:child_process";
 import { test } from "node:test";
 
 import { decodeLevels } from "../../app/painted/model.js";
-import { defaultPage, forLink, openDocument, tabState, upgrade, withRecording, withTabState } from "../../app/document.js";
+import { defaultPage, forLink, openDocument, stretchPage, tabState, upgrade, withRecording, withTabState } from "../../app/document.js";
 import { encodePcm16 } from "../../app/edit/model.js";
-import { BLANK_LEVELS, COLUMNS, FLOOR_DB, ROWS, WINDOW_S, blank, check, rowFrequency } from "../../app/mask/model.js";
+import { BLANK_LEVELS, COLUMNS, FLOOR_DB, ROWS, WINDOW_S, blank, check, retime, rowFrequency, stretchSection } from "../../app/mask/model.js";
 
 function python(code) {
   return execFileSync("python", ["-c", `import sys; sys.path.insert(0, "src")\nfrom sonore_sketch import mask\n${code}`], { encoding: "utf8" }).trim();
@@ -51,4 +51,22 @@ test("bad sections are refused", () => {
   assert.throws(() => check({ ...state, rows: 128 }), /256 rows/);
   assert.throws(() => check({ ...state, window: 0.005 }), /window/);
   assert.throws(() => openDocument({ ...defaultPage(), mask: { ...state, columns: 3 } }), /256 columns/);
+});
+
+test("erasures on a recording or syllables keep their seconds when the duration changes", () => {
+  const section = { source: "file", levels: BLANK_LEVELS };
+  assert.deepEqual(stretchSection(section, 3, 6), { ...section, span: 3 });
+  assert.deepEqual(stretchSection({ ...section, span: 3 }, 6, 3), section); // back where the columns were
+  assert.deepEqual(stretchSection({ ...section, source: "speech" }, 3, 6), { ...section, source: "speech" });
+  assert.deepEqual(stretchSection({ ...section, source: "speech", span: 1 }, 2, 4), { ...section, source: "speech", span: 2 });
+  // on the page: Reset (0.6 s) after a 3 s recording keeps the first 0.6 s of the erasures
+  const page = withTabState(defaultPage(), "mask", { ...tabState(defaultPage(), "mask"), source: "syllables" });
+  assert.equal(stretchPage({ ...page, duration: 3 }, 0.6).mask.span, 3);
+
+  const bytes = blank();
+  for (let r = 0; r < ROWS; r++) for (let c = 64; c < 128; c++) bytes[r * COLUMNS + c] = 60; // 0.75-1.5 s of 3 s
+  const at6 = retime(bytes, 3, 6);
+  const erased = (b, c) => b[c] === 60;
+  assert.ok(erased(at6, 40) && !erased(at6, 70) && !erased(at6, 200)); // 0.95 s erased; 1.65 s and 4.7 s not
+  assert.equal(retime(bytes, 3, 3), bytes);
 });

@@ -55,7 +55,7 @@ def tab_state(document: Mapping[str, Any], tab: str | None = None) -> dict[str, 
     if tab == "blobs" and "blobs" in page:
         return {"blobs": blobs.FORMAT, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page["blobs"]}
     if tab in ("edit", "mask") and tab in page:
-        # the source's own drawing goes with the state: the Speech tab's, or the page's recording
+        # the source's own drawing goes with the state: the Draw speech tab's, or the page's recording
         form = edit.FORMAT if tab == "edit" else mask.FORMAT
         state = {tab: form, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page[tab]}
         if state.get("source") == "speech":
@@ -105,7 +105,7 @@ def handle(request: Mapping[str, Any]) -> dict[str, Any]:
 
     Returns the sampling rate, the samples as little-endian float32 bytes
     (sonore's level: RMS 1), a spectrogram (:func:`spectrogram`), and the
-    seconds synthesis took; on the Modulation tab also the result's measured
+    seconds synthesis took; on the Draw modulation tab also the result's measured
     modulation spectrum (``blobs.measured_picture``), and on the Edit
     modulation tab the source's and the result's (``edit.plane_picture``)
     and the fraction of envelope values sonore clipped; on the Filter

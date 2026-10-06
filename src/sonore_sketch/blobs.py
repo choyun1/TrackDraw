@@ -1,4 +1,4 @@
-"""The Modulation tab's state, and the sound it describes.
+"""The Draw modulation tab's state, and the sound it describes.
 
 A drawing is a list of Gaussian blobs on a modulation spectrum, rate [Hz,
 signed] by density [cycles/octave] (docs/design/tabs/blobs.md)::

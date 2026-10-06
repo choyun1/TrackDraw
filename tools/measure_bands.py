@@ -1,4 +1,4 @@
-"""Measure band-limiting the Modulation tab's sound (docs/design/tabs/bands.md).
+"""Measure band-limiting the Draw modulation tab's sound (docs/design/tabs/bands.md).
 
 This script runs sonore to measure it; it is not an independent check. A
 band is a centre-frequency track (breakpoints in time) and a width in
@@ -35,7 +35,7 @@ import numpy as np
 import sonore as so
 
 FS = 16000
-F_LO, F_HI = 100.0, 6400.0  # the Modulation tab's carrier range (blobs.md, B9)
+F_LO, F_HI = 100.0, 6400.0  # the Draw modulation tab's carrier range (blobs.md, B9)
 BPO = 12
 FLOOR_DB = -60.0
 SKIRT = 1 / 6  # octaves, the raised-cosine edge on each side

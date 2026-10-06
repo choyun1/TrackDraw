@@ -1,11 +1,11 @@
-"""Measure modulation-spectrum editing as the Edit modulation tab would use it
+"""Measure modulation-spectrum editing as the Erase modulation tab would use it
 (docs/design/tabs/edit.md).
 
 This script runs sonore to measure it; it is not an independent check. The
 tab's route is ``so.ModulationSpectrum.octave(source)``, a gain painted on
 rate x density, ``.with_gain(g)``, and ``.to_sound(carrier=...)``. With no
 recording in the repository, the source is a Klatt "syllable train" made
-with the Speech tab's own Python (4.5 syllables per second, formants moving
+with the Draw speech tab's own Python (4.5 syllables per second, formants moving
 from syllable to syllable, F0 falling), which has speech-like modulation.
 
 1. Speed: analysis, and synthesis on the source's own fine structure with 0,

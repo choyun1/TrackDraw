@@ -1,14 +1,14 @@
-// The Edit modulation tab: paint out parts of a sound's modulation spectrum
+// The Erase modulation tab: paint out parts of a sound's modulation spectrum
 // and hear what is left (docs/design/tabs/edit.md).
 //
-// The plane is the Modulation tab's (signed log rate, 1 to 64 Hz each side;
+// The plane is the Draw modulation tab's (signed log rate, 1 to 64 Hz each side;
 // density 0 to 6 cyc/oct) with a narrow centre strip for |rate| < 1 Hz, the
 // sound's static spectral shape (E2). It shows the source's modulation
 // spectrum, analysed by Python with each sound made; the mask painted on it
 // darkens what it cuts and is outlined where the cut is deep, so the source
 // stays readable (E7). A stroke collects each cell's largest brush weight
 // and moves every cell toward the brush's cut by its weight when it ends, as
-// the Spectrogram tab's brush does.
+// the Paint spectrogram tab's brush does.
 //
 // Below, in the Result box: the result's spectrogram on a log-frequency
 // axis, and its waveform.
@@ -41,7 +41,7 @@ const STRIP = 8; // half the centre strip's width, px
 const RATE_TICKS = [1, 2, 4, 8, 16, 32, 64];
 const CACHE = 200; // decoded masks kept, so undo and redo are instant
 const OUTLINE_DB = 30; // the mask's outline runs where the cut crosses this
-const SOURCE_LABELS = { syllables: "Syllable train", speech: "The Speech tab's sound", file: "A recording" };
+const SOURCE_LABELS = { syllables: "Syllable train", speech: "The Draw speech tab's sound", file: "A recording" };
 const CARRIER_LABELS = { source: "the source's own", tones: "tones", noise: "noise" };
 const STFT_MARGIN = { left: 52, right: 10, top: 6, bottom: 20 };
 const FREQUENCY_TICKS = [100, 200, 500, 1000, 2000, 5000];
@@ -331,7 +331,7 @@ export function createEditTab(root, { commit, openRecording, hasRecording, log }
     context.stroke();
   }
 
-  // The plane's frame, gridlines and labels, as on the Modulation tab
+  // The plane's frame, gridlines and labels, as on the Draw modulation tab
   // (`densities`: the ones labelled; `words`: the rate axis's name and directions).
   function axes(context, target, g, densities, words) {
     const style = getComputedStyle(target);

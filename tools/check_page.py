@@ -50,7 +50,7 @@ def document_in(page) -> dict:
 
 
 def edit_tab_state(document: dict) -> dict:
-    """The Edit modulation tab's state of a saved document (sonore_sketch.page.tab_state)."""
+    """The Erase modulation tab's state of a saved document (sonore_sketch.page.tab_state)."""
     sys.path.insert(0, str(ROOT / "src"))
     from sonore_sketch import page as page_module
 
@@ -293,7 +293,7 @@ def main() -> None:
             assert document_in(page) == doc, "the Tracks drawing changed while painting"
             print("painted: Clear, Undo, the noise carrier and switching tabs work")
 
-            # The Modulation tab: the example plays; clicking adds a blob,
+            # The Draw modulation tab: the example plays; clicking adds a blob,
             # dragging moves it across the seam and resizes it; a depth sonore
             # refuses offers the depth that fits; New draw, Delete, Clear, Undo.
             page.click(".tabs [data-tab=blobs]")
@@ -464,7 +464,7 @@ def main() -> None:
             assert len(drawn) == 1 and len(drawn[0]["points"]) >= 2, drawn
             assert abs(math.log2(drawn[0]["points"][0][1] / 300)) < 0.15 and abs(math.log2(drawn[0]["points"][-1][1] / 1200)) < 0.15, drawn
             expect(status).to_contain_text("Made", timeout=60_000)
-            assert page.locator("main > .result").is_hidden(), "the page's own waveform strip shows on the Modulation tab"
+            assert page.locator("main > .result").is_hidden(), "the page's own waveform strip shows on the Draw modulation tab"
             print(f"modulation: a freehand stroke drew a new band {drawn[0]['points']}")
             page.mouse.move(sx(0.3), stft["y"] - 30)
             page.keyboard.press("p")
@@ -476,10 +476,10 @@ def main() -> None:
             assert page_document_in(page)["blobs"] == example, "Reset did not restore the example blobs"
             print("modulation: New draw, Delete, Clear, Undo and Reset work")
 
-            # The Edit modulation tab (edit.md): it starts on the syllable
+            # The Erase modulation tab (edit.md): it starts on the syllable
             # train with "keep below 4 Hz", and the source's spectrum is drawn
             # on the plane once heard; a stroke, a preset, Clear and Undo
-            # change the mask and are heard; the Speech tab's sound and a
+            # change the mask and are heard; the Draw speech tab's sound and a
             # recording opened from a file are sources too; a recording sets
             # the duration, goes in saved files and never in the link.
             page.click(".tabs [data-tab=edit]")
@@ -487,7 +487,7 @@ def main() -> None:
             expect(status).to_contain_text("Made", timeout=120_000)
             section = page_document_in(page)["edit"]
             assert page_document_in(page)["tab"] == "edit" and section["source"] == "syllables" and section["iterations"] == 5, section
-            assert page.locator("main > .result").is_hidden(), "the page's own waveform strip shows on the Edit modulation tab"
+            assert page.locator("main > .result").is_hidden(), "the page's own waveform strip shows on the Erase modulation tab"
             colours = page.evaluate(
                 """() => { const c = document.querySelector('#tab-edit canvas.mask-plane');
                     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
@@ -545,7 +545,7 @@ def main() -> None:
             page.select_option("#tab-edit .source", "speech")
             expect(status).to_contain_text("Made", timeout=120_000)
             assert page_document_in(page)["edit"]["source"] == "speech"
-            print("edit: a preset, Undo, Clear, iterations, the tones carrier and the Speech tab's sound work")
+            print("edit: a preset, Undo, Clear, iterations, the tones carrier and the Draw speech tab's sound work")
             # a recording: 1.5 s of a tone pulsing at 4 Hz, as a WAV file
             import io
             import wave
@@ -578,7 +578,7 @@ def main() -> None:
             assert page_document_in(page)["duration"] == 0.6 and page_document_in(page)["edit"]["source"] == "speech"
             print("edit: Undo takes the recording away again")
 
-            # The Filter recording tab (mask.md): it starts on the syllable
+            # The Erase spectrogram tab (mask.md): it starts on the syllable
             # train with nothing erased, and draws the source's spectrogram
             # once heard; an Erase stroke along 2 kHz and a Restore stroke
             # change the mask and are heard; a recording opened here is this
@@ -590,7 +590,7 @@ def main() -> None:
             from sonore_sketch import mask as mask_tab
 
             assert section["source"] == "syllables" and not mask_tab.cuts(section).any(), section["source"]
-            assert page.locator("main > .result").is_hidden(), "the page's own waveform strip shows on the Filter recording tab"
+            assert page.locator("main > .result").is_hidden(), "the page's own waveform strip shows on the Erase spectrogram tab"
             for name in ("filter-plane", "filter-result"):
                 colours = page.evaluate(
                     """name => { const c = document.querySelector('#tab-mask canvas.' + name);

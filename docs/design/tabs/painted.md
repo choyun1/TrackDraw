@@ -7,6 +7,9 @@ envelope is the painting. The brush, grid and canvas it is built on are the
 Edit tabs will reuse; this document designs both, and leaves what is
 particular to Mask and Edit to their own documents.
 
+On 2026-10-06 Cho renamed the tab "Paint spectrogram" on the page; this document
+keeps its earlier names.
+
 Status: decided (2026-10-05). Cho accepted every recommendation except
 P3's frequency range, which goes down to 100 Hz; the numbers below are
 measured at that range. Built: step 1 of the order of work below, then steps 2

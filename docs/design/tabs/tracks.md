@@ -7,6 +7,9 @@ the original, what sonore already provides and what is missing, the checks
 behind each number, a proposed interface and data model, and the decisions
 for this tab.
 
+On 2026-10-06 Cho renamed the tab "Draw speech" on the page; this document
+keeps its earlier names.
+
 Status: accepted with `../app.md` on 2026-10-05; steps 1 and 2 of the
 order of work below are built, and from step 3 the bandwidth strips and the
 time stretch (the duration). Noise sources, value scaling, copy synthesis

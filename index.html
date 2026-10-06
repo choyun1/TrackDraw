@@ -14,20 +14,20 @@
     <h1>sonore-sketch</h1>
     <nav class="tabs" role="tablist">
       <button role="tab" class="active" aria-selected="true" data-tab="tracks"
-        data-caption="Draw formant, pitch and loudness tracks over time, and hear the speech Klatt's synthesizer makes from them (after TrackDraw; Assmann et al., 1994)."
-        title="Formant, F0 and amplitude tracks, synthesized by Klatt's synthesizer">Speech</button>
+        data-caption="Draw formant, pitch and voicing tracks over time, and hear Klatt's synthesizer speak them (after TrackDraw; Assmann et al., 1994)."
+        title="Formant, F0 and amplitude tracks, synthesized by Klatt's synthesizer">Draw speech</button>
       <button role="tab" aria-selected="false" data-tab="painted"
         data-caption="Paint loudness over time and frequency, and hear a sound whose spectrogram is your painting."
-        title="Level painted on time × log-frequency, heard through sonore's ripple_sound">Spectrogram</button>
+        title="Level painted on time × log-frequency, heard through sonore's ripple_sound">Paint spectrogram</button>
       <button role="tab" aria-selected="false" data-tab="mask"
-        data-caption="Erase parts of a sound's spectrogram (a band, a moment, one harmonic) and hear what is left; the result's own spectrogram shows what came out."
-        title="A mask painted on a sound's spectrogram, heard through sonore's least-squares STFT resynthesis (GaborFrame)">Filter recording</button>
+        data-caption="Take a sound (a syllable train, the Draw speech tab's sound, or a recording), erase parts of its spectrogram (a band, a moment, a harmonic) and hear what is left."
+        title="A mask painted on a sound's spectrogram, heard through sonore's least-squares STFT resynthesis (GaborFrame)">Erase spectrogram</button>
       <button role="tab" aria-selected="false" data-tab="blobs"
-        data-caption="Place blobs on a modulation spectrum, how fast loudness changes in time (rate) and across frequency (density), and hear a sound with that modulation."
-        title="Gaussian blobs on rate × density, heard through sonore's ModulationSpectrum.from_blobs">Modulation</button>
+        data-caption="Place blobs on a modulation spectrum (how fast loudness changes in time and across frequency) and hear a sound with that rhythm and texture."
+        title="Gaussian blobs on rate × density, heard through sonore's ModulationSpectrum.from_blobs">Draw modulation</button>
       <button role="tab" aria-selected="false" data-tab="edit"
-        data-caption="Paint out parts of a sound's modulation spectrum and hear what is left: erase every rate above 4 Hz from speech and it blurs into a murmur that keeps its rhythm."
-        title="Parts of a sound's modulation spectrum painted out, heard through sonore's ModulationSpectrum.with_gain and to_sound">Edit modulation</button>
+        data-caption="Take a sound and erase parts of its modulation spectrum: remove every rate above 4 Hz from speech and it blurs into a murmur that keeps its rhythm."
+        title="Parts of a sound's modulation spectrum painted out, heard through sonore's ModulationSpectrum.with_gain and to_sound">Erase modulation</button>
     </nav>
     <div class="controls">
       <button type="button" id="play" class="primary" title="Play or stop (Space)" disabled>▶ Play</button>

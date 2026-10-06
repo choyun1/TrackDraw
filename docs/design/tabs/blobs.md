@@ -8,6 +8,9 @@ whose envelopes have that spectrum. The shapes, handles and dragging are the
 designs both. Its internal tab id is `blobs`, as the Spectrogram tab's is
 `painted`.
 
+On 2026-10-06 Cho renamed the tab "Draw modulation" on the page; this document
+keeps its earlier names.
+
 Status: decided (2026-10-05). Cho accepted every recommendation (B1–B9).
 Built: all three steps of the order of work below (steps 1 and 2 together,
 so the tab arrived audible; then the measured result and iterations). A

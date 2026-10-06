@@ -102,3 +102,18 @@ def test_a_link_without_the_recording_says_to_open_it_again():
 def test_bad_states_say_what_is_wrong(change, message):
     with pytest.raises(ValueError, match=message):
         mask.check({**STATE, **change})
+
+
+def test_erasures_on_a_recording_keep_their_seconds_with_span():
+    # erase 0.75-1.5 s on a 3 s recording, then double the duration: the
+    # page keeps the mask's columns over the first 3 s (span), so the same
+    # seconds stay erased and the new time is not
+    cut = np.zeros((mask.ROWS, mask.COLUMNS))
+    cut[:, 64:128] = -mask.FLOOR_DB
+    state = {**STATE, "source": "file", "recording": noise_file(3.0), "levels": mask.encode(cut)}
+    at_3 = mask.synthesize({**state, "duration": 3.0})
+    at_6 = mask.synthesize({**state, "duration": 6.0, "span": 3.0})
+    for sound in (at_3, at_6):
+        assert band_level(sound, 500, 4000, 0.85, 1.4) < band_level(sound, 500, 4000, 0.2, 0.6) - 40
+    # 1.7-2.1 s was not erased (it was where the stretched erasure would land)
+    assert abs(band_level(at_6, 500, 4000, 1.7, 2.1) - band_level(at_6, 500, 4000, 0.2, 0.6)) < 3

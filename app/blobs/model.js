@@ -1,4 +1,4 @@
-// The Modulation tab's state, the plane it is drawn on, and the picture of
+// The Draw modulation tab's state, the plane it is drawn on, and the picture of
 // the drawing (docs/design/tabs/blobs.md; sonore_sketch.blobs is the Python
 // half).
 //
@@ -155,7 +155,7 @@ export const tidyHz = (f) => Math.round(f);
 
 // A Line or Freehand stroke [[t, Hz], ...] laid onto a band's points (or
 // onto none, for a new band): the stroke, simplified in octaves, replaces
-// the points within its span, as the Speech tab's tools do.
+// the points within its span, as the Draw speech tab's tools do.
 export const STROKE_TOLERANCE_OCT = 0.04;
 export function strokeOnto(points, stroke) {
   const inOctaves = stroke.map(([t, f]) => [tidyTime(t), Math.log2(f)]);

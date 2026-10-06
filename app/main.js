@@ -122,7 +122,7 @@ function showTab() {
     button.setAttribute("aria-selected", String(active));
   }
   for (const id of Object.keys(tabs)) $(`tab-${id}`).hidden = id !== tab.id;
-  // a tab that draws the result's waveform itself (the Modulation tab, in its Result box)
+  // a tab that draws the result's waveform itself (the Draw modulation tab, in its Result box)
   document.querySelector("main > .result").hidden = Boolean(tab.ownWaveform);
   $("tab-caption").textContent = tabButtons.find((b) => b.dataset.tab === tab.id)?.dataset.caption ?? "";
 }

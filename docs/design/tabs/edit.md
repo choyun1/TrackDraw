@@ -7,6 +7,9 @@ it, and hear the sound with that modulation removed. It reuses the
 **Paint** primitive (`painted.md`) on the Modulation tab's plane
 (`blobs.md`). Its internal tab id is `edit`.
 
+On 2026-10-06 Cho renamed the tab "Erase modulation" on the page; this document
+keeps its first name, "Edit modulation".
+
 Status: decided (2026-10-06): Cho accepted E1–E9 as recommended, and the
 tab is built (PR #33). E1 decides how a recording gets into the page for
 both this tab and Filter recording (`mask.md`, built after it in PR #36).

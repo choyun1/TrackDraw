@@ -1,4 +1,4 @@
-// The Modulation tab: place Gaussian blobs on rate x density and hear a sound
+// The Draw modulation tab: place Gaussian blobs on rate x density and hear a sound
 // whose envelopes have that modulation spectrum (docs/design/tabs/blobs.md).
 //
 // The plane shows the drawn spectrum itself, on the grid sonore puts it on
@@ -139,7 +139,7 @@ export function createBlobsTab(root, { commit: commitDocument }) {
     removeBand: $(".delete-band"), addBand: $(".add-band"), bandMotion: $(".band-motion"), wave: $("canvas.wave"),
   };
 
-  // The bands' drawing tools, as on the Speech tab: Point moves breakpoints
+  // The bands' drawing tools, as on the Draw speech tab: Point moves breakpoints
   // (and a click on a band's line adds one, a drag inside it moves it all);
   // Line and Freehand draw a stroke that replaces the band's track over its
   // span, on the band pressed in, or make a new band when pressed outside.

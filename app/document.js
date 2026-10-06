@@ -12,7 +12,7 @@
 //    "mask": {"source": "syllables", ..., "levels": "..."},
 //    "recording": {"name": "talk.wav", "fs": 16000, "pcm16": "..."}}
 //
-// A recording opened on the Edit modulation or Filter recording tab belongs
+// A recording opened on the Erase modulation or Erase spectrogram tab belongs
 // to the page, so either tab can use it; it is kept in saved files but never
 // in links (docs/design/tabs/edit.md, E1), which would be far too long.
 //
@@ -141,13 +141,14 @@ export function openDocument(doc) {
 
 // Change the duration, stretching what every tab has drawn (a painting's
 // columns are fractions of the duration, so it stretches by itself; blobs
-// are in Hz and stay where they are, but the Modulation tab's bands are
+// are in Hz and stay where they are, but the Draw modulation tab's bands are
 // tracks in time and stretch).
 export function stretchPage(page, duration) {
   const state = tracks.stretch(tabState(page, "tracks"), duration);
   const stretched = withTabState({ ...page, duration }, "tracks", state);
-  if (!page.blobs?.bands?.length) return stretched;
-  return { ...stretched, blobs: { ...page.blobs, bands: blobs.stretchBands(page.blobs.bands, page.duration, duration) } };
+  const out = page.mask ? { ...stretched, mask: mask.stretchSection(page.mask, page.duration, duration) } : stretched;
+  if (!page.blobs?.bands?.length) return out;
+  return { ...out, blobs: { ...page.blobs, bands: blobs.stretchBands(page.blobs.bands, page.duration, duration) } };
 }
 
 // Reset: the duration, sampling rate and `tab`'s drawing go back to their

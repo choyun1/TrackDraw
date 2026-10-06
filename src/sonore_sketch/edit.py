@@ -1,4 +1,4 @@
-"""The Edit modulation tab's state, and the sound it describes.
+"""The Erase modulation tab's state, and the sound it describes.
 
 Take a sound, analyse its modulation spectrum, cut parts of it with a mask
 painted on rate x density, and hear the sound rebuilt from what is left
@@ -12,8 +12,8 @@ painted on rate x density, and hear the sound rebuilt from what is left
      "recording": {"name": "...", "fs": 16000, "pcm16": "<base64>"}}  # with source "file"
 
 The source (E1) is a Klatt syllable train made here at the page's duration,
-the Speech tab's sound, or a recording opened in the page. The mask (E4) is
-a grid of cuts in dB, one byte a cell like the Spectrogram tab's painting:
+the Draw speech tab's sound, or a recording opened in the page. The mask (E4) is
+a grid of cuts in dB, one byte a cell like the Paint spectrogram tab's painting:
 0 keeps a cell, ``-floor_db`` and more removes it. Its columns are 16 per
 octave of rate from 1 to 64 Hz on each side of the plane plus one centre
 column for |rate| < 1 Hz (the static spectral shape); its rows are density
@@ -59,7 +59,7 @@ def _number(value: Any) -> bool:
 def check(state: Mapping[str, Any]) -> None:
     """Raise ``ValueError`` saying what is wrong with ``state``, if anything."""
     if state.get("edit") != FORMAT:
-        raise ValueError(f"not an Edit modulation state of format {FORMAT}: 'edit' is {state.get('edit')!r}")
+        raise ValueError(f"not an Erase modulation state of format {FORMAT}: 'edit' is {state.get('edit')!r}")
     duration, fs = state.get("duration"), state.get("fs")
     if not _number(duration) or not 0 < duration <= MAX_DURATION:
         raise ValueError(f"'duration' must be a number of seconds in (0, {MAX_DURATION:g}], not {duration!r}")
@@ -123,7 +123,7 @@ def keep_below(rate: float) -> np.ndarray:
 def remove_sweeps(direction: str) -> np.ndarray:
     """The "remove downward/upward sweeps" presets (E6): cut one side of the
     plane above the first row (density 0 has no direction). Positive rates
-    sweep down, as on the Modulation tab."""
+    sweep down, as on the Draw modulation tab."""
     side = column_rates() > 0 if direction == "down" else column_rates() < 0
     cut = np.zeros((ROWS, COLUMNS))
     cut[1:, side] = -FLOOR_DB
@@ -222,7 +222,7 @@ def source(state: Mapping[str, Any], silent: str = "there is no modulation to ed
     elif kind == "speech":
         speech = state.get("speech")
         if not isinstance(speech, Mapping):
-            raise ValueError("the Speech tab's drawing is missing")
+            raise ValueError("the Draw speech tab's drawing is missing")
         sound = tracks.synthesize({"trackdraw": tracks.FORMAT, "duration": duration, "fs": fs, **speech})
     else:
         sound = recording(state)
@@ -236,7 +236,7 @@ def source(state: Mapping[str, Any], silent: str = "there is no modulation to ed
 
 def analyse(sound: so.Sound, state: Mapping[str, Any]) -> so.ModulationSpectrum:
     """The modulation spectrum the mask is painted on (``octave``, as the
-    Modulation tab's plane)."""
+    Draw modulation tab's plane)."""
     return so.ModulationSpectrum.octave(
         sound, bands_per_octave=int(state["bands_per_octave"]), f_lo=float(state["f_lo"]), f_hi=float(state["f_hi"])
     )
