@@ -32,7 +32,7 @@ import numpy as np
 import sonore as so
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from sonore_sketch import tracks  # noqa: E402
+from sonore_sketch import edit  # noqa: E402
 
 FS = 16000
 F_LO, F_HI = 100.0, 6400.0  # the other tabs' range
@@ -40,26 +40,8 @@ WARM_REPEATS = 3
 
 
 def syllables(duration: float) -> so.Sound:
-    """A Klatt syllable train: one syllable every 0.22 s, each a voicing
-    burst whose F1 and F2 move between two vowels."""
-    starts = np.arange(0.0, duration - 0.15, 0.22)
-    times, av, f1, f2 = [0.0], [0.0], [300.0], [900.0]
-    for i, t in enumerate(starts):
-        hi = (650, 1700) if i % 2 else (450, 1100)
-        for dt, a, (g1, g2) in ((0.03, 60, hi), (0.15, 58, hi), (0.19, 0, (300, 900))):
-            times.append(round(t + dt, 4))
-            av.append(a)
-            f1.append(g1)
-            f2.append(g2)
-    times.append(duration)
-    av.append(0)
-    f1.append(300)
-    f2.append(900)
-    document = {
-        "trackdraw": 1, "sonore": "0.5.0", "duration": duration, "fs": FS, "mode": "klatt",
-        "params": {"F0": [[0, duration], [130, 90]], "AV": [times, av], "F1": [times, f1], "F2": [times, f2], "F3": 2500},
-    }
-    return tracks.synthesize(document)
+    """The tab's own syllable-train source (sonore_sketch.edit.syllables)."""
+    return edit.syllables(duration, FS)
 
 
 def analyse(sound):

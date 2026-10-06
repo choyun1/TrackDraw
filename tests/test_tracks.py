@@ -97,4 +97,4 @@ def test_page_result_holds_the_samples_and_a_picture():
 
 def test_page_rejects_an_unknown_tab():
     with pytest.raises(ValueError, match="unknown tab"):
-        page.handle({"tab": "edit", "state": {}})
+        page.handle({"tab": "mask", "state": {}})

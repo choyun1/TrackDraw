@@ -9,8 +9,9 @@ import { History } from "./history.js";
 import { Log } from "./log.js";
 import { drawWaveform } from "./plot.js";
 import { encodeState, stateFromHash } from "./share.js";
-import { defaultPage, openDocument, resetTab, stretchPage, tabState, withTabState } from "./document.js";
+import { defaultPage, forLink, openDocument, resetTab, stretchPage, tabState, withRecording, withTabState } from "./document.js";
 import { createBlobsTab } from "./blobs/tab.js";
+import { createEditTab } from "./edit/tab.js";
 import { createPaintedTab } from "./painted/tab.js";
 import { clampDuration } from "./tracks/model.js";
 import { createTracksTab } from "./tracks/tab.js";
@@ -93,6 +94,12 @@ const tabs = {
   tracks: createTracksTab($("tab-tracks"), { commit: commitFrom("tracks") }),
   painted: createPaintedTab($("tab-painted"), { commit: commitFrom("painted"), log }),
   blobs: createBlobsTab($("tab-blobs"), { commit: commitFrom("blobs") }),
+  edit: createEditTab($("tab-edit"), {
+    commit: commitFrom("edit"),
+    // a recording belongs to the page, and sets its duration (edit.md, E1)
+    openRecording: (recording, seconds) => change(withRecording(history.present, recording, seconds)),
+    log,
+  }),
 };
 // The tab shown is not an edit (undo does not switch tabs); it is saved with
 // the document, so a link opens on the tab it was made on.
@@ -124,8 +131,9 @@ function switchTab(id) {
 }
 for (const button of tabButtons) button.addEventListener("click", () => switchTab(button.dataset.tab));
 
-// The document as saved and linked: with the tab shown.
+// The document as saved and linked: with the tab shown (a link without the recording).
 const saved = () => ({ ...history.present, tab: tab.id });
+const linked = () => forLink(saved());
 
 function show() {
   const doc = history.present;
@@ -133,7 +141,7 @@ function show() {
   ui.duration.value = doc.duration;
   ui.undo.disabled = !history.past.length;
   ui.redo.disabled = !history.future.length;
-  window.history.replaceState(null, "", `${location.pathname}${location.search}#state=${encodeState(saved())}`);
+  window.history.replaceState(null, "", `${location.pathname}${location.search}#state=${encodeState(linked())}`);
 }
 
 // An edit has ended: keep it, and hear it if it is short enough.

@@ -49,6 +49,14 @@ def document_in(page) -> dict:
     return {"trackdraw": 1, "sonore": document["sonore"], "duration": document["duration"], "fs": document["fs"], **document["tracks"]}
 
 
+def edit_tab_state(document: dict) -> dict:
+    """The Edit modulation tab's state of a saved document (sonore_sketch.page.tab_state)."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from sonore_sketch import page as page_module
+
+    return page_module.tab_state(document, "edit")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--engine", choices=["local", "pyodide"], default="local")
@@ -467,6 +475,108 @@ def main() -> None:
             expect(status).to_contain_text("Made", timeout=60_000)
             assert page_document_in(page)["blobs"] == example, "Reset did not restore the example blobs"
             print("modulation: New draw, Delete, Clear, Undo and Reset work")
+
+            # The Edit modulation tab (edit.md): it starts on the syllable
+            # train with "keep below 4 Hz", and the source's spectrum is drawn
+            # on the plane once heard; a stroke, a preset, Clear and Undo
+            # change the mask and are heard; the Speech tab's sound and a
+            # recording opened from a file are sources too; a recording sets
+            # the duration, goes in saved files and never in the link.
+            page.click(".tabs [data-tab=edit]")
+            expect(page.locator("#tab-edit")).to_be_visible()
+            expect(status).to_contain_text("Made", timeout=120_000)
+            section = page_document_in(page)["edit"]
+            assert page_document_in(page)["tab"] == "edit" and section["source"] == "syllables" and section["iterations"] == 5, section
+            assert page.locator("main > .result").is_hidden(), "the page's own waveform strip shows on the Edit modulation tab"
+            colours = page.evaluate(
+                """() => { const c = document.querySelector('#tab-edit canvas.mask-plane');
+                    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+                    const s = new Set(); for (let i = 0; i < d.length; i += 4) s.add(d[i] << 16 | d[i + 1] << 8 | d[i + 2]); return s.size; }"""
+            )
+            assert colours > 100, f"the source's spectrum is not drawn on the plane ({colours} colours)"
+            measured = page.evaluate(
+                """() => { const c = document.querySelector('#tab-edit canvas.measured-plane');
+                    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+                    const s = new Set(); for (let i = 0; i < d.length; i += 4) s.add(d[i] << 16 | d[i + 1] << 8 | d[i + 2]); return s.size; }"""
+            )
+            assert measured > 100, f"the result's measured spectrum is not drawn ({measured} colours)"
+            # a hard cut clips envelopes, which a note says (E9)
+            expect(page.locator("#tab-edit .clip-note")).to_contain_text("% of the envelopes were clipped")
+            print(f"edit: the source's spectrum ({colours} colours), the result's ({measured}) and the clipping note are shown")
+            plane = page.locator("#tab-edit canvas.mask-plane").bounding_box()
+            p_left, p_right = plane["x"] + 52, plane["x"] + plane["width"] - 10
+            p_top, p_bottom = plane["y"] + 8, plane["y"] + plane["height"] - 36
+            p_centre = (p_left + p_right) / 2
+            # erase the cut at about -16 Hz, density 3, with a right-drag
+            ex = p_centre - 8 - (4 / 6) * ((p_right - p_left) / 2 - 8)
+            ey = p_bottom - 0.5 * (p_bottom - p_top)
+            before = page.evaluate("location.hash")
+            page.mouse.move(ex, ey)
+            page.mouse.down(button="right")
+            page.mouse.move(ex + 20, ey + 10, steps=4)
+            page.mouse.up(button="right")
+            page.wait_for_function("h => location.hash !== h", arg=before)  # the mask is encoded asynchronously
+            erased = page_document_in(page)["edit"]["levels"]
+            assert erased != section["levels"], "the stroke did not change the mask"
+            expect(status).to_contain_text("Made", timeout=120_000)
+            from sonore_sketch import edit as edit_tab  # the Python half reads what the page wrote
+
+            cut = edit_tab.cuts({**section, "levels": erased})
+            column = int(round(edit_tab.SIDE - 1 - (math.log2(16) * 16 - 0.5)))
+            assert cut[24, column] < 30 and cut[24, 0] == 60, (cut[24, column], cut[24, 0])
+            print(f"edit: a right-drag erased the cut at -16 Hz (now {cut[24, column]:g} dB) and was heard")
+            before = page.evaluate("location.hash")
+            page.click("#tab-edit .no-down")
+            page.wait_for_function("h => location.hash !== h", arg=before)
+            expect(status).to_contain_text("Made", timeout=120_000)
+            assert (edit_tab.cuts(page_document_in(page)["edit"]) == edit_tab.remove_sweeps("down")).all()
+            page.keyboard.press("Control+z")
+            assert page_document_in(page)["edit"]["levels"] == erased, "Undo did not bring the mask back"
+            before = page.evaluate("location.hash")
+            page.click("#tab-edit .clear")
+            page.wait_for_function("h => location.hash !== h", arg=before)
+            expect(status).to_contain_text("Made", timeout=120_000)
+            assert not edit_tab.cuts(page_document_in(page)["edit"]).any()
+            expect(page.locator("#tab-edit .clip-note")).to_be_hidden()  # nothing cut, nothing clipped
+            page.locator("#tab-edit .iterations").fill("0")
+            page.locator("#tab-edit .iterations").press("Enter")
+            page.select_option("#tab-edit .carrier", "tones")
+            expect(status).to_contain_text("Made", timeout=120_000)
+            page.select_option("#tab-edit .source", "speech")
+            expect(status).to_contain_text("Made", timeout=120_000)
+            assert page_document_in(page)["edit"]["source"] == "speech"
+            print("edit: a preset, Undo, Clear, iterations, the tones carrier and the Speech tab's sound work")
+            # a recording: 1.5 s of a tone pulsing at 4 Hz, as a WAV file
+            import io
+            import wave
+
+            import numpy as np
+
+            t = np.arange(int(1.5 * 22050)) / 22050
+            tone = 0.5 * np.sin(2 * np.pi * 440 * t) * (0.6 + 0.4 * np.sin(2 * np.pi * 4 * t))
+            buffer = io.BytesIO()
+            with wave.open(buffer, "wb") as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(22050)
+                w.writeframes((tone * 32767).astype("<i2").tobytes())
+            before = page.evaluate("location.hash")
+            page.locator("#tab-edit .audio-file").set_input_files(files=[{"name": "pulse.wav", "mimeType": "audio/wav", "buffer": buffer.getvalue()}])
+            page.wait_for_function("h => location.hash !== h", arg=before)  # decoded by the browser
+            expect(status).to_contain_text("Made", timeout=120_000)
+            linked = page_document_in(page)
+            assert linked["duration"] == 1.5 and linked["edit"]["source"] == "file" and "recording" not in linked, {k: linked[k] for k in ("duration", "edit")}
+            expect(page.locator("#tab-edit .recording-note")).to_contain_text("pulse.wav: 1.50 s")
+            with page.expect_download() as download:
+                page.click("#save")
+            saved = json.loads(Path(download.value.path()).read_text())
+            assert saved["recording"]["name"] == "pulse.wav" and saved["recording"]["fs"] == 16000, saved.get("recording", {}).keys()
+            heard = edit_tab.recording({**edit_tab_state(saved), "source": "file"})
+            assert heard.n_samples == 24000 and abs(np.corrcoef(heard.data[:, 0], np.interp(np.arange(24000) / 16000, t, tone))[0, 1]) > 0.99
+            print("edit: a WAV file opened as the source, set the duration to 1.5 s, was heard, saved, and left out of the link")
+            page.keyboard.press("Control+z")
+            assert page_document_in(page)["duration"] == 0.6 and page_document_in(page)["edit"]["source"] == "speech"
+            print("edit: Undo takes the recording away again")
             if args.screenshot:
                 page.screenshot(path=args.screenshot)
             browser.close()
