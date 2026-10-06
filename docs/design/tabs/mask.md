@@ -4,11 +4,14 @@ The third tab of the app (`../app.md`, D7; called "Mask" there): load a
 recording, see its spectrogram, paint over parts of it to turn them down or
 remove them (a band, a moment, one harmonic), and hear what is left. It
 reuses the Paint primitive of `painted.md`, with a cell meaning a gain on the
-recording rather than a level of a new sound, and it brings recordings into
-the app, which the Edit modulation tab will need too.
+recording rather than a level of a new sound, and it uses the recordings the
+Edit modulation tab already opens (`edit.md`, E1, built in PR #33).
 
-Status: proposed, for Cho to decide (2026-10-05). No code until the
-decisions below are answered.
+Status: proposed 2026-10-05, parked, revised 2026-10-06 for Cho to decide.
+Since it was parked, the Edit modulation tab has built recordings (open a
+file, keep it in saved files and not in links, let it set the duration), so
+F1, F3 and F6 are settled and this tab reuses that code. Three decisions
+are open: F2, F4 and F5. No code until they are answered.
 
 This project is AI-assisted: the document and `tools/measure_mask.py` were
 drafted by Claude (Claude Code), for Cho to review.
@@ -92,12 +95,12 @@ itself does not fit (F-M5).
 ┌ Speech │ Spectrogram │ Filter recording │ … ──────────── ▶ ■  ⤓ ⟲ ┐
 │ Erase parts of a recording's spectrogram and hear what is left.     │
 │ 8k ┤▓▓▒▒░░▓▓▒▒░░▓▓▒▒░░▓▓▒▒░░▓▓▒▒░░│ Source                  │
-│    │▓▓▒▒░░▓▓▒▒████████▒▒░░▓▓▒▒░░▓▓│  ◉ Speech tab's sound   │
-│ 4k ┤▓▓▒▒░░▓▓▒▒████████▒▒░░▓▓▒▒░░▓▓│  ○ hello.wav (1.8 s)    │
-│    │▒▒░░▓▓▒▒░░████████░░▓▓▒▒░░▓▓▒▒│  [Open recording…]      │
+│    │▓▓▒▒░░▓▓▒▒████████▒▒░░▓▓▒▒░░▓▓│  [syllables ▾]          │
+│ 4k ┤▓▓▒▒░░▓▓▒▒████████▒▒░░▓▓▒▒░░▓▓│  (Speech tab, hello.wav)│
+│    │▒▒░░▓▓▒▒░░████████░░▓▓▒▒░░▓▓▒▒│  [Open audio file…]     │
 │  0 ┤▓▓▒▒░░▓▓▒▒░░▓▓▒▒░░▓▓▒▒░░▓▓▒▒░░│ Brush                   │
-│    0 s                       1.8 s│  ◉ remove ○ restore     │
-├───────────────────────────────────┤  size, softness, −60 dB │
+│    0 s                       1.8 s│  ◉ Erase E ○ Restore R  │
+├───────────────────────────────────┤  size, softness, Depth  │
 │ result: waveform and spectrogram  │  [Clear]                │
 └───────────────────────────────────┴─────────────────────────┘
 ```
@@ -105,7 +108,8 @@ itself does not fit (F-M5).
 - The recording's spectrogram (magma) fills the canvas; painted areas are
   shown darkened by the amount they are turned down, so the picture shows
   what should remain. The result's spectrogram below shows what did.
-- Remove paints a gain (default −60 dB, removed); Restore paints 0 dB.
+- Erase paints a cut down to its Depth (default −60 dB, removed);
+  Restore paints 0 dB, and right-drag restores, as on Edit modulation.
   The brush, undo, Clear and the grid are the Paint primitive's.
 
 ### The grid
@@ -119,20 +123,21 @@ each STFT coefficient (as in `measure_mask.py`).
 
 ### The recording
 
-A recording is shared by the tabs that use one (`../app.md`, "Layout"),
-kept in the page's memory and in a saved file, not in the document's
-history (undo does not unload a recording). It is decoded in the browser,
-mixed to mono, resampled to the page's sampling rate, and cut to 10 s
-(D10), with a note when it was cut. Loading one sets the page's duration
-to its length (the other tabs' drawings stretch, as they do when the
-duration is changed by hand).
+Built in PR #33 for Edit modulation, and reused unchanged: the page keeps
+one `recording`, shared by the tabs that use one. The browser decodes the
+file at the page's sampling rate, mixed to mono and cut to 10 s, and
+opening it sets the page's duration to its length (the other tabs'
+drawings stretch). It goes in saved files and never in links; a link whose
+source was a file opens with a note asking for it again. Opening a file
+on this tab makes it this tab's source; the Edit tab can then pick the same
+recording from its Source list, and the other way round.
 
 ### Data model
 
 ```json
 "mask": {
   "rows": 256, "columns": 256, "floor_db": -60, "window": 0.032,
-  "source": "speech" | "recording",
+  "source": "syllables" | "speech" | "file",
   "levels": "<base64 of deflated bytes, one per cell: 0 = 0 dB ... 60 = removed>"
 }
 ```
@@ -140,14 +145,16 @@ duration is changed by hand).
 and, at the page level of a saved file (never in a link):
 
 ```json
-"recording": {"name": "hello.wav", "fs": 16000, "samples": "<base64 of 16-bit PCM>"}
+"recording": {"name": "hello.wav", "fs": 16000, "pcm16": "<base64 of 16-bit PCM>"}
+
+(as now: the Edit tab's page-level recording).
 ```
 
 ### Python side
 
 `src/sonore_sketch/mask.py`, `synthesize(state) -> so.Sound`, as the other
-tabs: it takes the source (the Speech tab's sound, made by `tracks.py`, or
-the recording's samples), analyzes it with a `GaborFrame`, applies the
+tabs: it takes the source from `edit.source` (the syllable train, the
+Speech tab's sound or the recording), analyzes it with a `GaborFrame`, applies the
 gains and resynthesizes. Tests: removing a band comes out at its painted
 depth (F-M2, as a test); a blank mask gives back the source (an
 unmodified STFT resynthesizes exactly [read: `STFT`'s docstring]); a
@@ -155,28 +162,21 @@ saved document gives the same samples in Python and from the page.
 
 ## Decisions
 
-**F1. How a recording gets in.**
-(a) Open an audio file;
-(b) also record from the microphone;
-(c) also drag and drop a file onto the canvas.
-*Recommended:* (a) in this tab's first PR, then (b) and (c) as a follow-up
-PR. The microphone is the quickest way to hear your own voice filtered,
-but it needs a permission prompt and a recording control, which is a
-separate piece of work.
+**F1, F3, F6. Recordings.** Settled by the Edit modulation tab (E1),
+which took this document's recommendations and built them in PR #33: open
+a file now, with the microphone and drag and drop in a later PR; keep a
+recording in memory and in saved files, never in links; a recording sets
+the page's duration to its length, up to 10 s.
 
-**F2. What the tab filters before a recording is loaded.**
-(a) nothing ("Open a recording to start");
-(b) the Speech tab's current sound;
-(c) a short example recording shipped with the app.
-*Recommended:* (b). Play works at once, nothing needs a licence, and it
-connects the tabs: draw a vowel on Speech, then take its third formant
-out here. (c) needs a recording we may redistribute.
-
-**F3. Where the recording is kept.**
-*Recommended:* in the page's memory and in saved files (as 16-bit PCM,
-about 427 kB of text for 10 s, F-M5), never in links. A link to a drawing
-whose source was a recording opens with the mask and a note asking for the
-recording; the Speech tab's sound is used until one is opened.
+**F2. The source before a file is opened.**
+(a) the Speech tab's current sound, as first proposed;
+(b) the Edit tab's three sources (syllable train, Speech tab, file) with
+the syllable train as the default;
+(c) (b) with the Speech tab as the default.
+*Recommended:* (b). The Speech tab's default is a single 0.6 s vowel, so
+there is little to erase on it; the syllable train has formants moving,
+gaps and harmonics to take out, and the two recording tabs then work the
+same way.
 
 **F4. Frequency axis.**
 (a) linear, 0 Hz to Nyquist, as the STFT the mask applies to;
@@ -195,21 +195,12 @@ together.
 shows. The result spectrogram below stays wideband (5 ms), as on the
 other tabs.
 
-**F6. Duration.**
-*Recommended:* the page's duration follows the source: a recording sets it
-to its length (up to 10 s); with the Speech tab as source it is the page's
-duration as now. One duration rule for the whole app (`../app.md`,
-"Duration").
-
 ## Order of work
 
-After the decisions, each a PR for Cho:
-
-1. The tab with the Speech tab's sound as its source: the grid, the
-   background spectrogram, Remove and Restore, `mask.py` and its tests,
-   and the page check.
-2. Opening a recording, keeping it in saved files, the link note.
-3. The microphone and drag and drop (F1, if (b) and (c) are wanted).
+After the decisions, one PR for Cho, since recordings already exist: the
+tab with its three sources, the grid, the background spectrogram, Erase
+and Restore, `mask.py` and its tests, and the page check. The microphone
+and drag and drop follow for both recording tabs together (F1).
 
 ## References
 
