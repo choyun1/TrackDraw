@@ -52,7 +52,9 @@ instead.
 **Spectrogram.** Drag to paint at the brush's level (0 dB is the loudest);
 right-drag or **Erase** paints silence, and **Clear** erases everything.
 Size and Softness shape the brush. The **carrier** is what the painting
-shapes: log-spaced tones, harmonics of an F0, or noise.
+shapes: log-spaced tones, harmonics of an F0, or noise. The harmonic
+carrier sounds only at multiples of F0, which show as faint dashed lines;
+paint between them is silent.
 
 **Modulation.** The **Design** panels are what you draw: click the plane to
 add a blob, drag it to move it, and drag its squares to change its width

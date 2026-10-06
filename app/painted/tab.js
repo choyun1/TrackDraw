@@ -186,6 +186,23 @@ export function createPaintedTab(root, { commit, log }) {
       context.drawImage(image, g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0);
     }
 
+    // the harmonic carrier sounds only at multiples of F0, so paint between them is silent:
+    // mark each harmonic, until they come closer than a few pixels and paint anywhere sounds
+    if (state.carrier === "harmonic") {
+      context.strokeStyle = "rgba(120, 200, 255, 0.45)";
+      context.lineWidth = 1;
+      context.setLineDash([2, 3]);
+      context.beginPath();
+      for (let k = Math.ceil(state.f_lo / state.f0); k * state.f0 <= state.f_hi; k++) {
+        const y = g.y(k * state.f0);
+        if (y - g.y((k + 1) * state.f0) < 4) break;
+        context.moveTo(g.x0, Math.round(y) + 0.5);
+        context.lineTo(g.x1, Math.round(y) + 0.5);
+      }
+      context.stroke();
+      context.setLineDash([]);
+    }
+
     // axes
     context.strokeStyle = line;
     context.fillStyle = muted;
