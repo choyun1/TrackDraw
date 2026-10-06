@@ -58,7 +58,12 @@ const BAND_TOOLS = [
   { id: "freehand", label: "Freehand", key: "f", title: "Draw the band's centre; outside every band, a new band (F)" },
 ];
 
-export function createBlobsTab(root, { commit }) {
+export function createBlobsTab(root, { commit: commitDocument }) {
+  // The harmonic carrier takes iterations only with bands (bands.md, K-M5b).
+  function commit(next) {
+    commitDocument(next.carrier === "harmonic" && !next.bands?.length ? { ...next, iterations: 0 } : next);
+  }
+
   let state = null;
   let selected = null; // index of the selected blob
   let drag = null; // {kind, index, items, changed, added} while a gesture lasts
@@ -115,7 +120,7 @@ export function createBlobsTab(root, { commit }) {
           <label class="field" title="How deep the modulation is: the envelopes' rms about their mean, relative to it">Depth <input type="number" class="depth" min="0.01" max="1" step="0.01"></label>
           <button type="button" class="use-depth" hidden></button>
           <label class="field" title="Which random draw of the modulation's timing to hear">Seed <input type="number" class="seed" step="1"></label>
-          <label class="field iterations-field" title="How many times to search for a sound whose own modulation comes closer to the blobs (slower). With bands, each time goes back and forth between the blobs and the bands. Not on the harmonic carrier">Iterations <input type="number" class="iterations" min="0" max="10" step="1"></label>
+          <label class="field iterations-field" title="How many times to search for a sound whose own modulation comes closer to the blobs (slower). With bands, each time goes back and forth between the blobs and the bands. On the harmonic carrier, only with bands">Iterations <input type="number" class="iterations" min="0" max="10" step="1"></label>
           <button type="button" class="new-draw" title="Hear another draw with the same spectrum">New draw</button>
           <button type="button" class="clear" title="Remove every blob (Undo brings them back)">Clear</button>
         </fieldset>
@@ -185,7 +190,7 @@ export function createBlobsTab(root, { commit }) {
     ui.depth.value = state.rms_depth;
     ui.seed.value = state.seed;
     ui.iterations.value = state.iterations ?? 0;
-    ui.iterationsField.hidden = state.carrier === "harmonic";
+    ui.iterationsField.hidden = state.carrier === "harmonic" && !state.bands?.length;
     ui.useDepth.hidden = fits === null;
     if (fits !== null) ui.useDepth.textContent = `Use depth ${fits}`;
     const bandList = bands();
@@ -268,8 +273,7 @@ export function createBlobsTab(root, { commit }) {
   }
 
   ui.carrier.addEventListener("change", () => {
-    const carrier = ui.carrier.value; // the harmonic carrier takes no iterations
-    commit({ ...state, carrier, iterations: carrier === "harmonic" ? 0 : state.iterations });
+    commit({ ...state, carrier: ui.carrier.value });
   });
   ui.f0.addEventListener("change", () => {
     const f0 = Math.round(Number(ui.f0.value));

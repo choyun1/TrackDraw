@@ -99,7 +99,7 @@ def test_iterations_without_bands_are_to_sounds_own():
     assert np.allclose(blobs.synthesize(drawing).data, expected.data, atol=1e-9)
 
 
-def test_iterations_are_refused_on_the_harmonic_carrier():
+def test_without_bands_iterations_are_refused_on_the_harmonic_carrier():
     with pytest.raises(ValueError, match="iterations"):
         blobs.synthesize(state(carrier="harmonic", iterations=2))
 
@@ -235,9 +235,12 @@ def test_with_bands_iterations_pull_the_sound_toward_the_blobs_and_the_bands_sti
     assert sound.rms == pytest.approx(1)
 
 
-def test_with_bands_iterations_are_still_refused_on_the_harmonic_carrier():
-    with pytest.raises(ValueError, match="iterations"):
-        blobs.synthesize(state(carrier="harmonic", iterations=2, bands=[band([(0, 1000)])]))
+def test_with_bands_iterations_work_on_the_harmonic_carrier_too():
+    # bands.md, K-M5b: a gliding band, 3 s, 18.8 dB at 0 iterations and 26.0 dB at 5; asked here: 2 dB.
+    drawing = state(duration=3.0, carrier="harmonic", bands=[band([(0, 500), (3, 4000)])])
+    before = drawn_contrast(blobs.synthesize(drawing), drawing)
+    after = drawn_contrast(blobs.synthesize(drawing | {"iterations": 5}), drawing)
+    assert after - before > 2
 
 
 @pytest.mark.parametrize(

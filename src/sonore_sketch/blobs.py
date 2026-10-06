@@ -192,8 +192,9 @@ def steps(state: Mapping[str, Any]) -> Iterator[float]:
     check(state)
     if not state["items"]:
         raise ValueError("no blobs yet: add a blob to hear something")
-    if state.get("carrier") == "harmonic" and state.get("iterations", 0):
-        raise ValueError("iterations work on the tones and noise carriers only")
+    if state.get("carrier") == "harmonic" and state.get("iterations", 0) and not state.get("bands"):
+        # without bands the harmonics' own beating pulls the search away (bands.md, K-M5b)
+        raise ValueError("on the harmonic carrier, iterations need bands")
     iterations = int(state.get("iterations", 0))
     carried = {**state, "iterations": 0}  # iterations are taken below, one at a time
     try:
