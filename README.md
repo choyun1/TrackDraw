@@ -69,9 +69,9 @@ carrier (tones, harmonic or noise), the modulation depth, and the seed
 page's duration, the Speech tab's sound, or a recording (**Open audio
 file…**, which sets the duration to the recording's, up to 10 s). Each
 sound made shows the source's modulation spectrum on the plane, with a
-centre strip for rates under 1 Hz. Paint on it to cut that modulation
-(right-drag or **Erase** restores it); the brush's **Cut** goes down to
--60 dB, which removes it. The presets replace the mask: keep the rates
+centre strip for rates under 1 Hz. Paint on it to erase that modulation
+(right-drag or **Restore** brings it back); **Erase**'s **Depth** goes down
+to -60 dB, which removes it. The presets replace the mask: keep the rates
 below some Hz, or remove the downward or upward sweeps. The **carrier** is
 the source's own fine structure, tones or noise; **Iterations** search for
 a sound whose own modulation comes closer to the edit, which the source's

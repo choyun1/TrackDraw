@@ -86,12 +86,12 @@ export function createEditTab(root, { commit, openRecording, log }) {
           <p class="hint recording-note"></p>
         </fieldset>
         <fieldset><legend>Brush</legend>
-          <label class="choice" title="Cut modulation where you paint (B)"><input type="radio" name="edit-mode" value="paint" checked> Cut <kbd>B</kbd></label>
-          <label class="choice" title="Restore what was cut; right-drag erases too (E)"><input type="radio" name="edit-mode" value="erase"> Erase <kbd>E</kbd></label>
+          <label class="choice" title="Erase modulation where you paint (E)"><input type="radio" name="edit-mode" value="paint" checked> Erase <kbd>E</kbd></label>
+          <label class="choice" title="Restore what was erased; right-drag restores too (R)"><input type="radio" name="edit-mode" value="erase"> Restore <kbd>R</kbd></label>
           <label class="field" title="The brush's diameter on screen">Size <input type="range" class="size" min="4" max="80" value="24"></label>
           <label class="field" title="How much of the brush's radius fades out at its edge (a soft edge clips the sound less)">Softness <input type="range" class="softness" min="0" max="1" step="0.05" value="0.6"></label>
-          <label class="field" title="How much the brush cuts: ${FLOOR_DB} dB removes what it covers">Cut <input type="number" class="cut" min="${FLOOR_DB}" max="-1" step="1" value="${FLOOR_DB}"> dB</label>
-          <button type="button" class="clear" title="Remove every cut, so Play gives the source back (Undo brings them back)">Clear</button>
+          <label class="field" title="How deep Erase goes: ${FLOOR_DB} dB removes what it covers">Depth <input type="number" class="cut" min="${FLOOR_DB}" max="-1" step="1" value="${FLOOR_DB}"> dB</label>
+          <button type="button" class="clear" title="Restore everything, so Play gives the source back (Undo brings the erasing back)">Clear</button>
         </fieldset>
         <fieldset><legend>Presets</legend>
           <div class="preset-row">
@@ -107,7 +107,7 @@ export function createEditTab(root, { commit, openRecording, log }) {
           <label class="field" title="How many times to search for a sound whose own modulation comes closer to the edit (each one an analysis and a synthesis; slower). On the source's own fine structure, an edit needs a few to be heard">Iterations <input type="number" class="iterations" min="0" max="${MAX_ITERATIONS}" step="1"></label>
         </fieldset>
         <p class="hint coarse" hidden></p>
-        <p class="hint">Paint on the plane to cut that modulation; right-drag erases. Space plays.</p>
+        <p class="hint">Paint on the plane to erase that modulation; right-drag restores it. Space plays.</p>
       </aside>
     </div>`;
   const $ = (selector) => root.querySelector(selector);
@@ -631,8 +631,8 @@ export function createEditTab(root, { commit, openRecording, log }) {
     },
     key(event) {
       const key = event.key.toLowerCase();
-      if (key === "b") setMode("paint");
-      else if (key === "e") setMode("erase");
+      if (key === "e") setMode("paint");
+      else if (key === "r") setMode("erase");
       else return false;
       return true;
     },
