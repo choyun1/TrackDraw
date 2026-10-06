@@ -385,6 +385,20 @@ def main() -> None:
             def bands_now():
                 return page_document_in(page)["blobs"].get("bands", [])
 
+            # On the harmonic carrier, Iterations is offered only with bands (bands.md, K-M5b).
+            iterations_field = page.locator("#tab-blobs .iterations-field")
+            page.click("#tab-blobs .add-band")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            expect(iterations_field).to_be_visible()
+            page.locator("#tab-blobs .iterations").fill("1")
+            page.locator("#tab-blobs .iterations").press("Enter")
+            expect(status).to_contain_text("Made", timeout=60_000)
+            assert page_document_in(page)["blobs"]["iterations"] == 1
+            page.click("#tab-blobs .delete-band")
+            expect(iterations_field).to_be_hidden()
+            assert page_document_in(page)["blobs"]["iterations"] == 0 and bands_now() == []
+            expect(status).to_contain_text("Made", timeout=60_000)
+            print("modulation: on the harmonic carrier, Iterations shows with a band and goes with it")
             page.select_option("#tab-blobs .carrier", "tones")
             expect(status).to_contain_text("Made", timeout=60_000)
             page.click("#tab-blobs .add-band")

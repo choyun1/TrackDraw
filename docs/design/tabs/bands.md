@@ -283,6 +283,16 @@ half-octave bands, 28–31 dB for one or two octaves), as a band *w* octaves
 wide resolves density only in steps of about 1/*w* cyc/oct (K-M2).
 Without bands the search keeps climbing slowly.
 
+**K-M5b. On the harmonic carrier, iterations help only with bands.**
+[measure] The same contrast, harmonic carrier on 100 Hz, B9's blobs, 3 s,
+at 0, 1, 2, 5 and 10 iterations: with no bands (`to_sound`'s step on the
+harmonic fine structure) 23.0, 15.9, 17.1, 19.6, 21.9 dB, worse than none;
+with a 1-octave band gliding 500→4000 Hz (the loop) 18.8, 22.7, 23.9,
+26.0, 26.8 dB. Several harmonics share each carrier band and beat at F0,
+and without bands that beating keeps pulling the modulation phase away
+[inferred]. So the page offers Iterations on the harmonic carrier only when
+bands are drawn (Cho, 2026-10-06).
+
 **K-M6. Which dominates the whole sound: the blobs, unless the bands move
 fast or the blobs are shallow.** [measure] `tools/measure_dominance.py`:
 the blobs' share of the result's modulation power over the whole range,
