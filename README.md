@@ -1,8 +1,16 @@
 # sonore-sketch
 
+[![test](https://github.com/choyun1/sonore-sketch/actions/workflows/test.yml/badge.svg)](https://github.com/choyun1/sonore-sketch/actions/workflows/test.yml)
+[![pages](https://github.com/choyun1/sonore-sketch/actions/workflows/pages.yml/badge.svg)](https://github.com/choyun1/sonore-sketch/actions/workflows/pages.yml)
+[![licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE.txt)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![sonore 0.5](https://img.shields.io/badge/sonore-0.5-blue.svg)](https://pypi.org/project/sonore/)
+
 Draw on a picture of sound and hear the result.
 
 **Try it: https://choyun1.github.io/sonore-sketch/**
+
+[![The Draw modulation tab: one blob on a modulation spectrum, and the spectrogram of the sound it makes](docs/screenshot.png)](https://choyun1.github.io/sonore-sketch/)
 
 Each tab is one of [sonore](https://pypi.org/project/sonore/)'s routes back
 to sound, given a point-and-click surface. sonore does the synthesis, in
