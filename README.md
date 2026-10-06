@@ -17,7 +17,7 @@ There is nothing to install.
 | **Spectrogram** | level painted on time × log-frequency | a sound whose spectrogram is the painting (sonore's `ripple_sound`) | built |
 | **Filter recording** | erasures on a recording's spectrogram | what is left of the recording | designed, not built |
 | **Modulation** | blobs on a modulation spectrum (rate × density), and optional frequency bands | a sound with that modulation (sonore's `ModulationSpectrum.from_blobs`), confined to the bands | built |
-| **Edit modulation** | changes to a recording's modulation spectrum | the recording with its modulation repainted | designed, not built |
+| **Edit modulation** | cuts on a sound's modulation spectrum (a syllable train, the Speech tab's sound, or a recording) | the sound with that modulation taken out (sonore's `ModulationSpectrum.with_gain`) | built |
 
 Tabs that are not built yet are greyed out on the page.
 
@@ -65,6 +65,19 @@ its own modulation spectrum and its waveform, beside what you drew. The
 carrier (tones, harmonic or noise), the modulation depth, and the seed
 (**New draw** hears another random draw with the same spectrum) are below.
 
+**Edit modulation.** Choose a **source**: a syllable train made at the
+page's duration, the Speech tab's sound, or a recording (**Open audio
+file…**, which sets the duration to the recording's, up to 10 s). Each
+sound made shows the source's modulation spectrum on the plane, with a
+centre strip for rates under 1 Hz. Paint on it to cut that modulation
+(right-drag or **Erase** restores it); the brush's **Cut** goes down to
+-60 dB, which removes it. The presets replace the mask: keep the rates
+below some Hz, or remove the downward or upward sweeps. The **carrier** is
+the source's own fine structure, tones or noise; **Iterations** search for
+a sound whose own modulation comes closer to the edit, which the source's
+own fine structure needs to be heard well. A recording is kept in saved
+files but never in links.
+
 ## The same sound in Python
 
 A saved drawing gives the same sound outside the browser:
@@ -110,10 +123,11 @@ Two things to keep in step:
 
 Every tab is designed before it is built, in `docs/design/`: `app.md` for
 the page as a whole, and `tabs/` for each tab (`tracks.md` for Speech,
-`painted.md` for Spectrogram, `blobs.md` and `bands.md` for Modulation).
+`painted.md` for Spectrogram, `blobs.md` and `bands.md` for Modulation,
+`edit.md` for Edit modulation).
 Each records the measurements behind it, made by the scripts in `tools/`,
-and the decisions Cho made. The designs of Filter recording and Edit
-modulation are still in review as pull requests.
+and the decisions Cho made. The design of Filter recording is still in
+review as a pull request.
 
 ## Credits
 

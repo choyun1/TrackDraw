@@ -7,9 +7,9 @@ it, and hear the sound with that modulation removed. It reuses the
 **Paint** primitive (`painted.md`) on the Modulation tab's plane
 (`blobs.md`). Its internal tab id is `edit`.
 
-Status: proposed (2026-10-05), for Cho to decide E1–E9. The Filter
-recording design (`mask.md`, PR #14) is parked; E1 decides how a recording
-gets into the page for both tabs, since this tab now comes first.
+Status: decided (2026-10-06): Cho accepted E1–E9 as recommended. The
+Filter recording design (`mask.md`, PR #14) is parked; E1 decides how a
+recording gets into the page for both tabs, since this tab now comes first.
 
 This project is AI-assisted: the document and `tools/measure_edit.py` were
 drafted by Claude (Claude Code), for Cho to review.
@@ -258,6 +258,12 @@ After the decisions, each a PR for Cho:
 2. The Edit modulation tab: the plane with the source's spectrum, the Paint
    mask, presets, `edit.py` and its tests, playback, and the page check.
 3. The measured result spectrum below the plane, and the clipping note.
+
+Steps 1 and 2 were built together (2026-10-06), since a source has nothing
+to show it until the tab does. As built: the recording is kept on the page
+document as 16-bit samples in base64 (`recording`), and opened from the
+tab's Source box rather than the shell's Open button, which stays for
+saved drawings.
 
 ## References
 
