@@ -1,4 +1,4 @@
-// The Filter recording tab: paint over parts of a sound's spectrogram to
+// The Erase spectrogram tab: paint over parts of a sound's spectrogram to
 // turn them down or remove them, and hear what is left
 // (docs/design/tabs/mask.md).
 //
@@ -14,21 +14,22 @@
 
 import { magma } from "../colormap.js";
 import { drawWaveform, fitCanvas, niceStep } from "../plot.js";
-import { applyStroke, dab, dabsAlong, decodeLevels, encodeLevels } from "../painted/model.js";
+import { applyCut, dab, dabsAlong, decodeLevels, encodeLevels, typedNumber } from "../painted/model.js";
 import { MAX_RECORDING_S, encodePcm16, pcm16Length } from "../edit/model.js";
 import { decodeAudio } from "../edit/tab.js";
-import { COLUMNS, FLOOR_DB, ROWS, blank, isBlank } from "./model.js";
+import { COLUMNS, FLOOR_DB, ROWS, blank, isBlank, retime } from "./model.js";
 
 const MARGIN = { left: 52, right: 10, top: 8, bottom: 22 };
 const CACHE = 200; // decoded masks kept, so undo and redo are instant
 const OUTLINE_DB = 30; // the mask's outline runs where the cut crosses this
-const SOURCE_LABELS = { syllables: "Syllable train", speech: "The Speech tab's sound", file: "A recording" };
+const SOURCE_LABELS = { syllables: "Syllable train", speech: "The Draw speech tab's sound", file: "A recording" };
 const FREQUENCY_STEPS = [250, 500, 1000, 2000, 5000];
 
-export function createMaskTab(root, { commit, openRecording, log }) {
+export function createMaskTab(root, { commit, openRecording, hasRecording, log }) {
   let state = null;
   let bytes = null; // the mask shown: state's levels, decoded
   let stroke = null; // {weights, last, target, preview} while painting
+  let resultMask = null; // {bytes, duration}: the mask the result shown was made with, for its outline
   let pointer = null;
   let mode = "paint";
   let sound = null;
@@ -40,7 +41,7 @@ export function createMaskTab(root, { commit, openRecording, log }) {
     <div class="mask-body">
       <div class="paint-area">
         <section class="panel-box design-box">
-          <h3 class="panel-group" title="What you paint: cuts on the source's spectrogram">Design</h3>
+          <h3 class="panel-group" title="What you paint: what to erase from the source's spectrogram">Design</h3>
           <div class="panel-stack">
             <canvas class="filter-plane" title="The source's spectrogram (32 ms window); what you paint is turned down or removed"></canvas>
           </div>
@@ -97,7 +98,9 @@ export function createMaskTab(root, { commit, openRecording, log }) {
   async function commitBytes(next) {
     const levels = await encodeLevels(next);
     remember(levels, next);
-    commit({ ...state, levels });
+    // `bytes` are on the duration's columns (load retimes them), so the span goes
+    const { span: _span, ...rest } = state;
+    commit({ ...rest, levels });
   }
 
   async function load(next) {
@@ -112,7 +115,7 @@ export function createMaskTab(root, { commit, openRecording, log }) {
       remember(next.levels, decoded);
     }
     if (state === next) {
-      bytes = decoded;
+      bytes = retime(decoded, next.span, next.duration); // erasures kept in seconds (model.js, stretchSection)
       renderAll();
     }
   }
@@ -130,7 +133,8 @@ export function createMaskTab(root, { commit, openRecording, log }) {
   }
 
   ui.source.addEventListener("change", () => {
-    if (ui.source.value === "file" && !state.recording) {
+    // the page may hold a recording while another source is chosen
+    if (ui.source.value === "file" && !hasRecording()) {
       showSettings(); // the source changes when a recording opens
       return ui.audioFile.click();
     }
@@ -338,7 +342,8 @@ export function createMaskTab(root, { commit, openRecording, log }) {
     context.imageSmoothingEnabled = false;
     context.drawImage(cached(g, shown, null, resultImage), g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0);
     axes(context, target, g);
-    const mask = stroke?.preview ?? bytes;
+    // on the duration shown: the result keeps its own seconds, as its spectrogram does
+    const mask = resultMask && retime(resultMask.bytes, resultMask.duration, state.duration);
     if (mask && shown) {
       context.strokeStyle = "rgba(255, 255, 255, 0.6)";
       context.setLineDash([3, 3]);
@@ -385,11 +390,11 @@ export function createMaskTab(root, { commit, openRecording, log }) {
     event.preventDefault();
     canvas.setPointerCapture(event.pointerId);
     const restore = mode === "erase" || event.button === 2;
-    const cut = Math.min(-1, Math.max(FLOOR_DB, Number(ui.cut.value) || FLOOR_DB));
+    const cut = Math.min(-1, Math.max(FLOOR_DB, typedNumber(ui.cut.value, FLOOR_DB)));
     const at = geometry().cell(...local(event));
     stroke = { weights: new Float32Array(bytes.length), last: at, target: restore ? 0 : -cut, preview: null };
     dabAt(at);
-    stroke.preview = applyStroke(bytes, stroke.weights, stroke.target);
+    stroke.preview = applyCut(bytes, stroke.weights, stroke.target);
     render();
   });
   canvas.addEventListener("pointermove", (event) => {
@@ -402,7 +407,7 @@ export function createMaskTab(root, { commit, openRecording, log }) {
         for (const centre of dabsAlong(stroke.last, at, rRow, rColumn)) dabAt(centre);
         stroke.last = at;
       }
-      stroke.preview = applyStroke(bytes, stroke.weights, stroke.target);
+      stroke.preview = applyCut(bytes, stroke.weights, stroke.target);
     }
     render();
   });
@@ -437,7 +442,7 @@ export function createMaskTab(root, { commit, openRecording, log }) {
       showSettings();
       const decoded = cache.get(next.levels);
       if (decoded) {
-        bytes = decoded;
+        bytes = retime(decoded, next.span, next.duration);
         renderAll();
       } else {
         load(next);
@@ -445,6 +450,8 @@ export function createMaskTab(root, { commit, openRecording, log }) {
     },
     setResult(next) {
       sound = next ?? null;
+      // made from the drawing shown now, so from this mask; later strokes are not in it yet
+      resultMask = sound ? { bytes, duration: state.duration } : null;
       if (sound?.sourceStft) source = { key: sourceKey(state), picture: sound.sourceStft };
       renderAll();
       renderWave();

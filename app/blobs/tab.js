@@ -1,4 +1,4 @@
-// The Modulation tab: place Gaussian blobs on rate x density and hear a sound
+// The Draw modulation tab: place Gaussian blobs on rate x density and hear a sound
 // whose envelopes have that modulation spectrum (docs/design/tabs/blobs.md).
 //
 // The plane shows the drawn spectrum itself, on the grid sonore puts it on
@@ -139,7 +139,7 @@ export function createBlobsTab(root, { commit: commitDocument }) {
     removeBand: $(".delete-band"), addBand: $(".add-band"), bandMotion: $(".band-motion"), wave: $("canvas.wave"),
   };
 
-  // The bands' drawing tools, as on the Speech tab: Point moves breakpoints
+  // The bands' drawing tools, as on the Draw speech tab: Point moves breakpoints
   // (and a click on a band's line adds one, a drag inside it moves it all);
   // Line and Freehand draw a stroke that replaces the band's track over its
   // span, on the band pressed in, or make a new band when pressed outside.
@@ -292,7 +292,7 @@ export function createBlobsTab(root, { commit: commitDocument }) {
     else showSettings();
   });
   ui.iterations.addEventListener("change", () => {
-    const iterations = Math.round(Number(ui.iterations.value));
+    const iterations = Math.round(String(ui.iterations.value).trim() === "" ? NaN : Number(ui.iterations.value));
     if (iterations >= 0 && iterations <= 10 && iterations !== state.iterations) commit({ ...state, iterations });
     else showSettings();
   });
@@ -490,8 +490,10 @@ export function createBlobsTab(root, { commit: commitDocument }) {
     const near = (x, y) => Math.hypot(px - x, py - y) <= PICK_PX;
     if (selected !== null && list[selected]) {
       const s = shape(g, list[selected]);
-      if (near(...s.widthHandle)) return { kind: "rate_width", index: selected };
-      if (near(...s.heightHandle)) return { kind: "density_width", index: selected };
+      // a handle held on the centre by the plane's edge leaves the centre to Move
+      const onCentre = (handle) => Math.hypot(handle[0] - s.cx, handle[1] - s.cy) <= PICK_PX;
+      if (near(...s.widthHandle) && !onCentre(s.widthHandle)) return { kind: "rate_width", index: selected };
+      if (near(...s.heightHandle) && !onCentre(s.heightHandle)) return { kind: "density_width", index: selected };
     }
     let best = null;
     list.forEach((blob, index) => {
@@ -720,7 +722,8 @@ export function createBlobsTab(root, { commit: commitDocument }) {
     const y0 = STFT_MARGIN.top;
     const y1 = height - STFT_MARGIN.bottom;
     const { f_lo, f_hi } = state;
-    const duration = sound ? sound.samples.length / sound.fs : state.duration;
+    // the drawing's own time axis: a result of an older duration (not remade above 3 s) shows at its own times
+    const duration = state.duration;
     const span = Math.log2(f_hi / f_lo);
     return {
       width, height, x0, x1, y0, y1, duration, span,

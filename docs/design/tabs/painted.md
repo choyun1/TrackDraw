@@ -7,6 +7,9 @@ envelope is the painting. The brush, grid and canvas it is built on are the
 Edit tabs will reuse; this document designs both, and leaves what is
 particular to Mask and Edit to their own documents.
 
+On 2026-10-06 Cho renamed the tab "Paint spectrogram" on the page; this document
+keeps its earlier names.
+
 Status: decided (2026-10-05). Cho accepted every recommendation except
 P3's frequency range, which goes down to 100 Hz; the numbers below are
 measured at that range. Built: step 1 of the order of work below, then steps 2
@@ -131,7 +134,9 @@ links, so a big painting is better saved as a file (`../app.md`, D8).
   Gaussian falloff), that moves each cell toward the brush's level by the
   falloff's weight, once per pointer sample along the stroke, spaced by a
   fraction of the radius so a fast stroke is not dotted. Erase is the same
-  brush at the floor.
+  brush at the floor. As built, the edge is a raised cosine, and a stroke
+  keeps each cell's largest weight and moves the cell once when it ends,
+  so going over a spot twice in one stroke does not darken it twice.
 - **Canvas.** A `<canvas>` (not SVG: 18 432 cells), drawn as an image of
   the grid scaled to the plot, with SVG axes over it as in Tracks.
 - The Mask and Edit tabs reuse all of this with a different meaning for a

@@ -1,4 +1,4 @@
-"""The Filter recording tab's state, and the sound it describes.
+"""The Erase spectrogram tab's state, and the sound it describes.
 
 Take a sound, paint over parts of its spectrogram to turn them down or
 remove them, and hear what is left (docs/design/tabs/mask.md)::
@@ -9,12 +9,14 @@ remove them, and hear what is left (docs/design/tabs/mask.md)::
      "speech": {"mode": "klatt", "params": {...}},          # with source "speech"
      "recording": {"name": "...", "fs": 16000, "pcm16": "<base64>"}}  # with source "file"
 
-The source (F2) is the Edit modulation tab's: a Klatt syllable train, the
-Speech tab's sound, or the page's recording (``edit.source``). The mask is a
+The source (F2) is the Erase modulation tab's: a Klatt syllable train, the
+Draw speech tab's sound, or the page's recording (``edit.source``). The mask is a
 grid of cuts in dB, one byte a cell, stored as the other tabs store theirs:
 0 keeps a cell and ``-floor_db`` removes it. Its rows are equal steps of
-frequency from 0 Hz to Nyquist (F4), its columns equal fractions of the
-duration, so it stretches with the duration. The sound is
+frequency from 0 Hz to Nyquist (F4), its columns equal fractions of
+``span`` seconds (the duration when absent): erasures on a recording or the
+syllable train keep their seconds when the duration changes, and time past
+``span`` is not erased. The sound is
 ``(stft * gains).to_sound()``, sonore's least-squares resynthesis, with a
 32 ms Hann window and a hop of a quarter of it (F5).
 """
@@ -34,7 +36,7 @@ import sonore as so
 from . import edit
 
 FORMAT = 1
-SOURCES = edit.SOURCES  # F2: the Edit modulation tab's
+SOURCES = edit.SOURCES  # F2: the Erase modulation tab's
 ROWS, COLUMNS = 256, 256
 FLOOR_DB = -60.0  # a cut this deep removes the cell
 WINDOW_S = 0.032  # F5: only a long window lets a painted cut come out as painted (F-M2, F-M3)
@@ -44,7 +46,7 @@ PICTURE_FLOOR_DB = -80.0  # the pictures' range below the source's loudest cell
 def check(state: Mapping[str, Any]) -> None:
     """Raise ``ValueError`` saying what is wrong with ``state``, if anything."""
     if state.get("mask") != FORMAT:
-        raise ValueError(f"not a Filter recording state of format {FORMAT}: 'mask' is {state.get('mask')!r}")
+        raise ValueError(f"not an Erase spectrogram state of format {FORMAT}: 'mask' is {state.get('mask')!r}")
     duration, fs = state.get("duration"), state.get("fs")
     if not edit._number(duration) or not 0 < duration <= edit.MAX_DURATION:
         raise ValueError(f"'duration' must be a number of seconds in (0, {edit.MAX_DURATION:g}], not {duration!r}")
@@ -55,6 +57,9 @@ def check(state: Mapping[str, Any]) -> None:
     shape = (state.get("rows"), state.get("columns"), state.get("floor_db"), state.get("window"))
     if shape != (ROWS, COLUMNS, FLOOR_DB, WINDOW_S):
         raise ValueError(f"the mask must be {ROWS} rows x {COLUMNS} columns with a floor of {FLOOR_DB:g} dB and a {WINDOW_S:g} s window")
+    span = state.get("span")
+    if span is not None and not (edit._number(span) and span > 0):
+        raise ValueError(f"'span' must be a positive number of seconds, not {span!r}")
     cuts(state)  # decodes, and checks the size
 
 
@@ -96,11 +101,12 @@ def _weights(x: np.ndarray, centres: np.ndarray) -> np.ndarray:
     return out
 
 
-def gains(cut_db: np.ndarray, f: np.ndarray, t: np.ndarray, duration: float, fs: float) -> np.ndarray:
+def gains(cut_db: np.ndarray, f: np.ndarray, t: np.ndarray, span: float, fs: float) -> np.ndarray:
     """The mask read bilinearly, in amplitude, at each STFT coefficient
-    (frequencies ``f`` x frames ``t``); a removed cell is a gain of 0."""
+    (frequencies ``f`` x frames ``t``), its columns over ``span`` seconds,
+    held beyond the outer ones; a removed cell is a gain of 0."""
     amplitude = np.where(cut_db >= -FLOOR_DB, 0.0, 10 ** (-cut_db / 20))
-    columns = (np.arange(COLUMNS) + 0.5) / COLUMNS * duration
+    columns = (np.arange(COLUMNS) + 0.5) / COLUMNS * span
     return _weights(np.asarray(f, float), row_frequencies(fs)) @ amplitude @ _weights(np.asarray(t, float), columns).T
 
 
@@ -121,7 +127,11 @@ def steps(state: Mapping[str, Any]) -> Iterator[float]:
     yield 1 / 3
     analysis = frame().analyze(original)
     duration, fs = float(state["duration"]), float(state["fs"])
-    out = (analysis * gains(cuts(state), analysis.f, analysis.t, duration, fs)).to_sound()
+    span = float(state.get("span", duration))
+    gain = gains(cuts(state), analysis.f, analysis.t, span, fs)
+    if span < duration:  # the erasures kept their seconds; what came after them is not erased
+        gain[:, np.asarray(analysis.t) >= span] = 1.0
+    out = (analysis * gain).to_sound()
     sound = so.Sound(out.data[: original.n_samples], original.fs)
     yield 2 / 3
     # the result's STFT before it is normalized, so it is on the source's scale

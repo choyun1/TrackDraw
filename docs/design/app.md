@@ -9,8 +9,9 @@ surface. sonore does the synthesis; this project is only the interface.
 Status: accepted. Proposed 2026-10-04, replacing the TrackDraw-only
 proposal of 2026-10-03, which is now the Tracks tab (`tabs/tracks.md`).
 Cho merged it on 2026-10-05 (TrackDraw PR #3), which accepts the
-recommendations below, and the name is settled (D1). Building has started:
-the shell and the Tracks tab's first steps (see "Order of work").
+recommendations below, and the name is settled (D1). As of 2026-10-06
+every step of the order of work is built: the shell and all five tabs,
+each with its own design document in `tabs/`.
 
 This project is AI-assisted: the documents and the scripts in `tools/` were
 drafted by Claude (Claude Code) for Cho to review.
@@ -178,7 +179,7 @@ Options:
 (a) keep **TrackDraw** for the whole app, for its history and the link to
 Assmann et al. (1994), with "Tracks" as one tab;
 (b) a name that ties it to sonore, such as **sonore-sketch** (import
-`sonore_sketch`, page "sonore sketch"): it says it is the drawing front end
+`sonore_sketch`, page "sonore-sketch"): it says it is the drawing front end
 of sonore;
 (c) a name of its own, such as **Soundsketch** or **Drawn Sound**.
 For the repository: rename `choyun1/TrackDraw`, which keeps the 2016 history
@@ -269,9 +270,9 @@ The Tracks tab's own decisions (scope, track model, file format, sine-wave
 speech upstream, drawing interaction) are in `tabs/tracks.md`.
 The Painted tab's and the Paint primitive's decisions are in
 `tabs/painted.md`.
-The Modulation tab's and the Blobs primitive's decisions are in
-`tabs/blobs.md`, the Edit modulation tab's in `tabs/edit.md`, and the
-Filter recording (Mask) tab's in `tabs/mask.md`.
+The Draw modulation tab's and the Blobs primitive's decisions are in
+`tabs/blobs.md`, the Erase modulation tab's in `tabs/edit.md`, and the
+Erase spectrogram (Mask) tab's in `tabs/mask.md`.
 
 ## Order of work
 

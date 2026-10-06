@@ -1,4 +1,4 @@
-// The Modulation tab's state, the plane it is drawn on, and the picture of
+// The Draw modulation tab's state, the plane it is drawn on, and the picture of
 // the drawing (docs/design/tabs/blobs.md; sonore_sketch.blobs is the Python
 // half).
 //
@@ -144,7 +144,7 @@ export function bandCentre(points, t) {
 export function newBand(bands, duration) {
   const inside = (f) => bands.some((b) => [0, duration / 2, duration].some((t) => Math.abs(Math.log2(f / bandCentre(b.points, t))) <= b.width / 2));
   const centre = NEW_BAND_CENTRES.find((f) => !inside(f)) ?? 1000;
-  return { points: [[0, centre], [tidyTime(duration), centre]], width: 1, level: 0 };
+  return { points: [[0, centre], [Math.min(duration, tidyTime(duration)), centre]], width: 1, level: 0 };
 }
 
 export const clampBandWidth = (w) => Math.min(BAND_WIDTH_MAX, Math.max(BAND_WIDTH_MIN, w));
@@ -155,7 +155,7 @@ export const tidyHz = (f) => Math.round(f);
 
 // A Line or Freehand stroke [[t, Hz], ...] laid onto a band's points (or
 // onto none, for a new band): the stroke, simplified in octaves, replaces
-// the points within its span, as the Speech tab's tools do.
+// the points within its span, as the Draw speech tab's tools do.
 export const STROKE_TOLERANCE_OCT = 0.04;
 export function strokeOnto(points, stroke) {
   const inOctaves = stroke.map(([t, f]) => [tidyTime(t), Math.log2(f)]);
@@ -175,7 +175,7 @@ export function stretchBands(bands, from, to) {
   return bands.map((b) => {
     const points = [];
     for (const [t, f] of b.points) {
-      const next = tidyTime((t / from) * to);
+      const next = Math.min(to, tidyTime((t / from) * to));
       if (!points.length || next > points[points.length - 1][0]) points.push([next, f]);
     }
     return { ...b, points };

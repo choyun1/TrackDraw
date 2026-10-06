@@ -8,11 +8,14 @@ whose envelopes have that spectrum. The shapes, handles and dragging are the
 designs both. Its internal tab id is `blobs`, as the Spectrogram tab's is
 `painted`.
 
+On 2026-10-06 Cho renamed the tab "Draw modulation" on the page; this document
+keeps its earlier names.
+
 Status: decided (2026-10-05). Cho accepted every recommendation (B1–B9).
-Built: steps 1 and 2 of the order of work below together, so the tab arrived
-audible; step 3 (the measured result and iterations) is next. The Filter
-recording design (`mask.md`, PR #14) is parked, so nothing here depends on
-a loaded recording: a recording as carrier waits for that tab.
+Built: all three steps of the order of work below (steps 1 and 2 together,
+so the tab arrived audible; then the measured result and iterations). A
+recording as carrier is not built: the page's recording (Edit modulation,
+Filter recording) is a source to edit, not a carrier here.
 Band-limiting the sound with drawn bands is designed in `bands.md`; the
 measured result (B7) is built with it, under the plane.
 
@@ -226,7 +229,8 @@ recording would take the phase from the steady complex itself). At 3 s, with
 rate 0 left out (a harmonic complex has static spectral ripple of its own
 there), the drawn blobs stand 21–24 dB above the rest on harmonics at
 100–200 Hz, against 26 dB on tones and 15 dB on noise [measure: the B-M4
-comparison, one-off]. Iterations are not offered on it. Under the plane, the
+comparison, one-off]. Iterations are offered on it only with bands drawn
+(`bands.md`, K-M5b). Under the plane, the
 result's spectrogram (the shell's 5 ms STFT) is shown on a log-frequency
 axis over 100–6400 Hz.
 

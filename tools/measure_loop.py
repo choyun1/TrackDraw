@@ -1,7 +1,7 @@
 """Measure going back and forth between the blobs and the bands.
 
 This script runs sonore to measure it; it is not an independent check. The
-Modulation tab applies the bands last, as a time-varying filter on the
+Draw modulation tab applies the bands last, as a time-varying filter on the
 finished sound (docs/design/tabs/bands.md, K1), so the bands always hold and
 the blobs pay: the measured plane within the bands (``blobs.measured``) is
 a few dB less like the drawing than with no bands (K-M2, K-M4). The

@@ -114,9 +114,11 @@ export function createPaintedTab(root, { commit, log }) {
   }
 
   ui.carrier.addEventListener("change", () => commit({ ...state, carrier: ui.carrier.value }));
+  // The harmonic carrier needs a harmonic of F0 inside the range, or sonore has nothing to shape.
+  const hasHarmonic = (f0, f_lo, f_hi) => f0 > 0 && Math.ceil(f_lo / f0) * f0 <= f_hi;
   ui.f0.addEventListener("change", () => {
     const f0 = Number(ui.f0.value);
-    if (f0 >= 20 && f0 <= state.f_hi) commit({ ...state, f0 });
+    if (f0 >= 20 && hasHarmonic(f0, state.f_lo, state.f_hi)) commit({ ...state, f0 });
     else ui.f0.value = state.f0;
   });
   function changeRange() {
@@ -124,8 +126,10 @@ export function createPaintedTab(root, { commit, log }) {
     const f_hi = Number(ui.fHi.value);
     const ok = f_lo >= 20 && f_hi < state.fs / 2 && Math.log2(f_hi / f_lo) * state.rows_per_octave >= 2;
     if (!ok || !bytes || (f_lo === state.f_lo && f_hi === state.f_hi)) return showSettings();
-    const next = { ...state, f_lo, f_hi };
-    commitBytes(resampleRows(bytes, state, next), { f_lo, f_hi });
+    // an F0 with no harmonic left in the new range moves to its bottom, so the harmonic carrier still sounds
+    const f0 = hasHarmonic(state.f0, f_lo, f_hi) ? state.f0 : Math.ceil(f_lo);
+    const next = { ...state, f_lo, f_hi, f0 };
+    commitBytes(resampleRows(bytes, state, next), { f_lo, f_hi, f0 });
   }
   ui.fLo.addEventListener("change", changeRange);
   ui.fHi.addEventListener("change", changeRange);

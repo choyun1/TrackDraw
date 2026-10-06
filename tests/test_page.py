@@ -29,7 +29,7 @@ def test_a_saved_page_sounds_as_its_tab_does():
 
 @pytest.mark.parametrize(
     "document, message",
-    [({"app": "sonore-sketch", "version": 3}, "version 2"), ({"hello": 1}, "not a sonore sketch"), ({**PAGE, "tab": "nope"}, "unknown tab")],
+    [({"app": "sonore-sketch", "version": 3}, "version 2"), ({"hello": 1}, "not a sonore-sketch"), ({**PAGE, "tab": "nope"}, "unknown tab")],
 )
 def test_other_documents_are_refused(document, message):
     with pytest.raises(ValueError, match=message):

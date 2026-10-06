@@ -7,6 +7,9 @@ reuses the Paint primitive of `painted.md`, with a cell meaning a gain on the
 recording rather than a level of a new sound, and it uses the recordings the
 Edit modulation tab already opens (`edit.md`, E1, built in PR #33).
 
+On 2026-10-06 Cho renamed the tab "Erase spectrogram" on the page; this document
+keeps its first name, "Filter recording".
+
 Status: decided 2026-10-06. Cho accepted every recommendation (F2 (b),
 F4 (a), F5 (a)); F1, F3 and F6 were settled by the Edit modulation tab,
 which built recordings in PR #33. Built in one PR.
@@ -118,6 +121,13 @@ fractions of the duration (256), so the mask stretches with the duration
 as a painting does. A cell is a gain in dB from 0 down to −60, where −60
 means removed. Between cells the gain is read bilinearly, in amplitude, at
 each STFT coefficient (as in `measure_mask.py`).
+
+Changed 2026-10-06 (Cho, after the final check found erasures drifting):
+a recording or the syllable train does not stretch with the duration, so
+on those sources the erasures keep their seconds instead. A duration change
+records in the section the time the columns cover (`span`); time past it
+is not erased, and the next stroke puts the mask back on the duration's
+columns. On the Speech sound, which does stretch, the mask stretches too.
 
 ### The recording
 

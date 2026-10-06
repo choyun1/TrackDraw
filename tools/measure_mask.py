@@ -1,4 +1,4 @@
-"""Measure a painted mask on a recording, as the Filter recording tab would use it
+"""Measure a painted mask on a recording, as the Erase spectrogram tab would use it
 (docs/design/tabs/mask.md).
 
 This script runs sonore to measure it; it is not an independent check. A mask

@@ -7,7 +7,7 @@
 // removes one), Line (press at one end, release at the other) and Freehand
 // (a stroke, simplified to the fewest breakpoints within a tolerance).
 
-import { drawSpectrogram } from "../plot.js";
+import { drawSpectrogram, niceStep } from "../plot.js";
 import {
   TRACKS,
   clampValue,
@@ -205,7 +205,7 @@ export function createTracksTab(root, { commit }) {
       const label = element("text", { x: g.x0 - 6, y: g.y(tick), class: "tick" }, grid);
       label.textContent = panel.format ? panel.format(tick) : tick;
     }
-    const step = niceStep(doc.duration);
+    const step = niceStep(doc.duration, g.x1 - g.x0);
     for (let t = 0; t <= doc.duration + 1e-9; t += step) {
       element("line", { x1: g.x(t), x2: g.x(t), y1: g.y0, y2: g.y1, class: "time" }, grid);
     }
@@ -254,7 +254,8 @@ export function createTracksTab(root, { commit }) {
     const x1 = width - MARGIN.right;
     axis.setAttribute("viewBox", `0 0 ${width} 18`);
     axis.replaceChildren();
-    const step = niceStep(doc.duration);
+    // labels at least 44 px apart, so a phone's narrow axis does not run them together
+    const step = niceStep(doc.duration, x1 - x0);
     for (let t = 0; t <= doc.duration + 1e-9; t += step) {
       const label = element("text", { x: x0 + (t / doc.duration) * (x1 - x0), y: 12 }, axis);
       label.textContent = Number(t.toFixed(2));
@@ -440,7 +441,3 @@ export function createTracksTab(root, { commit }) {
   };
 }
 
-function niceStep(duration) {
-  for (const step of [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2]) if (duration / step <= 12) return step;
-  return 5;
-}

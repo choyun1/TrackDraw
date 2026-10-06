@@ -7,8 +7,13 @@ the original, what sonore already provides and what is missing, the checks
 behind each number, a proposed interface and data model, and the decisions
 for this tab.
 
+On 2026-10-06 Cho renamed the tab "Draw speech" on the page; this document
+keeps its earlier names.
+
 Status: accepted with `../app.md` on 2026-10-05; steps 1 and 2 of the
-order of work below are built. Written 2026-10-03 as the design for TrackDraw alone;
+order of work below are built, and from step 3 the bandwidth strips and the
+time stretch (the duration). Noise sources, value scaling, copy synthesis
+and sine-wave speech (the rest of step 3, steps 4 and 5) are not built. Written 2026-10-03 as the design for TrackDraw alone;
 on 2026-10-04 Cho broadened the project to a general drawing front end for
 sonore, so this became one tab of it. Platform, synthesis location,
 repository, generality and pinning (D2, D3, D7, D8, D9 below) now belong

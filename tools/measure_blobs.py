@@ -1,4 +1,4 @@
-"""Measure modulation blobs as the Modulation tab would use them (docs/design/tabs/blobs.md).
+"""Measure modulation blobs as the Draw modulation tab would use them (docs/design/tabs/blobs.md).
 
 This script runs sonore to measure it; it is not an independent check. A
 drawing is a list of ``so.ModulationBlob`` (rate [Hz], density [cycles/octave],
@@ -26,7 +26,7 @@ import numpy as np
 import sonore as so
 
 FS = 16000
-F_LO, F_HI = 100.0, 6400.0  # the Spectrogram tab's range (painted.md, P3)
+F_LO, F_HI = 100.0, 6400.0  # the Paint spectrogram tab's range (painted.md, P3)
 WARM_REPEATS = 3
 BLOBS = [so.ModulationBlob(4.0, 0.0), so.ModulationBlob(8.0, 1.0, level=-3.0)]
 
