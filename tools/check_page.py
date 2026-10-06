@@ -124,7 +124,8 @@ def main() -> None:
             # Freehand on the F0 strip: a rise and fall becomes a few breakpoints.
             strip = page.locator(".panel-F0 svg").bounding_box()
             sx = lambda t: strip["x"] + 52 + t / doc["duration"] * (strip["width"] - 62)  # noqa: E731
-            sy = lambda hz: strip["y"] + strip["height"] - 8 - hz / 300 * (strip["height"] - 16)  # noqa: E731
+            # The F0 strip is in octaves from 20 to 800 Hz.
+            sy = lambda hz: strip["y"] + strip["height"] - 8 - math.log2(hz / 20) / math.log2(40) * (strip["height"] - 16)  # noqa: E731
             page.keyboard.press("f")
             page.mouse.move(sx(0.05), sy(110))
             page.mouse.down()
@@ -135,12 +136,22 @@ def main() -> None:
             f0 = document_in(page)["params"]["F0"]
             assert 3 <= len(f0[0]) <= 12 and max(f0[1]) > 150, f"freehand F0 not simplified as expected: {f0}"
             print(f"freehand: F0 has {len(f0[0])} breakpoints, peak {max(f0[1]):.0f} Hz")
+            # The F0 axis can be switched to linear and back; the drawing stays.
+            log_top = page.locator(".panel-F0 .tick").last.text_content()
+            page.locator('input[name="tracks-f0-scale"][value="linear"]').check()
+            ticks = page.locator(".panel-F0 .tick").all_text_contents()
+            assert ticks == ["0", "200", "400", "600", "800"] and log_top == "800", ticks
+            assert document_in(page)["params"]["F0"] == f0, "switching the F0 axis changed the drawing"
+            page.locator('input[name="tracks-f0-scale"][value="log"]').check()
+            assert page.locator(".panel-F0 .tick").first.text_content() == "25"
+            print("F0 axis: switched to linear and back to log")
             expect(status).to_contain_text("Made", timeout=60_000)
 
             # Bandwidths: the strip shows the selected formant's, here B1.
             page.check(".show-bandwidths")
             page.keyboard.press("1")
             page.keyboard.press("l")
+            page.locator(".panel-bandwidths svg").scroll_into_view_if_needed()
             bw = page.locator(".panel-bandwidths svg").bounding_box()
             bx = lambda t: bw["x"] + 52 + t / doc["duration"] * (bw["width"] - 62)  # noqa: E731
             by = lambda hz: bw["y"] + bw["height"] - 8 - hz / 600 * (bw["height"] - 16)  # noqa: E731

@@ -134,6 +134,7 @@ canvas.measured {
 }
 .panel[hidden] { display: none; }
 .panel-formants { height: min(52vh, 380px); min-height: 220px; }
+.panel-F0 { height: min(28vh, 210px); min-height: 160px; } /* tall enough to draw pitch on: about 35 px per octave */
 .panel canvas.background { position: absolute; pointer-events: none; }
 .panel svg.surface {
   position: absolute;

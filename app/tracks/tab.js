@@ -11,13 +11,18 @@ import { drawSpectrogram } from "../plot.js";
 import {
   TRACKS,
   clampValue,
+  drawnPoints,
+  fromScale,
   insertPoint,
+  lineSpan,
   movePoint,
   nearestPoint,
   points,
   removePoint,
   replaceSpan,
-  simplify,
+  simplifyStroke,
+  toScale,
+  trackSpec,
   valueAt,
   withPoints,
 } from "./model.js";
@@ -31,7 +36,7 @@ const SELECT_PX = 7; // a press this close to another track's line selects it
 
 const PANELS = [
   { id: "formants", label: "Formants", tracks: ["F1", "F2", "F3", "F4", "F5"], ticks: [0, 1000, 2000, 3000, 4000, 5000], format: (v) => `${v / 1000}k` },
-  { id: "F0", label: "F0 (Hz)", tracks: ["F0"], ticks: [0, 100, 200, 300] },
+  { id: "F0", label: "F0 (Hz)", tracks: ["F0"], ticks: [25, 50, 100, 200, 400, 800], linearTicks: [0, 200, 400, 600, 800] },
   { id: "AV", label: "AV (dB)", tracks: ["AV"], ticks: [0, 20, 40, 60, 80] },
   { id: "bandwidths", label: "Bandwidth (Hz)", tracks: [], ticks: [0, 200, 400, 600] },
 ];
@@ -56,6 +61,13 @@ export function createTracksTab(root, { commit }) {
   let picture = null;
   let playhead = null;
   let gesture = null;
+  // How the F0 strip is spaced: a viewing choice, remembered in this browser
+  // but not part of the drawing.
+  let f0Scale = "log";
+  try {
+    if (localStorage.getItem("sonore-sketch.f0-scale") === "linear") f0Scale = "linear";
+  } catch {}
+  const scaleOf = (name) => (name === "F0" ? f0Scale : undefined);
 
   root.innerHTML = `
     <div class="tracks-body">
@@ -64,6 +76,10 @@ export function createTracksTab(root, { commit }) {
         <fieldset class="tool-group"><legend>Tool</legend></fieldset>
         <fieldset class="track-group"><legend>Track</legend></fieldset>
         <label class="check"><input type="checkbox" class="show-bandwidths"> Bandwidths</label>
+        <fieldset class="f0-scale-group" title="How the F0 strip spaces its frequencies"><legend>F0 axis</legend>
+          <label class="choice"><input type="radio" name="tracks-f0-scale" value="log"> Log (octaves)</label>
+          <label class="choice"><input type="radio" name="tracks-f0-scale" value="linear"> Linear</label>
+        </fieldset>
         <p class="hint">Space plays. 1–5 select F1–F5. Ctrl+Z undoes.</p>
       </aside>
     </div>`;
@@ -71,6 +87,16 @@ export function createTracksTab(root, { commit }) {
   const toolGroup = root.querySelector(".tool-group");
   const trackGroup = root.querySelector(".track-group");
   const showBandwidths = root.querySelector(".show-bandwidths");
+  for (const input of root.querySelectorAll('input[name="tracks-f0-scale"]')) {
+    input.checked = input.value === f0Scale;
+    input.addEventListener("change", () => {
+      f0Scale = input.value;
+      try {
+        localStorage.setItem("sonore-sketch.f0-scale", f0Scale);
+      } catch {}
+      render();
+    });
+  }
 
   for (const { id, label, key, title } of TOOLS) {
     const node = document.createElement("label");
@@ -129,7 +155,11 @@ export function createTracksTab(root, { commit }) {
   function geometry(panel) {
     const width = panel.svg.clientWidth || 600;
     const height = panel.svg.clientHeight || 100;
-    const { min, max } = TRACKS[trackList(panel)[0]];
+    const name = trackList(panel)[0];
+    const scale = scaleOf(name);
+    const { min, max } = trackSpec(name, scale);
+    // Positions go by the panel's scale: octaves on a log one.
+    const [lo, hi] = [toScale(name, min, scale), toScale(name, max, scale)];
     const x0 = MARGIN.left;
     const x1 = width - MARGIN.right;
     const y0 = MARGIN.top;
@@ -137,9 +167,9 @@ export function createTracksTab(root, { commit }) {
     return {
       width, height, x0, x1, y0, y1, min, max,
       x: (t) => x0 + (t / doc.duration) * (x1 - x0),
-      y: (v) => y1 - ((v - min) / (max - min)) * (y1 - y0),
+      y: (v) => y1 - ((toScale(name, v, scale) - lo) / (hi - lo)) * (y1 - y0),
       t: (x) => Math.min(doc.duration, Math.max(0, ((x - x0) / (x1 - x0)) * doc.duration)),
-      v: (y) => min + ((y1 - y) / (y1 - y0)) * (max - min),
+      v: (y) => fromScale(name, lo + ((y1 - y) / (y1 - y0)) * (hi - lo), scale),
     };
   }
 
@@ -150,7 +180,8 @@ export function createTracksTab(root, { commit }) {
     svg.setAttribute("viewBox", `0 0 ${g.width} ${g.height}`);
     svg.replaceChildren();
     const grid = element("g", { class: "grid" }, svg);
-    for (const tick of panel.ticks) {
+    const ticks = panel.linearTicks && trackSpec(trackList(panel)[0], scaleOf(trackList(panel)[0])).scale === "linear" ? panel.linearTicks : panel.ticks;
+    for (const tick of ticks) {
       element("line", { x1: g.x0, x2: g.x1, y1: g.y(tick), y2: g.y(tick) }, grid);
       const label = element("text", { x: g.x0 - 6, y: g.y(tick), class: "tick" }, grid);
       label.textContent = panel.format ? panel.format(tick) : tick;
@@ -169,7 +200,7 @@ export function createTracksTab(root, { commit }) {
       const isSelected = name === selected;
       const ends = [[0, pts[0][1]], ...pts, [doc.duration, pts[pts.length - 1][1]]];
       const group = element("g", { class: `track${isSelected ? " selected" : ""}`, style: `--track: ${TRACKS[name].color}; --track-bright: ${TRACKS[name].bright ?? TRACKS[name].color}` }, svg);
-      element("polyline", { points: ends.map(([t, v]) => `${g.x(t)},${g.y(v)}`).join(" ") }, group);
+      element("polyline", { points: drawnPoints(name, ends, scaleOf(name)).map(([t, v]) => `${g.x(t)},${g.y(v)}`).join(" ") }, group);
       if (names.length > 1) {
         const label = element("text", { x: g.x1 - 4, y: g.y(pts[pts.length - 1][1]) - 5, class: "track-label" }, group);
         label.textContent = name;
@@ -323,10 +354,10 @@ export function createTracksTab(root, { commit }) {
       const pts = points(doc, name);
       if (kind === "line") {
         const [a, b] = gesture.preview;
-        const span = Math.abs(geometry(panel).x(b[0]) - geometry(panel).x(a[0])) < 3 && Math.abs(a[1] - b[1]) < 1e-9 ? [a] : [a, b].sort((p, q) => p[0] - q[0]);
+        const span = Math.abs(geometry(panel).x(b[0]) - geometry(panel).x(a[0])) < 3 && Math.abs(a[1] - b[1]) < 1e-9 ? [a] : lineSpan(name, a, b, scaleOf(name));
         doc = withPoints(doc, name, span.length === 1 ? insertPoint(pts, ...span[0]).pts : replaceSpan(pts, span));
       } else if (kind === "freehand") {
-        const simplified = simplify(gesture.stroke, TRACKS[name].tolerance);
+        const simplified = simplifyStroke(name, gesture.stroke, scaleOf(name));
         doc = withPoints(doc, name, simplified.length === 1 ? insertPoint(pts, ...simplified[0]).pts : replaceSpan(pts, simplified));
       }
       gesture = null;
