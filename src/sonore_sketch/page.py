@@ -10,15 +10,15 @@ in typed arrays without copying element by element.
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 import numpy as np
 import sonore as so
 
-from . import painted, tracks
+from . import blobs, edit, painted, tracks
 
-TABS = {"tracks": tracks.synthesize, "painted": painted.synthesize}
+TABS = {"tracks": tracks.synthesize, "painted": painted.synthesize, "blobs": blobs.synthesize, "edit": edit.synthesize}
 
 # The page's document (docs/design/tabs/painted.md, "Data model"), as
 # app/document.js writes it: duration and fs for the page, a section per tab.
@@ -49,6 +49,16 @@ def tab_state(document: Mapping[str, Any], tab: str | None = None) -> dict[str, 
         return {"trackdraw": tracks.FORMAT, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page["tracks"]}
     if tab == "painted" and "painted" in page:
         return {"painted": painted.FORMAT, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page["painted"]}
+    if tab == "blobs" and "blobs" in page:
+        return {"blobs": blobs.FORMAT, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page["blobs"]}
+    if tab == "edit" and "edit" in page:
+        # the source's own drawing goes with the state: the Speech tab's, or the page's recording
+        state = {"edit": edit.FORMAT, "sonore": page.get("sonore"), "duration": page["duration"], "fs": page["fs"], **page["edit"]}
+        if state.get("source") == "speech":
+            state["speech"] = page["tracks"]
+        if state.get("source") == "file" and "recording" in page:
+            state["recording"] = page["recording"]
+        return state
     raise ValueError(f"unknown tab {tab!r}; known: {sorted(TABS)}")
 
 
@@ -91,17 +101,58 @@ def handle(request: Mapping[str, Any]) -> dict[str, Any]:
 
     Returns the sampling rate, the samples as little-endian float32 bytes
     (sonore's level: RMS 1), a spectrogram (:func:`spectrogram`), and the
-    seconds synthesis took.
+    seconds synthesis took; on the Modulation tab also the result's measured
+    modulation spectrum (``blobs.measured_picture``), and on the Edit
+    modulation tab the source's and the result's (``edit.plane_picture``)
+    and the fraction of envelope values sonore clipped.
     """
+    work = handle_steps(request)
+    while True:
+        try:
+            next(work)
+        except StopIteration as done:
+            return done.value
+
+
+def handle_steps(request: Mapping[str, Any]) -> Iterator[float]:
+    """``handle`` one step at a time: yields the fraction done (synthesis
+    takes most of it, the pictures the rest) and returns ``handle``'s
+    result. The Pyodide worker runs it between messages, so the page can
+    show progress and drop a request the drawing has outgrown."""
     tab = request.get("tab")
     if tab not in TABS:
         raise ValueError(f"unknown tab {tab!r}; known: {sorted(TABS)}")
     start = time.perf_counter()
-    sound = TABS[tab](request["state"])
+    if tab == "blobs":
+        work = blobs.steps(request["state"])
+        while True:
+            try:
+                yield 0.9 * next(work)
+            except StopIteration as done:
+                sound = done.value
+                break
+    elif tab == "edit":
+        work = edit.steps(request["state"])
+        while True:
+            try:
+                yield 0.9 * next(work)
+            except StopIteration as done:
+                sound, original, clipped = done.value
+                break
+    else:
+        sound = TABS[tab](request["state"])
+        yield 0.9
     elapsed = time.perf_counter() - start
-    return {
+    result = {
         "fs": float(sound.fs),
         "samples": np.ascontiguousarray(sound.mono().data[:, 0], dtype="<f4").tobytes(),
         "spectrogram": spectrogram(sound),
         "synthesis_s": elapsed,
     }
+    if tab == "blobs":  # the result's measured modulation spectrum, for under the plane (blobs.md, B7)
+        result["modulation"] = blobs.measured_picture(blobs.measured(sound, request["state"]))
+    if tab == "edit":  # the source's modulation spectrum and the result's, on the plane (edit.md, E7, E9)
+        result["source_modulation"] = edit.plane_picture(original)
+        result["modulation"] = edit.plane_picture(edit.analyse(sound, request["state"]))
+        result["clipped"] = clipped
+    return result

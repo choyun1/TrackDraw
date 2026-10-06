@@ -20,15 +20,19 @@
         data-caption="Paint loudness over time and frequency, and hear a sound whose spectrogram is your painting."
         title="Level painted on time × log-frequency, heard through sonore's ripple_sound">Spectrogram</button>
       <button role="tab" disabled title="Not built yet: erase parts of a recording's spectrogram and hear what is left">Filter recording</button>
-      <button role="tab" disabled title="Not built yet: place blobs of temporal and spectral modulation and hear them">Modulation</button>
-      <button role="tab" disabled title="Not built yet: repaint a recording's modulation spectrum">Edit modulation</button>
+      <button role="tab" aria-selected="false" data-tab="blobs"
+        data-caption="Place blobs on a modulation spectrum, how fast loudness changes in time (rate) and across frequency (density), and hear a sound with that modulation."
+        title="Gaussian blobs on rate × density, heard through sonore's ModulationSpectrum.from_blobs">Modulation</button>
+      <button role="tab" aria-selected="false" data-tab="edit"
+        data-caption="Paint out parts of a sound's modulation spectrum and hear what is left: cut every rate above 4 Hz from speech and it blurs into a murmur that keeps its rhythm."
+        title="Cuts painted on a sound's modulation spectrum, heard through sonore's ModulationSpectrum.with_gain and to_sound">Edit modulation</button>
     </nav>
     <div class="controls">
       <button type="button" id="play" class="primary" title="Play or stop (Space)" disabled>▶ Play</button>
       <label class="duration" title="Length of the sound, up to 10 s. Changing it stretches what is drawn.">
         <input type="number" id="duration" min="0.05" max="10" step="0.05" value="0.6"> s
       </label>
-      <label class="check" title="Hear each change as soon as it is drawn (sounds up to 3 s)"><input type="checkbox" id="autoplay" checked> Auto-play</label>
+      <label class="check" title="Hear each change as soon as it is drawn (sounds up to 3 s)"><input type="checkbox" id="autoplay"> Auto-play</label>
       <button type="button" id="reset" title="Start this tab again from its default drawing, at the default duration (Undo brings yours back)">Reset</button>
       <button type="button" id="undo" title="Undo (Ctrl+Z)">↶</button>
       <button type="button" id="redo" title="Redo (Ctrl+Shift+Z)">↷</button>
@@ -38,20 +42,19 @@
       <button type="button" id="wav" title="Save the sound as a WAV file" disabled>WAV</button>
       <button type="button" id="log-toggle" title="Show what the page did and any errors" aria-expanded="false">Log</button>
       <input type="file" id="file" accept=".json,application/json" hidden>
+      <a class="about" href="https://github.com/choyun1/sonore-sketch#readme" target="_blank" rel="noopener" title="What this page is and how each tab works, on GitHub">About ↗</a>
     </div>
   </header>
   <main>
     <p class="tab-caption" id="tab-caption"></p>
     <section class="tab-body" id="tab-tracks"></section>
     <section class="tab-body" id="tab-painted" hidden></section>
+    <section class="tab-body" id="tab-blobs" hidden></section>
+    <section class="tab-body" id="tab-edit" hidden></section>
     <section class="result">
       <div class="result-row">
         <span class="result-label">Result</span>
         <canvas id="waveform"></canvas>
-      </div>
-      <div class="result-row">
-        <span class="result-label">0–8 kHz</span>
-        <canvas id="spectrogram"></canvas>
       </div>
     </section>
     <section class="log" id="log" hidden>

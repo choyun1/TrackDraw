@@ -7,9 +7,11 @@ import { Player, wavBlob } from "./audio.js";
 import { LatestOnly, createEngine } from "./engine.js";
 import { History } from "./history.js";
 import { Log } from "./log.js";
-import { drawSpectrogram, drawWaveform } from "./plot.js";
+import { drawWaveform } from "./plot.js";
 import { encodeState, stateFromHash } from "./share.js";
-import { defaultPage, openDocument, resetTab, stretchPage, tabState, withTabState } from "./document.js";
+import { defaultPage, forLink, openDocument, resetTab, stretchPage, tabState, withRecording, withTabState } from "./document.js";
+import { createBlobsTab } from "./blobs/tab.js";
+import { createEditTab } from "./edit/tab.js";
 import { createPaintedTab } from "./painted/tab.js";
 import { clampDuration } from "./tracks/model.js";
 import { createTracksTab } from "./tracks/tab.js";
@@ -20,7 +22,7 @@ const $ = (id) => document.getElementById(id);
 const ui = {
   play: $("play"), duration: $("duration"), autoplay: $("autoplay"), reset: $("reset"), undo: $("undo"), redo: $("redo"),
   open: $("open"), save: $("save"), link: $("link"), wav: $("wav"), file: $("file"),
-  status: $("status"), versions: $("versions"), waveform: $("waveform"), spectrogram: $("spectrogram"),
+  status: $("status"), versions: $("versions"), waveform: $("waveform"),
   log: $("log"), logToggle: $("log-toggle"), logLines: $("log-lines"), logCopy: $("log-copy"), logClear: $("log-clear"),
 };
 
@@ -91,6 +93,13 @@ const commitFrom = (id) => (state) => change(withTabState(history.present, id, s
 const tabs = {
   tracks: createTracksTab($("tab-tracks"), { commit: commitFrom("tracks") }),
   painted: createPaintedTab($("tab-painted"), { commit: commitFrom("painted"), log }),
+  blobs: createBlobsTab($("tab-blobs"), { commit: commitFrom("blobs") }),
+  edit: createEditTab($("tab-edit"), {
+    commit: commitFrom("edit"),
+    // a recording belongs to the page, and sets its duration (edit.md, E1)
+    openRecording: (recording, seconds) => change(withRecording(history.present, recording, seconds)),
+    log,
+  }),
 };
 // The tab shown is not an edit (undo does not switch tabs); it is saved with
 // the document, so a link opens on the tab it was made on.
@@ -104,6 +113,8 @@ function showTab() {
     button.setAttribute("aria-selected", String(active));
   }
   for (const id of Object.keys(tabs)) $(`tab-${id}`).hidden = id !== tab.id;
+  // a tab that draws the result's waveform itself (the Modulation tab, in its Result box)
+  document.querySelector("main > .result").hidden = Boolean(tab.ownWaveform);
   $("tab-caption").textContent = tabButtons.find((b) => b.dataset.tab === tab.id)?.dataset.caption ?? "";
 }
 
@@ -120,8 +131,9 @@ function switchTab(id) {
 }
 for (const button of tabButtons) button.addEventListener("click", () => switchTab(button.dataset.tab));
 
-// The document as saved and linked: with the tab shown.
+// The document as saved and linked: with the tab shown (a link without the recording).
 const saved = () => ({ ...history.present, tab: tab.id });
+const linked = () => forLink(saved());
 
 function show() {
   const doc = history.present;
@@ -129,7 +141,7 @@ function show() {
   ui.duration.value = doc.duration;
   ui.undo.disabled = !history.past.length;
   ui.redo.disabled = !history.future.length;
-  window.history.replaceState(null, "", `${location.pathname}${location.search}#state=${encodeState(saved())}`);
+  window.history.replaceState(null, "", `${location.pathname}${location.search}#state=${encodeState(linked())}`);
 }
 
 // An edit has ended: keep it, and hear it if it is short enough.
@@ -142,36 +154,76 @@ function change(doc) {
 function afterChange() {
   const short = history.present.duration <= AUTOPLAY_MAX_S;
   if (ready && short) synthesize({ play: ui.autoplay.checked });
+  // a synthesis under way for the old drawing starts again on the new one
+  else if (ready && running) synthesize({ play: running.play });
   else if (ready) status("Press Play to hear the change.");
+}
+
+// --- synthesis progress, over the tab's main figure ------------------------------
+
+const progress = document.createElement("div");
+progress.className = "synth-progress";
+progress.innerHTML = `<div class="bar"></div><span class="label"></span>`;
+let requests = 0; // counts synthesize() calls: only the newest shows its progress
+let running = null; // {play} while a synthesis is under way
+
+// fraction from 0 to 1, undefined while it is not known yet, null to hide
+function showProgress(fraction) {
+  const figure = tab.figure;
+  if (fraction === null || !figure) return progress.remove();
+  if (progress.parentNode !== figure) figure.appendChild(progress);
+  const known = typeof fraction === "number";
+  progress.classList.toggle("unknown", !known);
+  progress.querySelector(".bar").style.width = known ? `${Math.round(100 * fraction)}%` : "";
+  progress.querySelector(".label").textContent = known ? `Synthesizing… ${Math.round(100 * fraction)}%` : "Synthesizing…";
 }
 
 // --- synthesis and playback ----------------------------------------------------
 
 async function synthesize({ play }) {
   const doc = history.present;
+  const asked = tab;
   const state = tabState(doc, tab.id);
   const key = `${tab.id} ${JSON.stringify(state)}`;
+  const mine = ++requests;
   if (result?.key === key) {
+    running = null;
+    showProgress(null);
     if (play) start(result.sound);
     return result.sound;
   }
   const blocked = tab.blocked?.();
   if (blocked) {
+    running = null;
+    showProgress(null);
     result = null;
     showResult();
     status(blocked);
     return null;
   }
   status(doc.duration > 1 ? `Synthesizing ${doc.duration} s…` : "Synthesizing…");
+  running = { play };
+  showProgress(undefined);
   let sound;
   try {
-    sound = await engine.synthesize({ tab: tab.id, state });
+    sound = await engine.synthesize({ tab: tab.id, state }, (fraction) => mine === requests && showProgress(fraction));
   } catch (error) {
+    if (mine !== requests) return null; // a newer drawing is being made; this one's failure no longer matters
+    running = null;
+    showProgress(null);
     status(`Synthesis failed: ${error.message} (see Log; Reset starts again)`, true);
     log.error(`synthesis failed: ${error.message}`, error.detail ?? "");
+    if (tab === asked && history.present === doc) tab.failed?.(error.message);
     return null;
   }
+  if (mine === requests) {
+    running = null;
+    showProgress(null);
+  }
   if (!sound) return null; // a newer drawing replaced this request
+  // The drawing changed while this was made, to one that asks for no sound
+  // (nothing drawn) or to another tab: this sound is no longer what is shown.
+  if (tab !== asked || history.present !== doc) return null;
   result = { key, doc, sound };
   showResult();
   status(`Made ${doc.duration} s in ${sound.synthesisSeconds.toFixed(2)} s.`);
@@ -186,7 +238,6 @@ function showResult() {
   const duration = result?.doc.duration ?? history.present.duration;
   tab.setResult(sound);
   drawWaveform(ui.waveform, sound?.samples, sound?.fs, duration);
-  drawSpectrogram(ui.spectrogram, sound?.spectrogram, duration, sound?.fs / 2 || 8000);
   ui.wav.disabled = !sound;
 }
 

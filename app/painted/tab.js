@@ -7,7 +7,7 @@
 // toward the brush's level by its weight when the stroke ends.
 
 import { magma } from "../colormap.js";
-import { fitCanvas } from "../plot.js";
+import { fitCanvas, niceStep } from "../plot.js";
 import {
   CARRIERS,
   applyStroke,
@@ -186,6 +186,23 @@ export function createPaintedTab(root, { commit, log }) {
       context.drawImage(image, g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0);
     }
 
+    // the harmonic carrier sounds only at multiples of F0, so paint between them is silent:
+    // mark each harmonic, until they come closer than a few pixels and paint anywhere sounds
+    if (state.carrier === "harmonic") {
+      context.strokeStyle = "rgba(120, 200, 255, 0.45)";
+      context.lineWidth = 1;
+      context.setLineDash([2, 3]);
+      context.beginPath();
+      for (let k = Math.ceil(state.f_lo / state.f0); k * state.f0 <= state.f_hi; k++) {
+        const y = g.y(k * state.f0);
+        if (y - g.y((k + 1) * state.f0) < 4) break;
+        context.moveTo(g.x0, Math.round(y) + 0.5);
+        context.lineTo(g.x1, Math.round(y) + 0.5);
+      }
+      context.stroke();
+      context.setLineDash([]);
+    }
+
     // axes
     context.strokeStyle = line;
     context.fillStyle = muted;
@@ -311,6 +328,7 @@ export function createPaintedTab(root, { commit, log }) {
 
   return {
     id: "painted",
+    figure: canvas.parentElement, // where the shell shows synthesis progress
     setDocument(next) {
       stroke = null;
       state = next;
@@ -341,10 +359,4 @@ export function createPaintedTab(root, { commit, log }) {
       return true;
     },
   };
-}
-
-// A time step whose labels are at least 44 px apart.
-function niceStep(duration, width) {
-  for (const step of [0.01, 0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2]) if ((width * step) / duration >= 44) return step;
-  return 5;
 }

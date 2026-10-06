@@ -5,7 +5,12 @@ import { History } from "../../app/history.js";
 import { decodeState, encodeState, stateFromHash } from "../../app/share.js";
 import {
   check,
+  drawnPoints,
+  lineSpan,
+  simplifyStroke,
+  trackSpec,
   clampDuration,
+  clampValue,
   defaultDocument,
   insertPoint,
   movePoint,
@@ -139,4 +144,55 @@ test("shrinking the duration never merges times into a repeat", () => {
 test("a document from a file or link with repeated times is tidied", () => {
   const doc = { ...defaultDocument(), params: { F0: [[0, 0.3, 0.3, 0.6], [125, 100, 140, 95]] } };
   assert.deepEqual(tidyDocument(doc).params.F0, [[0, 0.3, 0.6], [125, 140, 95]]);
+});
+
+test("F0 is never drawn or read below 20 Hz; other tracks still reach 0", () => {
+  assert.equal(clampValue("F0", 5), 20);
+  assert.equal(clampValue("F0", 120), 120);
+  assert.equal(clampValue("F1", -5), 0);
+  const doc = { ...defaultDocument(), params: { F0: [[0, 0.3, 0.6], [125, 8, 95]], AV: 0 } };
+  assert.deepEqual(tidyDocument(doc).params, { F0: [[0, 0.3, 0.6], [125, 20, 95]], AV: 0 });
+  assert.equal(tidyDocument({ ...doc, params: { F0: 10 } }).params.F0, 20);
+});
+
+test("F0 is drawn in octaves: a freehand stroke keeps the same detail in every octave", () => {
+  // A wobble of 1% rides on a glide from 50 to 400 Hz; at 0.02 octave
+  // tolerance (about 1.4%) it is dropped in every octave alike.
+  const stroke = Array.from({ length: 61 }, (_, i) => [i / 100, 50 * 8 ** (i / 60) * (1 + 0.01 * (i % 2))]);
+  const kept = simplifyStroke("F0", stroke);
+  assert.equal(kept.length, 2);
+  assert.ok(Math.abs(kept[1][1] - 400 * 1.0) < 5);
+});
+
+test("a Line on F0 is laid as breakpoints that stay straight in octaves", () => {
+  const span = lineSpan("F0", [0.5, 400], [0, 100]);
+  assert.deepEqual(span[0], [0, 100]);
+  assert.deepEqual(span[span.length - 1], [0.5, 400]);
+  assert.ok(span.length > 2);
+  // Halfway in time is one octave up, not 250 Hz.
+  assert.ok(Math.abs(valueAt(span, 0.25) - 200) / 200 < 0.02, `${valueAt(span, 0.25)}`);
+  // Linear tracks keep just the two ends.
+  assert.deepEqual(lineSpan("F1", [0, 500], [0.5, 900]), [[0, 500], [0.5, 900]]);
+});
+
+test("a log track is drawn along the curve sonore takes between breakpoints", () => {
+  const drawn = drawnPoints("F0", [[0, 100], [0.5, 400], [0.6, 400]]);
+  assert.ok(drawn.length > 3);
+  assert.deepEqual(drawn.find(([t]) => Math.abs(t - 0.25) < 1e-9), [0.25, 250]);
+  assert.deepEqual(drawnPoints("F1", [[0, 500], [1, 900]]), [[0, 500], [1, 900]]);
+});
+
+test("F0 is clamped to 20-800 Hz", () => {
+  assert.equal(clampValue("F0", 5), 20);
+  assert.equal(clampValue("F0", 2000), 800);
+});
+
+test("F0 can be shown linear: 0-800 Hz, strokes simplified in Hz, Lines kept to two ends", () => {
+  assert.equal(trackSpec("F0").scale, "log");
+  const linear = trackSpec("F0", "linear");
+  assert.deepEqual([linear.scale, linear.min, linear.max, linear.tolerance], ["linear", 0, 800, 1.5]);
+  assert.deepEqual(lineSpan("F0", [0, 100], [0.5, 400], "linear"), [[0, 100], [0.5, 400]]);
+  assert.deepEqual(drawnPoints("F0", [[0, 100], [0.5, 400]], "linear"), [[0, 100], [0.5, 400]]);
+  // Tracks with no linear settings stay as they are.
+  assert.equal(trackSpec("F1", "log").scale, undefined);
 });

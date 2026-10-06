@@ -41,6 +41,13 @@ def test_document_gives_the_same_samples_as_a_direct_call():
     np.testing.assert_array_equal(tracks.synthesize(DOCUMENT).data, direct.data)
 
 
+def test_f0_below_the_floor_is_raised_to_it():
+    low = {**DOCUMENT, "params": {**DOCUMENT["params"], "F0": [[0, 0.6], [5, 95]]}}
+    floored = {**DOCUMENT, "params": {**DOCUMENT["params"], "F0": [[0, 0.6], [20, 95]]}}
+    np.testing.assert_array_equal(tracks.synthesize(low).data, tracks.synthesize(floored).data)
+    assert tracks.klatt_params({**DOCUMENT, "params": {"F0": 3}})["F0"] == tracks.F0_FLOOR
+
+
 def test_a_document_survives_json():
     again = json.loads(json.dumps(DOCUMENT))
     np.testing.assert_array_equal(tracks.synthesize(again).data, tracks.synthesize(DOCUMENT).data)
@@ -90,4 +97,4 @@ def test_page_result_holds_the_samples_and_a_picture():
 
 def test_page_rejects_an_unknown_tab():
     with pytest.raises(ValueError, match="unknown tab"):
-        page.handle({"tab": "blobs", "state": {}})
+        page.handle({"tab": "mask", "state": {}})
