@@ -121,6 +121,15 @@ def main() -> None:
             page.keyboard.press("Control+z")
             assert document_in(page)["params"]["F3"] == f3
 
+            # Track keys go by physical key: 0 and the key left of 1 select F0.
+            active = lambda: page.locator(".track-group button.active").text_content()  # noqa: E731
+            page.keyboard.press("0")
+            assert active() == "F0", active()
+            page.keyboard.press("4")
+            page.keyboard.press("Backquote")
+            assert active() == "F0", active()
+            print("track keys: 0 and ` select F0")
+
             # Freehand on the F0 strip: a rise and fall becomes a few breakpoints.
             strip = page.locator(".panel-F0 svg").bounding_box()
             sx = lambda t: strip["x"] + 52 + t / doc["duration"] * (strip["width"] - 62)  # noqa: E731
