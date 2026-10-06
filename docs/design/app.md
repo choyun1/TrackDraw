@@ -9,8 +9,9 @@ surface. sonore does the synthesis; this project is only the interface.
 Status: accepted. Proposed 2026-10-04, replacing the TrackDraw-only
 proposal of 2026-10-03, which is now the Tracks tab (`tabs/tracks.md`).
 Cho merged it on 2026-10-05 (TrackDraw PR #3), which accepts the
-recommendations below, and the name is settled (D1). Building has started:
-the shell and the Tracks tab's first steps (see "Order of work").
+recommendations below, and the name is settled (D1). As of 2026-10-06
+every step of the order of work is built: the shell and all five tabs,
+each with its own design document in `tabs/`.
 
 This project is AI-assisted: the documents and the scripts in `tools/` were
 drafted by Claude (Claude Code) for Cho to review.

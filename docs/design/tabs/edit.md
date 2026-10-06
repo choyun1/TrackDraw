@@ -7,9 +7,9 @@ it, and hear the sound with that modulation removed. It reuses the
 **Paint** primitive (`painted.md`) on the Modulation tab's plane
 (`blobs.md`). Its internal tab id is `edit`.
 
-Status: decided (2026-10-06): Cho accepted E1–E9 as recommended. The
-Filter recording design (`mask.md`, PR #14) is parked; E1 decides how a
-recording gets into the page for both tabs, since this tab now comes first.
+Status: decided (2026-10-06): Cho accepted E1–E9 as recommended, and the
+tab is built (PR #33). E1 decides how a recording gets into the page for
+both this tab and Filter recording (`mask.md`, built after it in PR #36).
 
 This project is AI-assisted: the document and `tools/measure_edit.py` were
 drafted by Claude (Claude Code), for Cho to review.
@@ -160,7 +160,8 @@ A section in the version-2 page document:
 
 ### Python side
 
-`src/sonore_sketch/edit.py` with `synthesize(state, recording=None)`,
+`src/sonore_sketch/edit.py` with `synthesize(state)` (the recording comes
+in the state, as `state["recording"]`),
 registered in `page.TABS` and the worker's file list. It:
 
 - makes or takes the source;

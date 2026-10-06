@@ -242,7 +242,8 @@ blobs on the sound's envelopes *relative to the bands' gain* (as
 `measured` reads them, so the bands' motion is not what the blobs fight),
 give the gain back, put the bands on again, and repeat
 (`sonore_sketch.blobs._toward_blobs`). Without bands, iterations are
-`to_sound`'s, as before; the harmonic carrier still takes none.
+`to_sound`'s, as before; the harmonic carrier takes them only with bands
+(K-M5b, below).
 
 **K-M5. The loop gets back most of what the bands cost.** [measure]
 `tools/measure_loop.py`: the B-M4 contrast within the bands, 3 s, the

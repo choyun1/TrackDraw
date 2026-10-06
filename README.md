@@ -17,8 +17,7 @@ There is nothing to install.
 | **Spectrogram** | level painted on time × log-frequency | a sound whose spectrogram is the painting (sonore's `ripple_sound`) | built |
 | **Filter recording** | erasures on a sound's spectrogram (a syllable train, the Speech tab's sound, or a recording) | what is left of the sound (sonore's least-squares STFT resynthesis) | built |
 | **Modulation** | blobs on a modulation spectrum (rate × density), and optional frequency bands | a sound with that modulation (sonore's `ModulationSpectrum.from_blobs`), confined to the bands | built |
-| **Edit modulation** | cuts on a sound's modulation spectrum (a syllable train, the Speech tab's sound, or a recording) | the sound with that modulation taken out (sonore's `ModulationSpectrum.with_gain`) | built |
-
+| **Edit modulation** | erasures on a sound's modulation spectrum (a syllable train, the Speech tab's sound, or a recording) | the sound with that modulation taken out (sonore's `ModulationSpectrum.with_gain`) | built |
 
 ## Using it
 
@@ -35,22 +34,30 @@ made each time you finish a change.
   **Reset** starts the tab you are on again from its default drawing, at
   the default duration; Undo brings yours back.
 - **Save** writes the drawing as JSON, **Open** reads it back, **Link**
-  copies an address that opens it, and **WAV** saves the sound.
+  copies an address that opens it, and **WAV** saves the sound. A saved
+  file or a link opens on the tab it was made on.
+- Every sound is played and saved at the same peak level (−1 dBFS), so a
+  change that only turns the whole sound down is not heard; erasing a
+  loud part makes the rest louder.
 - **Log** shows what the page did and any errors, with Python's traceback.
   Its **Copy** puts the log, the versions and the current drawing on the
   clipboard, for a bug report.
 
 **Speech.** Select a track with its button, by clicking its line, or with
-the keys 1–5 for F1–F5. **Point** adds a breakpoint or drags one;
+the keys 1–5 for F1–F5 and 0 (or `` ` ``) for F0. The tools have keys too:
+P, L and F. **Point** adds a breakpoint or drags one;
 double-click removes it. **Line** replaces a span with a straight line.
 **Freehand** draws a stroke, kept as the fewest breakpoints within a small
 tolerance. With any tool, dragging a breakpoint's circle up or down moves
 it; with Line or Freehand, dragging from a circle along time draws from it
-instead.
+instead. **Bandwidths** shows a strip for the selected formant's bandwidth, and the **F0 axis** can be
+spaced in octaves (Log, from 20 to 800 Hz) or in Hz (Linear).
 
 **Spectrogram.** Drag to paint at the brush's level (0 dB is the loudest);
-right-drag or **Erase** paints silence, and **Clear** erases everything.
-Size and Softness shape the brush. The **carrier** is what the painting
+right-drag or **Erase** paints silence (B and E switch between them), and
+**Clear** erases everything. Size and Softness shape the brush. **Range**
+sets the frequencies painted, 100–6400 Hz to start with; changing it keeps
+what is painted inside the new range. The **carrier** is what the painting
 shapes: log-spaced tones, harmonics of an F0, or noise. The harmonic
 carrier sounds only at multiples of F0, which show as faint dashed lines;
 paint between them is silent.
@@ -59,7 +66,7 @@ paint between them is silent.
 add a blob, drag it to move it, and drag its squares to change its width
 and height (up to 8 blobs). **Add band** confines the sound to a band of
 frequencies that you reshape on the spectrogram with Point, Line or
-Freehand. The **Result** panels are measured from the sound that came out:
+Freehand (P, L, F); Delete removes the selected blob, band or breakpoint. The **Result** panels are measured from the sound that came out:
 its own modulation spectrum and its waveform, beside what you drew. The
 carrier (tones, harmonic or noise), the modulation depth, and the seed
 (**New draw** hears another random draw with the same spectrum) are below.
@@ -70,8 +77,9 @@ file…**); a recording opened on either tab can be the other's source too.
 The plane shows the source's spectrogram from 0 Hz to half the sampling
 rate, on a linear axis so harmonics are evenly spaced lines. Paint on it to
 erase that part of the sound (right-drag or **Restore** brings it back);
-**Erase**'s **Depth** goes down to -60 dB, which removes it. The
-**Result** panel shows the spectrogram of what came out, in the same
+**Erase**'s **Depth** goes down to -60 dB, which removes it (E and R switch
+between Erase and Restore; Erase never makes something already erased
+come back). The **Result** panel shows the spectrogram of what came out, in the same
 window and on the same scale, with what you erased outlined, and its
 waveform.
 
@@ -80,14 +88,14 @@ page's duration, the Speech tab's sound, or a recording (**Open audio
 file…**, which sets the duration to the recording's, up to 10 s). Each
 sound made shows the source's modulation spectrum on the plane, with a
 centre strip for rates under 1 Hz. Paint on it to erase that modulation
-(right-drag or **Restore** brings it back); **Erase**'s **Depth** goes down
-to -60 dB, which removes it. The presets replace the mask: keep the rates
+(right-drag or **Restore** brings it back; E and R switch between them);
+**Erase**'s **Depth** goes down to -60 dB, which removes it. The presets replace the mask: keep the rates
 below some Hz, or remove the downward or upward sweeps. The **carrier** is
 the source's own fine structure, tones or noise; **Iterations** search for
 a sound whose own modulation comes closer to the edit, which the source's
 own fine structure needs to be heard well. The **Result** panels show the
-sound that came out: its own modulation spectrum, measured, with the cuts
-outlined over it, its spectrogram and its waveform. When an edit needs
+sound that came out: its own modulation spectrum, measured, with what was
+erased outlined over it, its spectrogram and its waveform. When an edit needs
 envelopes below zero, sonore clips them and a note under the plane says how
 much. A recording is kept in saved files but never in links.
 
