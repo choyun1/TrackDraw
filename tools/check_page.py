@@ -151,6 +151,7 @@ def main() -> None:
             page.check(".show-bandwidths")
             page.keyboard.press("1")
             page.keyboard.press("l")
+            page.locator(".panel-bandwidths svg").scroll_into_view_if_needed()
             bw = page.locator(".panel-bandwidths svg").bounding_box()
             bx = lambda t: bw["x"] + 52 + t / doc["duration"] * (bw["width"] - 62)  # noqa: E731
             by = lambda hz: bw["y"] + bw["height"] - 8 - hz / 600 * (bw["height"] - 16)  # noqa: E731
