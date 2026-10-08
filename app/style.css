@@ -251,9 +251,6 @@ canvas.measured {
 }
 
 .status {
-  position: sticky;
-  bottom: 0;
-  background: var(--bg);
   display: flex;
   justify-content: space-between;
   gap: 12px;
