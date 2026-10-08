@@ -48,12 +48,27 @@ window.addEventListener("unhandledrejection", (event) =>
   log.error(`page error: ${event.reason?.message ?? event.reason}`, event.reason?.stack ?? ""),
 );
 
+// Loading the synthesizer takes a while on a first visit: say so under the header, with a clock
+const loadStart = performance.now();
+const loadClock = setInterval(() => {
+  $("loading-time").textContent = `${((performance.now() - loadStart) / 1000).toFixed(0)} s`;
+}, 1000);
+function loading(text, failed = false) {
+  $("loading-step").textContent = text.replace(/ \(\d+(\.\d+)? s\)$/, "");
+  $("loading").classList.toggle("failed", failed);
+  if (failed) {
+    clearInterval(loadClock);
+    ui.play.textContent = "▶ Play";
+  }
+}
+
 const engineKind = new URLSearchParams(location.search).get("engine") ?? "pyodide";
 log.info(`page opened, engine: ${engineKind}`, navigator.userAgent);
 let ready = false;
 const engine = new LatestOnly(
   createEngine(engineKind, {
     onProgress: (text) => {
+      loading(text);
       status(text);
       log.info(text);
     },
@@ -62,10 +77,14 @@ const engine = new LatestOnly(
       log.info(`ready: ${versions}`);
       ui.versions.textContent = versions;
       ui.play.disabled = false;
+      ui.play.textContent = "▶ Play";
+      clearInterval(loadClock);
+      $("loading").hidden = true;
       status("Ready. Draw, then press Play.");
       synthesize({ play: false });
     },
     onFailed: (message) => {
+      loading(`Could not start the synthesizer: ${message} (see Log)`, true);
       status(`Could not start the synthesizer: ${message} (see Log)`, true);
       log.error(`could not start the synthesizer: ${message}`);
     },
